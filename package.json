@@ -48,7 +48,7 @@
     "recharts": "^3.10.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz",
     "zod": "^4.4.3",
     "zustand": "^5.0.14"
   },
@@ -64,5 +64,10 @@
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.3"
+  },
+  "overrides": {
+    "pptxgenjs": {
+      "image-size": "^0.13.0"
+    }
   }
 }
