@@ -1,6 +1,6 @@
 {
   "name": "Vivexa - Enterprise AI Decision Intelligence Engine V3.0",
-  "description": "Autonomous Decision Intelligence Engine for enterprise data auditing, data cleaning, advanced statistical testing, real-time ML training, command palette orchestration, and executive decision reports.",
+  "description": "Enterprise-grade AI Decision Intelligence Platform powered by a React + Vite + TypeScript + Tailwind CSS frontend, Node.js/Express backend, PostgreSQL/Supabase database, and Google Gemini AI.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

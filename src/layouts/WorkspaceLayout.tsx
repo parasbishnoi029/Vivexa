@@ -4,7 +4,7 @@ import {
   BarChart3, Bot, FileText, LayoutTemplate, Bookmark, Activity, ScrollText,
   Shield, HelpCircle, MessageSquare, ChevronDown, Moon, Sun, Command, Users, CreditCard, Key,
   Network, Cable, TerminalSquare, Workflow, Blocks, ActivitySquare, BookOpen, Menu, X,
-  Boxes, Layers, Globe, Brain, Building2, User, Plus
+  Boxes, Layers, Globe, Brain, Building2, User, Plus, Wifi, WifiOff
 } from "lucide-react";
 import { AppBackground } from "@/components/layout/AppBackground";
 import { motion, AnimatePresence } from "motion/react";
@@ -64,6 +64,26 @@ export default function WorkspaceLayout() {
   const [headerSearch, setHeaderSearch] = useState("");
   const [healthStatus, setHealthStatus] = useState<'online' | 'degraded' | 'offline'>('online');
   const [latency, setLatency] = useState<number | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast.success("Network connection restored. Back online!", { id: "network-status" });
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast.error("Network connection lost. Some features might be offline.", { id: "network-status" });
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   const { selectedWorkspaceId, setSelectedWorkspaceId } = useWorkspaceStore();
   const [workspaces, setWorkspaces] = useState<any[]>([]);
@@ -166,7 +186,7 @@ export default function WorkspaceLayout() {
       }
     }
     loadWorkspaces();
-  }, [user, selectedWorkspaceId]);
+  }, [user?.id]);
 
   const handleCreateWorkspace = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -384,37 +404,63 @@ export default function WorkspaceLayout() {
                 </nav>
               </div>
 
-              {/* Robust Polled Sandbox Health Indicator */}
-              <div className="rounded-xl bg-slate-950/30 border border-slate-800/30 p-2.5 flex items-center justify-between text-[11px] font-mono">
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-2 w-2">
-                    {healthStatus === 'online' && (
-                      <>
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                      </>
+              {/* Robust Status Indicator Block */}
+              <div className="rounded-xl bg-slate-950/30 border border-slate-800/30 p-2.5 space-y-2 text-[11px] font-mono">
+                {/* Network Status */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {isOnline ? (
+                      <Wifi className="h-3.5 w-3.5 text-emerald-400" />
+                    ) : (
+                      <WifiOff className="h-3.5 w-3.5 text-rose-500 animate-pulse" />
                     )}
-                    {healthStatus === 'degraded' && (
-                      <>
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                      </>
-                    )}
-                    {healthStatus === 'offline' && (
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-                    )}
-                  </span>
-                  <span className="text-slate-400">Sandbox API:</span>
-                  <span className={`font-bold uppercase ${
-                    healthStatus === 'online' ? 'text-emerald-400' :
-                    healthStatus === 'degraded' ? 'text-amber-400' : 'text-rose-400'
-                  }`}>
-                    {healthStatus}
-                  </span>
+                    <span className="text-slate-400">Network:</span>
+                    <span className={`font-bold uppercase ${isOnline ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {isOnline ? 'Connected' : 'Offline'}
+                    </span>
+                  </div>
+                  {!isOnline && (
+                    <span className="flex h-1.5 w-1.5 relative">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500"></span>
+                    </span>
+                  )}
                 </div>
-                {latency !== null && (
-                  <span className="text-[10px] text-slate-500">{latency}ms</span>
-                )}
+
+                <div className="h-[1px] bg-slate-800/20 my-1" />
+
+                {/* Sandbox API Status */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2 w-2">
+                      {healthStatus === 'online' && (
+                        <>
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </>
+                      )}
+                      {healthStatus === 'degraded' && (
+                        <>
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                        </>
+                      )}
+                      {healthStatus === 'offline' && (
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                      )}
+                    </span>
+                    <span className="text-slate-400">Sandbox API:</span>
+                    <span className={`font-bold uppercase ${
+                      healthStatus === 'online' ? 'text-emerald-400' :
+                      healthStatus === 'degraded' ? 'text-amber-400' : 'text-rose-400'
+                    }`}>
+                      {healthStatus}
+                    </span>
+                  </div>
+                  {latency !== null && (
+                    <span className="text-[10px] text-slate-500">{latency}ms</span>
+                  )}
+                </div>
               </div>
             </div>
           </motion.aside>
@@ -719,6 +765,31 @@ export default function WorkspaceLayout() {
           onClearAllRead={clearAllRead}
         />
         <QuotaLimitModal />
+
+        {/* Floating Network Offline Status Banner */}
+        <AnimatePresence>
+          {!isOnline && (
+            <motion.div
+              initial={{ opacity: 0, y: 50, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 50, scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 350, damping: 25 }}
+              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4"
+            >
+              <div className="bg-rose-950/90 backdrop-blur-md border border-rose-500/30 rounded-2xl shadow-xl shadow-rose-950/20 p-4 flex items-center gap-3.5">
+                <div className="h-10 w-10 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-400 border border-rose-500/25 shrink-0 animate-pulse">
+                  <WifiOff className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-xs font-bold text-white tracking-tight">Offline Connection Mode</h4>
+                  <p className="text-[10px] text-rose-200 mt-0.5 leading-relaxed">
+                    Network loss detected. Some interactive metrics & AI streams are suspended.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* New Workspace Modal */}
         <AnimatePresence>

@@ -17,6 +17,7 @@ import { useSearchParams, Link } from "react-router-dom";
 import { toast } from "sonner";
 import { createNotification } from "@/lib/notifications";
 import { getAiUsageCount, getQuotaLimit } from "@/lib/telemetry";
+import { useTheme } from "@/providers/ThemeProvider";
 
 const TABS = [
   { id: "overview", label: "Settings Overview", icon: LayoutDashboard },
@@ -42,6 +43,7 @@ const TABS = [
 
 export default function WorkspaceSettings() {
   const { user, session } = useAuthStore();
+  const { theme, setTheme } = useTheme();
   const token = session?.access_token;
   const initials = user?.email?.substring(0, 2).toUpperCase() || 'U';
 
@@ -359,7 +361,10 @@ Thank you for scaling with Vivexa!
     try {
       const { data, error } = await supabase.from('settings').select('*').eq('user_id', user?.id).maybeSingle();
       if (!error && data) {
-        if (data.theme) setThemeMode(data.theme);
+        if (data.theme) {
+          setThemeMode(data.theme);
+          setTheme(data.theme as any);
+        }
         
         // Use JSONB metadata for extra fields if needed, or fallback to state
         if (data.preferences) {
@@ -1137,14 +1142,14 @@ Thank you for scaling with Vivexa!
                 <div className="space-y-6 text-xs">
                   <div>
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Globe className="h-5 w-5 text-indigo-400" /> Language & Localization Parameters
+                      <Globe className="h-5 w-5 text-indigo-400" /> Language, Appearance & Localization Parameters
                     </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Configure preferred translation mappings and time variables.</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Configure preferred translation mappings, time variables, and visual design themes.</p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-slate-400">Display Language</label>
+                      <label className="text-slate-400 font-bold">Display Language</label>
                       <select
                         className="w-full h-10 px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-950/60 text-slate-200 focus:outline-none"
                         value={displayLanguage}
@@ -1161,7 +1166,7 @@ Thank you for scaling with Vivexa!
                       </select>
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-slate-400">Timezone Offset</label>
+                      <label className="text-slate-400 font-bold">Timezone Offset</label>
                       <select
                         className="w-full h-10 px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-950/60 text-slate-200 focus:outline-none"
                         value={displayTimezone}
@@ -1175,6 +1180,50 @@ Thank you for scaling with Vivexa!
                         <option value="UTC">UTC (Coordinated Time)</option>
                         <option value="US/Eastern">US/Eastern (EST -5:00)</option>
                       </select>
+                    </div>
+                  </div>
+
+                  {/* Visual Theme Mode Selector with Premium Cards */}
+                  <div className="space-y-3 pt-6 border-t border-slate-800/60">
+                    <label className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                      <Palette className="h-4 w-4 text-indigo-400" /> Visual Theme Preference
+                    </label>
+                    <p className="text-[11px] text-slate-400">Choose between a dark luxury workspace, an airy light canvas, or synchronized system levels.</p>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {[
+                        { id: "dark", name: "Dark Theme", desc: "Premium dark slate & cobalt tones", style: "bg-slate-950 text-slate-200 border-slate-850" },
+                        { id: "light", name: "Light Theme", desc: "Clean, high-contrast crisp ivory", style: "bg-white text-slate-900 border-slate-200" },
+                        { id: "system", name: "System Level", desc: "Matches device-level configuration", style: "bg-gradient-to-r from-slate-950 to-white text-slate-400 border-slate-800" }
+                      ].map((t) => {
+                        const isSelected = themeMode === t.id;
+                        return (
+                          <div 
+                            key={t.id}
+                            onClick={() => {
+                              setThemeMode(t.id as any);
+                              setTheme(t.id as any);
+                              saveSetting('theme', t.id);
+                              toast.success(`Theme mode updated to: ${t.name}`);
+                            }}
+                            className={`p-4 rounded-xl cursor-pointer border transition-all duration-300 relative overflow-hidden group flex flex-col justify-between h-28 ${isSelected ? 'border-indigo-500 bg-indigo-500/5 shadow-lg shadow-indigo-500/10 scale-[1.02]' : 'border-slate-800 bg-slate-950/30 hover:border-slate-700'}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-slate-200">{t.name}</span>
+                              {isSelected && (
+                                <span className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-slate-400 mt-1">{t.desc}</p>
+                              {/* Miniature preview card */}
+                              <div className={`mt-2 h-4 w-full rounded border ${t.style} flex items-center px-1 text-[8px] font-mono overflow-hidden`}>
+                                Aa
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>

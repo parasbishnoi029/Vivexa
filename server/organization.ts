@@ -1092,7 +1092,7 @@ organizationRouter.post('/test-smtp', async (req: express.Request, res: express.
         pass: smtp_password
       },
       connectTimeout: 5000
-    });
+    } as any);
 
     const targetRecipient = recipient || user.email || "info.vivexa@gmail.com";
     const senderEmail = from_email || smtp_user;

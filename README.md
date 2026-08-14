@@ -3,7 +3,7 @@
 # Vivexa Open-Source Decision Intelligence Platform
 ### Domain-Aware AI Analytics, Executive Briefings & Predictive Intelligence
 
-[![CI/CD Pipeline](https://github.com/vivexa-ai/vivexa/actions/workflows/ci.yml/badge.svg)](https://github.com/vivexa-ai/vivexa/actions/workflows/ci.yml)
+[![CI/CD Pipeline](https://github.com/parasbishnoi029/Vivexa-Ai/actions/workflows/ci.yml/badge.svg)](https://github.com/parasbishnoi029/Vivexa-Ai/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19.x-cyan.svg)](https://react.dev/)
@@ -109,8 +109,8 @@ To keep documentation transparent and authentic for developers and recruiters, h
 
 ### 1. Clone the Workspace
 ```bash
-git clone https://github.com/vivexa-ai/vivexa.git
-cd vivexa
+git clone https://github.com/parasbishnoi029/Vivexa-Ai.git
+cd Vivexa-Ai
 ```
 
 ### 2. Configure Local Secrets

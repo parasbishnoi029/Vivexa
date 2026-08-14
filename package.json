@@ -2,6 +2,7 @@
   "name": "react-example",
   "private": true,
   "version": "0.0.0",
+  "description": "Enterprise-grade AI Decision Intelligence Platform powered by a React + Vite + TypeScript + Tailwind CSS frontend, Node.js/Express backend, PostgreSQL/Supabase database, and Google Gemini AI.",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
