@@ -4,11 +4,13 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   Search, Database, FolderKanban, MessageSquare, FileText, Loader2, Filter,
   Settings, Key, CreditCard, Shield, Users, Sparkles, Cpu, LineChart,
-  TerminalSquare, Workflow, Blocks, ActivitySquare, BookOpen, Layers, Zap, ExternalLink
+  TerminalSquare, Workflow, Blocks, ActivitySquare, BookOpen, Layers, Zap, ExternalLink,
+  Lock, ShieldCheck, ShieldAlert
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
+import { SearchIndexService, SearchHit, fuzzyMatch, maskSensitiveData } from "@/services/searchIndexService";
 
 const container = {
   hidden: { opacity: 0 },
@@ -19,18 +21,6 @@ const itemVariants = {
   hidden: { opacity: 0, y: 10 },
   show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 350, damping: 25 } }
 };
-
-interface SearchHit {
-  id?: string;
-  title: string;
-  subtitle?: string;
-  type: "Navigation" | "Settings" | "Ecosystem" | "Column" | "Project" | "Dataset" | "Report" | "AI Conversation" | "Action";
-  link: string;
-  icon: any;
-  color: string;
-  bg: string;
-  action?: () => void;
-}
 
 const COMMAND_ACTIONS: SearchHit[] = [
   { title: "Invite Team Member", subtitle: "Grant workspace access to a new user", type: "Action", link: "/workspace/organization?openInvite=true", icon: Users, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
@@ -129,91 +119,59 @@ export default function GlobalSearch() {
       try {
         const qLower = query.toLowerCase();
 
-        // 1. Database Hits
-        let projectHits: SearchHit[] = [];
-        let datasetHits: SearchHit[] = [];
-        let reportHits: SearchHit[] = [];
-        let chatHits: SearchHit[] = [];
-
+        // 1. Fetch Secured and Fuzzy-Matched Database Hits
+        let dbHits: SearchHit[] = [];
         if (user) {
-          const [projectsRes, datasetsRes, reportsRes, chatsRes] = await Promise.all([
-            supabase.from('projects').select('id, name, description, created_at').eq('owner_id', user.id).ilike('name', `%${query}%`).limit(5),
-            supabase.from('datasets').select('id, name, row_count, rows, metadata, created_at').eq('user_id', user.id).ilike('name', `%${query}%`).limit(5),
-            supabase.from('reports').select('id, title, summary, created_at').eq('user_id', user.id).ilike('title', `%${query}%`).limit(5),
-            supabase.from('ai_conversations').select('id, title, last_message, created_at').eq('user_id', user.id).ilike('title', `%${query}%`).limit(5),
-          ]);
-
-          projectHits = (projectsRes.data || []).map(p => ({
-            id: p.id,
-            title: p.name,
-            subtitle: p.description || "Enterprise Workspace Project",
-            type: "Project",
-            link: "/workspace/projects",
-            icon: FolderKanban,
-            color: "text-amber-400",
-            bg: "bg-amber-500/10 border-amber-500/20"
-          }));
-
-          datasetHits = (datasetsRes.data || []).map(d => ({
-            id: d.id,
-            title: d.name,
-            subtitle: `${(d.row_count ?? (d as any).rows ?? (d as any).metadata?.row_count ?? 0).toLocaleString()} rows • Active Dataset Asset`,
-            type: "Dataset",
-            link: `/workspace/datasets`,
-            icon: Database,
-            color: "text-indigo-400",
-            bg: "bg-indigo-500/10 border-indigo-500/20"
-          }));
-
-          reportHits = (reportsRes.data || []).map(r => ({
-            id: r.id,
-            title: r.title,
-            subtitle: r.summary || "Executive Strategic Analysis Briefing",
-            type: "Report",
-            link: "/workspace/reports",
-            icon: FileText,
-            color: "text-blue-400",
-            bg: "bg-blue-500/10 border-blue-500/20"
-          }));
-
-          chatHits = (chatsRes.data || []).map(c => ({
-            id: c.id,
-            title: c.title,
-            subtitle: c.last_message || "Conversational AI Scientist Thread",
-            type: "AI Conversation",
-            link: "/workspace/ai/chat",
-            icon: MessageSquare,
-            color: "text-purple-400",
-            bg: "bg-purple-500/10 border-purple-500/20"
-          }));
+          dbHits = await SearchIndexService.searchAndSecure(query, user.id);
         }
 
-        // 2. System Features & Column Index search
-        const featureHits = ALL_SYSTEM_FEATURES.filter(item => 
-          item.title.toLowerCase().includes(qLower) || 
-          (item.subtitle && item.subtitle.toLowerCase().includes(qLower)) ||
-          item.type.toLowerCase().includes(qLower)
-        );
+        // Attach Icons properly to Database search hits
+        const securedDbHits = dbHits.map(h => {
+          let icon = Search;
+          if (h.type === "Project") icon = FolderKanban;
+          else if (h.type === "Dataset") icon = Database;
+          else if (h.type === "Report") icon = FileText;
+          else if (h.type === "AI Conversation") icon = MessageSquare;
 
-        const columnHits = DATASET_COLUMN_INDEX.filter(item => 
-          item.title.toLowerCase().includes(qLower) || 
-          (item.subtitle && item.subtitle.toLowerCase().includes(qLower))
-        );
+          return { ...h, icon };
+        });
 
-        const actionHits = COMMAND_ACTIONS.filter(item =>
-          item.title.toLowerCase().includes(qLower) ||
-          item.subtitle?.toLowerCase().includes(qLower)
-        );
+        // 2. Perform secured fuzzy-matching on static system features & column indexes
+        const localFeaturesScored = ALL_SYSTEM_FEATURES.map(item => {
+          const titleMatch = fuzzyMatch(item.title, query);
+          const subtitleMatch = item.subtitle ? fuzzyMatch(item.subtitle, query) : { matches: false, score: 0 };
+          const matches = titleMatch.matches || subtitleMatch.matches;
+          const score = Math.max(titleMatch.score, subtitleMatch.score * 0.8);
+          return { item, matches, score };
+        }).filter(x => x.matches);
 
-        // Merge & deduplicate results
+        const localColumnsScored = DATASET_COLUMN_INDEX.map(item => {
+          const titleMatch = fuzzyMatch(item.title, query);
+          const subtitleMatch = item.subtitle ? fuzzyMatch(item.subtitle, query) : { matches: false, score: 0 };
+          const matches = titleMatch.matches || subtitleMatch.matches;
+          const score = Math.max(titleMatch.score, subtitleMatch.score * 0.8);
+          return { item, matches, score };
+        }).filter(x => x.matches);
+
+        const localActionsScored = COMMAND_ACTIONS.map(item => {
+          const titleMatch = fuzzyMatch(item.title, query);
+          const subtitleMatch = item.subtitle ? fuzzyMatch(item.subtitle, query) : { matches: false, score: 0 };
+          const matches = titleMatch.matches || subtitleMatch.matches;
+          const score = Math.max(titleMatch.score, subtitleMatch.score * 0.8);
+          return { item, matches, score };
+        }).filter(x => x.matches);
+
+        // Map scored items back to search hits
+        const matchedLocalFeatures = localFeaturesScored.sort((a,b) => b.score - a.score).map(x => x.item);
+        const matchedLocalColumns = localColumnsScored.sort((a,b) => b.score - a.score).map(x => x.item);
+        const matchedLocalActions = localActionsScored.sort((a,b) => b.score - a.score).map(x => x.item);
+
+        // Merge, de-duplicate and prioritize
         const combined = [
-          ...actionHits,
-          ...projectHits,
-          ...datasetHits,
-          ...reportHits,
-          ...chatHits,
-          ...featureHits,
-          ...columnHits
+          ...matchedLocalActions,
+          ...securedDbHits,
+          ...matchedLocalFeatures,
+          ...matchedLocalColumns
         ];
 
         const uniqueMap = new Map<string, SearchHit>();
@@ -235,6 +193,7 @@ export default function GlobalSearch() {
     const timer = setTimeout(performSearch, 150);
     return () => clearTimeout(timer);
   }, [query, user]);
+
 
   const handleQueryChange = (val: string) => {
     setQuery(val);
@@ -418,16 +377,49 @@ export default function GlobalSearch() {
                         <ResultIcon className={`h-5 w-5 ${result.color}`} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-sm font-bold transition-colors truncate ${isSelected ? "text-indigo-300" : "text-slate-200"}`}>{result.title}</span>
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border uppercase tracking-wider shrink-0 ${
-                            isSelected ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/30" : "bg-slate-800 text-slate-400 border-slate-700/60"
-                          }`}>
-                            {result.type}
-                          </span>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`text-sm font-bold transition-colors truncate ${isSelected ? "text-indigo-300" : "text-slate-200"}`}>{result.title}</span>
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border uppercase tracking-wider shrink-0 ${
+                              isSelected ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/30" : "bg-slate-800 text-slate-400 border-slate-700/60"
+                            }`}>
+                              {result.type}
+                            </span>
+                          </div>
+
+                          {/* Security Classification Badges */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {result.securityClassification === "CONFIDENTIAL" && (
+                              <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border bg-rose-500/10 border-rose-500/20 text-rose-400 flex items-center gap-0.5 shadow-sm">
+                                <Lock className="h-2.5 w-2.5" /> Confidential
+                              </span>
+                            )}
+                            {result.securityClassification === "SENSITIVE_PII" && (
+                              <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border bg-amber-500/10 border-amber-500/20 text-amber-400 flex items-center gap-0.5 shadow-sm">
+                                <ShieldAlert className="h-2.5 w-2.5" /> Sensitive PII
+                              </span>
+                            )}
+                            {result.securityClassification === "PUBLIC" && (
+                              <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border bg-emerald-500/10 border-emerald-500/20 text-emerald-400 flex items-center gap-0.5 shadow-sm">
+                                <ShieldCheck className="h-2.5 w-2.5" /> Public Asset
+                              </span>
+                            )}
+                            {result.isMasked && (
+                              <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider border bg-sky-500/10 border-sky-500/20 text-sky-400 flex items-center gap-0.5 shadow-sm" title="Sensitive elements automatically masked by Data Shield">
+                                Masked
+                              </span>
+                            )}
+                          </div>
                         </div>
                         {result.subtitle && (
-                          <div className="text-xs text-slate-400 truncate mt-0.5">{result.subtitle}</div>
+                          <div className="text-xs text-slate-400 truncate mt-1 flex items-center gap-1.5">
+                            {result.subtitle}
+                          </div>
+                        )}
+                        {result.securityWarning && (
+                          <div className="text-[10px] text-amber-400 font-semibold mt-1 flex items-center gap-1">
+                            <ShieldAlert className="h-3 w-3 shrink-0" /> {result.securityWarning}
+                          </div>
                         )}
                       </div>
                       <div className={`text-xs font-medium shrink-0 flex items-center gap-1 transition-opacity ${isSelected ? "opacity-100 text-indigo-400" : "opacity-0 text-slate-500"}`}>

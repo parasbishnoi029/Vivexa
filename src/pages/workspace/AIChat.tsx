@@ -204,7 +204,23 @@ export default function AIChat() {
 
   // Messages State
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(() => {
+    try {
+      return localStorage.getItem("vivexa_aichat_input") || "";
+    } catch {
+      return "";
+    }
+  });
+
+  // Auto-save input state to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("vivexa_aichat_input", input);
+    } catch (e) {
+      console.warn("localStorage write failed:", e);
+    }
+  }, [input]);
+
   const initialQuery = searchParams.get('q');
 
   useEffect(() => {

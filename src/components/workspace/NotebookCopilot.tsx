@@ -116,12 +116,41 @@ export default function NotebookCopilot({
       timestamp: new Date().toLocaleTimeString()
     }
   ]);
-  const [inputPrompt, setInputPrompt] = useState("");
+  const [inputPrompt, setInputPrompt] = useState(() => {
+    try {
+      return localStorage.getItem("vivexa_notebook_copilot_input") || "";
+    } catch {
+      return "";
+    }
+  });
   const [loadingAi, setLoadingAi] = useState(false);
 
   // Cell Work Assistant State
   const [targetCellId, setTargetCellId] = useState<string>(activeCellId || activeNotebook.cells[0]?.id || "");
-  const [cellPrompt, setCellPrompt] = useState("");
+  const [cellPrompt, setCellPrompt] = useState(() => {
+    try {
+      return localStorage.getItem("vivexa_notebook_copilot_cell") || "";
+    } catch {
+      return "";
+    }
+  });
+
+  // Auto-save copilot inputs to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("vivexa_notebook_copilot_input", inputPrompt);
+    } catch (e) {
+      console.warn("localStorage write failed:", e);
+    }
+  }, [inputPrompt]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("vivexa_notebook_copilot_cell", cellPrompt);
+    } catch (e) {
+      console.warn("localStorage write failed:", e);
+    }
+  }, [cellPrompt]);
   const [cellWorkLoading, setCellWorkLoading] = useState(false);
   const [cellExplanation, setCellExplanation] = useState("");
   const [showCodePreview, setShowCodePreview] = useState(true);

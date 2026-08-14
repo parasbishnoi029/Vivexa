@@ -505,6 +505,20 @@ ALTER TABLE public.email_logs ENABLE ROW LEVEL SECURITY;
 
 -- POLICIES
 
+-- Helper function to retrieve all organization IDs associated with a user (owner or member)
+CREATE OR REPLACE FUNCTION public.get_user_organizations(user_id UUID)
+RETURNS SETOF UUID AS $$
+BEGIN
+    RETURN QUERY
+    SELECT id FROM public.organizations WHERE owner_id = user_id
+    UNION
+    SELECT DISTINCT w.organization_id 
+    FROM public.workspace_members wm
+    JOIN public.workspaces w ON wm.workspace_id = w.id
+    WHERE wm.user_id = user_id AND w.organization_id IS NOT NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Users
 CREATE POLICY "Users view own user record" ON public.users FOR SELECT USING (auth.uid() = id OR (auth.jwt() ->> 'email') IN ('parasbishnoi012@gmail.com', 'info.vivexa@gmail.com'));
 CREATE POLICY "Users insert own user record" ON public.users FOR INSERT WITH CHECK (auth.uid() = id);
@@ -539,16 +553,68 @@ CREATE POLICY "Invitations manageable by workspace owner" ON public.workspace_in
 );
 
 -- Projects
-CREATE POLICY "Projects viewable by owner" ON public.projects FOR SELECT USING (auth.uid() = owner_id OR (auth.jwt() ->> 'email') IN ('parasbishnoi012@gmail.com', 'info.vivexa@gmail.com'));
-CREATE POLICY "Projects insertable by owner" ON public.projects FOR INSERT WITH CHECK (auth.uid() = owner_id);
-CREATE POLICY "Projects updateable by owner" ON public.projects FOR UPDATE USING (auth.uid() = owner_id);
-CREATE POLICY "Projects deleteable by owner" ON public.projects FOR DELETE USING (auth.uid() = owner_id);
+CREATE POLICY "Projects viewable by owner" ON public.projects FOR SELECT USING (
+    EXISTS (
+        SELECT 1 FROM public.workspaces w
+        WHERE w.id = workspace_id
+        AND w.organization_id IN (SELECT public.get_user_organizations(auth.uid()))
+    ) OR owner_id = auth.uid() OR (auth.jwt() ->> 'email') IN ('parasbishnoi012@gmail.com', 'info.vivexa@gmail.com')
+);
+CREATE POLICY "Projects insertable by owner" ON public.projects FOR INSERT WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM public.workspaces w
+        WHERE w.id = workspace_id
+        AND w.organization_id IN (SELECT public.get_user_organizations(auth.uid()))
+    ) OR owner_id = auth.uid()
+);
+CREATE POLICY "Projects updateable by owner" ON public.projects FOR UPDATE USING (
+    EXISTS (
+        SELECT 1 FROM public.workspaces w
+        WHERE w.id = workspace_id
+        AND w.organization_id IN (SELECT public.get_user_organizations(auth.uid()))
+    ) OR owner_id = auth.uid()
+);
+CREATE POLICY "Projects deleteable by owner" ON public.projects FOR DELETE USING (
+    EXISTS (
+        SELECT 1 FROM public.workspaces w
+        WHERE w.id = workspace_id
+        AND w.organization_id IN (SELECT public.get_user_organizations(auth.uid()))
+    ) OR owner_id = auth.uid()
+);
 
 -- Datasets
-CREATE POLICY "Datasets viewable by owner" ON public.datasets FOR SELECT USING (auth.uid() = user_id OR (auth.jwt() ->> 'email') IN ('parasbishnoi012@gmail.com', 'info.vivexa@gmail.com'));
-CREATE POLICY "Datasets insertable by owner" ON public.datasets FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Datasets updateable by owner" ON public.datasets FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Datasets deleteable by owner" ON public.datasets FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Datasets viewable by owner" ON public.datasets FOR SELECT USING (
+    EXISTS (
+        SELECT 1 FROM public.projects p
+        JOIN public.workspaces w ON p.workspace_id = w.id
+        WHERE p.id = project_id
+        AND w.organization_id IN (SELECT public.get_user_organizations(auth.uid()))
+    ) OR user_id = auth.uid() OR (auth.jwt() ->> 'email') IN ('parasbishnoi012@gmail.com', 'info.vivexa@gmail.com')
+);
+CREATE POLICY "Datasets insertable by owner" ON public.datasets FOR INSERT WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM public.projects p
+        JOIN public.workspaces w ON p.workspace_id = w.id
+        WHERE p.id = project_id
+        AND w.organization_id IN (SELECT public.get_user_organizations(auth.uid()))
+    ) OR user_id = auth.uid()
+);
+CREATE POLICY "Datasets updateable by owner" ON public.datasets FOR UPDATE USING (
+    EXISTS (
+        SELECT 1 FROM public.projects p
+        JOIN public.workspaces w ON p.workspace_id = w.id
+        WHERE p.id = project_id
+        AND w.organization_id IN (SELECT public.get_user_organizations(auth.uid()))
+    ) OR user_id = auth.uid()
+);
+CREATE POLICY "Datasets deleteable by owner" ON public.datasets FOR DELETE USING (
+    EXISTS (
+        SELECT 1 FROM public.projects p
+        JOIN public.workspaces w ON p.workspace_id = w.id
+        WHERE p.id = project_id
+        AND w.organization_id IN (SELECT public.get_user_organizations(auth.uid()))
+    ) OR user_id = auth.uid()
+);
 
 -- Dataset Versions
 CREATE POLICY "Dataset versions viewable by dataset owner" ON public.dataset_versions FOR SELECT 
@@ -558,10 +624,38 @@ CREATE POLICY "Dataset versions viewable by dataset owner" ON public.dataset_ver
 CREATE POLICY "Activity viewable by user" ON public.project_activity FOR SELECT USING (auth.uid() = user_id OR (auth.jwt() ->> 'email') IN ('parasbishnoi012@gmail.com', 'info.vivexa@gmail.com'));
 
 -- Reports
-CREATE POLICY "Reports viewable by owner" ON public.reports FOR SELECT USING (auth.uid() = user_id OR (auth.jwt() ->> 'email') IN ('parasbishnoi012@gmail.com', 'info.vivexa@gmail.com'));
-CREATE POLICY "Reports insertable by owner" ON public.reports FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Reports updateable by owner" ON public.reports FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Reports deleteable by owner" ON public.reports FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Reports viewable by owner" ON public.reports FOR SELECT USING (
+    EXISTS (
+        SELECT 1 FROM public.projects p
+        JOIN public.workspaces w ON p.workspace_id = w.id
+        WHERE p.id = project_id
+        AND w.organization_id IN (SELECT public.get_user_organizations(auth.uid()))
+    ) OR user_id = auth.uid() OR (auth.jwt() ->> 'email') IN ('parasbishnoi012@gmail.com', 'info.vivexa@gmail.com')
+);
+CREATE POLICY "Reports insertable by owner" ON public.reports FOR INSERT WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM public.projects p
+        JOIN public.workspaces w ON p.workspace_id = w.id
+        WHERE p.id = project_id
+        AND w.organization_id IN (SELECT public.get_user_organizations(auth.uid()))
+    ) OR user_id = auth.uid()
+);
+CREATE POLICY "Reports updateable by owner" ON public.reports FOR UPDATE USING (
+    EXISTS (
+        SELECT 1 FROM public.projects p
+        JOIN public.workspaces w ON p.workspace_id = w.id
+        WHERE p.id = project_id
+        AND w.organization_id IN (SELECT public.get_user_organizations(auth.uid()))
+    ) OR user_id = auth.uid()
+);
+CREATE POLICY "Reports deleteable by owner" ON public.reports FOR DELETE USING (
+    EXISTS (
+        SELECT 1 FROM public.projects p
+        JOIN public.workspaces w ON p.workspace_id = w.id
+        WHERE p.id = project_id
+        AND w.organization_id IN (SELECT public.get_user_organizations(auth.uid()))
+    ) OR user_id = auth.uid()
+);
 
 -- Notifications
 CREATE POLICY "Notifications viewable by user" ON public.notifications FOR SELECT USING (auth.uid() = user_id);

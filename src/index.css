@@ -12,3 +12,84 @@
   transition-delay: 0s !important;
 }
 
+/* Print-Specific Media Query for High-Fidelity PDF and Paper Reports */
+@media print {
+  /* Hide typical non-printable elements such as sidebar navigation, chat floats, headers, footers and action triggers */
+  header, 
+  footer, 
+  aside, 
+  nav, 
+  button, 
+  .no-print,
+  [role="dialog"],
+  [aria-modal="true"],
+  .ai-copilot-drawer,
+  .quick-actions-bar {
+    display: none !important;
+  }
+
+  /* Reset layout for full width page output */
+  body, 
+  html, 
+  main, 
+  .workspace-container,
+  .print-full-width {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
+  /* Enforce dark-on-light theme contrast for print readability */
+  * {
+    color-scheme: light !important;
+    color: #0f172a !important;
+    background-color: transparent !important;
+    border-color: #cbd5e1 !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Force page breaks on designated sections or tables */
+  .page-break,
+  .print-page-break {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  /* Keep table rows and cards together where possible */
+  tr, 
+  .card,
+  .print-keep-together {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Ensure maps, charts and diagrams fill the visible container and print perfectly */
+  .recharts-responsive-container,
+  .chart-container,
+  svg {
+    max-width: 100% !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Display clean explicit links next to anchored tags */
+  a[href]:after {
+    content: " (" attr(href) ")";
+    font-size: 0.8rem;
+    color: #64748b;
+  }
+
+  /* Suppress links that are internal references or empty anchors */
+  a[href^="#"]:after,
+  a[href^="javascript:"]:after {
+    content: "" !important;
+  }
+}
+
+

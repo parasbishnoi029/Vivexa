@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { ShareDialog } from "@/components/ShareDialog";
 import { createNotification } from "@/lib/notifications";
 import { Skeleton } from "@/components/ui/skeleton";
+import { encryptField, decryptField, isFieldEncrypted } from "@/lib/encryption";
 
 const container = {
   hidden: { opacity: 0 },
@@ -206,8 +207,18 @@ export default function Projects() {
         
       if (error) {
         setProjects([]);
-      } else {
-        setProjects(data || []);
+      } else if (data) {
+        // Dynamically decrypt sensitive descriptions on the fly
+        const decrypted = await Promise.all(
+          data.map(async (p: any) => {
+            let desc = p.description || "";
+            if (desc && isFieldEncrypted(desc)) {
+              desc = await decryptField(desc, user?.id || "vivexa_default_salt");
+            }
+            return { ...p, description: desc };
+          })
+        );
+        setProjects(decrypted);
       }
     } catch (err) {
       console.error(err);
@@ -479,9 +490,10 @@ export default function Projects() {
                    workspaceIdToInsert = wsList[0].id;
                  }
                }
+                const encryptedDesc = await encryptField(newProject.description || "", user.id);
                const { data, error } = await supabase.from('projects').insert({
                  name: newProject.name,
-                 description: newProject.description,
+                  description: encryptedDesc,
                  industry: newProject.industry,
                  color: newProject.theme || 'indigo',
                  owner_id: user.id,

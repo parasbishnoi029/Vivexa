@@ -276,7 +276,23 @@ export default function Notebooks() {
   // Modals & Panels
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [aiModalOpen, setAiModalOpen] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiPrompt, setAiPrompt] = useState(() => {
+    try {
+      return localStorage.getItem("vivexa_notebook_ai_prompt") || "";
+    } catch {
+      return "";
+    }
+  });
+
+  // Auto-save aiPrompt state to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("vivexa_notebook_ai_prompt", aiPrompt);
+    } catch (e) {
+      console.warn("localStorage write failed:", e);
+    }
+  }, [aiPrompt]);
+
   const [targetCellId, setTargetCellId] = useState<string | null>(null);
   const [newNotebookModal, setNewNotebookModal] = useState(false);
   const [newNbTitle, setNewNbTitle] = useState("");
