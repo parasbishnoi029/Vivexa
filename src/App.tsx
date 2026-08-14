@@ -109,12 +109,140 @@ const HelpCenter = lazyWithRetry(() => import("./pages/workspace/HelpCenter"));
 const DeveloperSDK = lazyWithRetry(() => import("./pages/workspace/DeveloperSDK"));
 const DecisionIntelligence = lazyWithRetry(() => import("./pages/workspace/DecisionIntelligence"));
 
-// Reusable loader
-const PageLoader = () => (
-  <div className="w-full h-[60vh] flex items-center justify-center">
-    <Skeleton className="w-full max-w-4xl h-full rounded-xl" />
+// Reusable high-fidelity skeleton screen loaders
+const PublicPageLoader = () => (
+  <div className="w-full min-h-[85vh] flex flex-col justify-center items-center py-20 px-4 space-y-12 animate-pulse">
+    {/* Eyebrow */}
+    <Skeleton className="h-4 w-32 bg-slate-800/25 dark:bg-slate-800/50 rounded-full" />
+    
+    {/* Hero Header */}
+    <div className="space-y-4 text-center max-w-3xl w-full flex flex-col items-center">
+      <Skeleton className="h-10 md:h-12 w-11/12 bg-slate-800/40 dark:bg-slate-800/60" />
+      <Skeleton className="h-10 md:h-12 w-2/3 bg-slate-800/40 dark:bg-slate-800/60" />
+      <div className="pt-4 space-y-2.5 w-full flex flex-col items-center">
+        <Skeleton className="h-4.5 w-3/4 bg-slate-800/20 dark:bg-slate-800/40" />
+        <Skeleton className="h-4.5 w-1/2 bg-slate-800/20 dark:bg-slate-800/40" />
+      </div>
+    </div>
+
+    {/* CTA Actions */}
+    <div className="flex gap-4">
+      <Skeleton className="h-11 w-36 rounded-xl bg-slate-800/40 dark:bg-slate-800/65" />
+      <Skeleton className="h-11 w-36 rounded-xl bg-slate-800/15 dark:bg-slate-800/30" />
+    </div>
+
+    {/* Visual Card Feature */}
+    <div className="w-full max-w-5xl aspect-[16/9] border border-slate-800/15 dark:border-slate-800/30 rounded-2xl p-4 bg-slate-900/5 dark:bg-slate-900/15">
+      <div className="h-full w-full rounded-xl bg-slate-800/10 dark:bg-slate-800/25 flex flex-col justify-between p-6">
+        <div className="flex justify-between items-center">
+          <div className="flex gap-2">
+            <div className="h-3 w-3 rounded-full bg-slate-800/30" />
+            <div className="h-3 w-3 rounded-full bg-slate-800/30" />
+            <div className="h-3 w-3 rounded-full bg-slate-800/30" />
+          </div>
+          <Skeleton className="h-6 w-24 bg-slate-800/25 dark:bg-slate-800/45" />
+        </div>
+        <div className="space-y-4 w-2/3">
+          <Skeleton className="h-8 w-1/2 bg-slate-800/25 dark:bg-slate-800/45" />
+          <Skeleton className="h-4 w-full bg-slate-800/15 dark:bg-slate-800/35" />
+          <Skeleton className="h-4 w-5/6 bg-slate-800/15 dark:bg-slate-800/35" />
+        </div>
+      </div>
+    </div>
   </div>
 );
+
+const WorkspacePageLoader = () => (
+  <div className="w-full space-y-8 animate-pulse p-1 md:p-2">
+    {/* Page Header */}
+    <div className="flex flex-col gap-2.5">
+      <Skeleton className="h-4 w-28 bg-slate-800/20 dark:bg-slate-800/45" />
+      <Skeleton className="h-8 w-56 bg-slate-800/40 dark:bg-slate-700/50" />
+      <Skeleton className="h-4 w-96 max-w-full bg-slate-800/15 dark:bg-slate-800/35" />
+    </div>
+
+    {/* Analytics Metric Cards Grid */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="border border-slate-800/10 dark:border-slate-800/25 rounded-2xl p-5 space-y-4 bg-slate-900/5 dark:bg-slate-900/10">
+          <Skeleton className="h-3 w-20 bg-slate-800/25 dark:bg-slate-800/45" />
+          <Skeleton className="h-8 w-28 bg-slate-800/40 dark:bg-slate-800/60" />
+          <div className="flex gap-2">
+            <Skeleton className="h-3 w-10 bg-slate-800/15 dark:bg-slate-800/35" />
+            <Skeleton className="h-3 w-24 bg-slate-800/15 dark:bg-slate-800/35" />
+          </div>
+        </div>
+      ))}
+    </div>
+
+    {/* Content Area Split Layout */}
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Primary High-Density Table / List Area */}
+      <div className="lg:col-span-2 border border-slate-800/10 dark:border-slate-800/25 rounded-2xl p-6 space-y-6 bg-slate-900/5 dark:bg-slate-900/10">
+        <div className="flex items-center justify-between border-b border-slate-800/10 dark:border-slate-800/20 pb-5">
+          <div className="space-y-2">
+            <Skeleton className="h-4.5 w-40 bg-slate-800/30 dark:bg-slate-800/50" />
+            <Skeleton className="h-3 w-64 max-w-full bg-slate-800/15 dark:bg-slate-800/35" />
+          </div>
+          <Skeleton className="h-8.5 w-28 rounded-xl bg-slate-800/25 dark:bg-slate-800/45" />
+        </div>
+        
+        {/* Table Rows */}
+        <div className="space-y-5">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="flex items-center justify-between py-3 border-b border-slate-800/5 dark:border-slate-800/10 last:border-0 pb-3 last:pb-0">
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-10 w-10 rounded-xl bg-slate-800/25 dark:bg-slate-800/45" />
+                <div className="space-y-2">
+                  <Skeleton className="h-3.5 w-36 bg-slate-800/30 dark:bg-slate-800/50" />
+                  <Skeleton className="h-2.5 w-24 bg-slate-800/15 dark:bg-slate-800/35" />
+                </div>
+              </div>
+              <div className="flex items-center gap-6">
+                <Skeleton className="h-3 w-16 bg-slate-800/20 dark:bg-slate-800/40" />
+                <Skeleton className="h-6 w-20 rounded-lg bg-slate-800/15 dark:bg-slate-800/35" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Secondary Insights & Context sidebar */}
+      <div className="border border-slate-800/10 dark:border-slate-800/25 rounded-2xl p-6 space-y-6 bg-slate-900/5 dark:bg-slate-900/10">
+        <div className="space-y-2 pb-4 border-b border-slate-800/10 dark:border-slate-800/20">
+          <Skeleton className="h-4.5 w-32 bg-slate-800/30 dark:bg-slate-800/50" />
+          <Skeleton className="h-3 w-48 bg-slate-800/15 dark:bg-slate-800/35" />
+        </div>
+        
+        {/* Action Blocks */}
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="p-4 border border-slate-800/5 dark:border-slate-800/15 rounded-xl space-y-3 bg-slate-900/5 dark:bg-slate-900/5">
+              <div className="flex items-center gap-2.5">
+                <Skeleton className="h-4 w-4 rounded-full bg-slate-800/25 dark:bg-slate-800/45" />
+                <Skeleton className="h-3 w-28 bg-slate-800/30 dark:bg-slate-800/45" />
+              </div>
+              <Skeleton className="h-2.5 w-full bg-slate-800/15 dark:bg-slate-800/35" />
+              <Skeleton className="h-2.5 w-11/12 bg-slate-800/15 dark:bg-slate-800/35" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// Reusable dynamic layout loader
+const PageLoader = () => {
+  const isWorkspaceOrAdmin = typeof window !== 'undefined' && 
+    (window.location.pathname.startsWith('/workspace') || window.location.pathname.startsWith('/admin'));
+
+  return (
+    <div className="w-full max-w-7xl mx-auto px-4 md:px-8 py-6">
+      {isWorkspaceOrAdmin ? <WorkspacePageLoader /> : <PublicPageLoader />}
+    </div>
+  );
+};
 
 const queryClient = new QueryClient({
   defaultOptions: {
