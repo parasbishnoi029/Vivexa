@@ -921,6 +921,16 @@ print(df.describe())`,
                               </button>
                               <button
                                 onClick={() => {
+                                  navigator.clipboard.writeText(msg.content);
+                                  toast.success("AI Response copied to clipboard!");
+                                }}
+                                className="hover:text-white transition-colors"
+                                title="Copy Response to Clipboard"
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => {
                                   setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, pinned: !m.pinned } : m));
                                   toast.success(msg.pinned ? "Unpinned message" : "Pinned message");
                                 }}

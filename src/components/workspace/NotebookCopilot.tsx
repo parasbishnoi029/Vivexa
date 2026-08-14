@@ -638,7 +638,18 @@ export default function NotebookCopilot({
                       )}
 
                       <div className="mt-2 text-[9px] text-slate-500 flex items-center justify-between border-t border-slate-800/50 pt-1">
-                        <span>{msg.timestamp}</span>
+                        <div className="flex items-center gap-2">
+                          <span>{msg.timestamp}</span>
+                          {msg.sender === "copilot" && (
+                            <button
+                              onClick={() => copyToClipboard(msg.text, "Copied AI Response to clipboard!")}
+                              className="text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1 transition-all"
+                              title="Copy AI Response"
+                            >
+                              <Copy className="h-2.5 w-2.5" /> Copy Response
+                            </button>
+                          )}
+                        </div>
                         {msg.modelUsed && <span className="font-mono">Model: {msg.modelUsed}</span>}
                       </div>
                     </div>

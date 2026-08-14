@@ -8,7 +8,8 @@ import {
   Globe, Server, Lock, RefreshCw, Terminal, Monitor, LayoutDashboard, Settings,
   Users, Layers, Workflow, Share2, Compass, AlertCircle, Signal, Network,
   MessageSquare, Presentation, PlayCircle, History, Filter, ArrowUpRight, ArrowDownRight,
-  Upload, TerminalSquare, Cable, Wand2, Shield, Eye, Bookmark, Sparkle, AlertTriangle
+  Upload, TerminalSquare, Cable, Wand2, Shield, Eye, Bookmark, Sparkle, AlertTriangle,
+  Download
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -118,6 +119,64 @@ export default function WorkspaceDashboard() {
 
     return () => clearInterval(interval);
   }, [isStreaming]);
+
+  // Export Telemetry / Report Metrics to CSV
+  const handleExportMetricsCsv = () => {
+    try {
+      const headers = ["Time", "Pipeline Throughput (MB/s)", "Active Queries / min", "Inference Latency (ms)", "Model Accuracy (%)"];
+      const rows = analyticsData.map(d => [
+        d.time,
+        d.throughput,
+        d.queries,
+        d.inferenceMs,
+        d.accuracy
+      ]);
+      
+      const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.join(","))].join("\r\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `vivexa_pipeline_report_metrics_${timeRange}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Report metrics exported successfully as CSV!");
+    } catch (err) {
+      toast.error("Failed to export metrics.");
+    }
+  };
+
+  // Export Dataset Summaries to CSV
+  const handleExportDatasetsCsv = () => {
+    if (recentDatasets.length === 0) {
+      toast.error("No dataset summaries available to export. Seed sample data first.");
+      return;
+    }
+    try {
+      const headers = ["Dataset Name", "File Type", "Description", "Row Count", "Column Count"];
+      const rows = recentDatasets.map(ds => [
+        `"${(ds.name || 'Unnamed').replace(/"/g, '""')}"`,
+        `"${(ds.file_type || 'Dataset').replace(/"/g, '""')}"`,
+        `"${(ds.description || 'Uploaded enterprise data pipeline table.').replace(/"/g, '""')}"`,
+        ds.row_count || 12500,
+        ds.column_count || 16
+      ]);
+      
+      const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.join(","))].join("\r\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", "vivexa_dataset_summaries.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Dataset summaries exported successfully as CSV!");
+    } catch (err) {
+      toast.error("Failed to export dataset summaries.");
+    }
+  };
 
   // Fetch Supabase Data
   useEffect(() => {
@@ -414,6 +473,14 @@ export default function WorkspaceDashboard() {
               className="h-11 px-5 rounded-xl bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-800 hover:text-white text-xs font-bold transition-all"
             >
               <Upload className="mr-2 h-4 w-4 text-cyan-400" /> Upload Data
+            </Button>
+            <Button 
+              onClick={handleExportMetricsCsv}
+              variant="outline"
+              className="h-11 px-5 rounded-xl bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-800 hover:text-white text-xs font-bold transition-all"
+              title="Export dynamic metrics to CSV"
+            >
+              <Download className="mr-2 h-4 w-4 text-emerald-400" /> Export Metrics CSV
             </Button>
             <Button 
               onClick={() => setIsShareDialogOpen(true)}
@@ -748,6 +815,16 @@ export default function WorkspaceDashboard() {
               <h3 className="text-xl font-black text-white tracking-tight">Enterprise Datasets & Data Engine</h3>
             </div>
             <div className="flex items-center gap-3">
+              {recentDatasets.length > 0 && (
+                <Button 
+                  onClick={handleExportDatasetsCsv}
+                  variant="outline"
+                  className="h-9 px-4 rounded-xl bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-800 hover:text-white text-xs font-bold transition-all"
+                  title="Export connected datasets summary as CSV"
+                >
+                  <Download className="mr-2 h-3.5 w-3.5 text-cyan-400" /> Export Summaries
+                </Button>
+              )}
               {recentDatasets.length === 0 && (
                 <Button 
                   onClick={handleSeedSampleDatasets}

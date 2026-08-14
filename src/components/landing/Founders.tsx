@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Github, Linkedin, ExternalLink, Code2, Brain, CheckCircle2, ArrowRight } from "lucide-react";
+import { useIntersectionPrefetch } from "../../hooks/useIntersectionPrefetch";
 
 const founders = [
   {
@@ -56,8 +57,18 @@ export function Founders() {
     "Karunya Sharma": 0
   });
 
+  const imageUrls = founders.map(f => f.image);
+  const { elementRef } = useIntersectionPrefetch<HTMLDivElement>({
+    urls: imageUrls,
+    observerOptions: { rootMargin: "150px" }
+  });
+
   return (
-    <section className="relative z-10 py-24 sm:py-32 overflow-hidden bg-slate-950/80 backdrop-blur-3xl" id="founders">
+    <section 
+      ref={elementRef}
+      className="relative z-10 py-24 sm:py-32 overflow-hidden bg-slate-950/80 backdrop-blur-3xl" 
+      id="founders"
+    >
       {/* Background decorations */}
       <div className="absolute top-1/2 left-0 -translate-y-1/2 w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[120px] pointer-events-none" />

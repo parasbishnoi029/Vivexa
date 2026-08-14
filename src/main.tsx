@@ -4,18 +4,38 @@ import App from './App.tsx';
 import './index.css';
 
 // Prevent unhandled rejections from WebSocket close/fail in sandboxed environments
-window.addEventListener('unhandledrejection', (event) => {
-  if (
-    event.reason && 
-    (event.reason.message?.includes('WebSocket') || 
-     event.reason.message?.includes('websocket') ||
-     event.reason.message?.includes('failed to connect') ||
-     event.reason.toString().includes('WebSocket') ||
-     event.reason.toString().includes('websocket'))
-  ) {
-    event.preventDefault();
+const isWebSocketError = (err: any): boolean => {
+  if (!err) return false;
+  try {
+    const str = typeof err === 'string' ? err : (err.message || err.description || String(err));
+    const lower = str.toLowerCase();
+    return (
+      lower.includes('websocket') ||
+      lower.includes('failed to connect') ||
+      lower.includes('closed without opened') ||
+      lower.includes('ws://') ||
+      lower.includes('wss://')
+    );
+  } catch (e) {
+    return false;
   }
-});
+};
+
+window.addEventListener('unhandledrejection', (event) => {
+  if (isWebSocketError(event.reason)) {
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+  }
+}, true);
+
+window.addEventListener('error', (event) => {
+  if (isWebSocketError(event.error) || isWebSocketError(event.message)) {
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+  }
+}, true);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
