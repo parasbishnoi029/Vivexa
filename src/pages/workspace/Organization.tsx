@@ -106,6 +106,33 @@ export default function Organization() {
   const [deptDistribution, setDeptDistribution] = useState(DEPT_DATA);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
+  // Custom SMTP states
+  const [customSmtpEnabled, setCustomSmtpEnabled] = useState(false);
+  const [smtpHost, setSmtpHost] = useState("");
+  const [smtpPort, setSmtpPort] = useState("587");
+  const [smtpUser, setSmtpUser] = useState("");
+  const [smtpPassword, setSmtpPassword] = useState("");
+  const [fromEmail, setFromEmail] = useState("");
+  const [fromName, setFromName] = useState("");
+  const [replyToEmail, setReplyToEmail] = useState("");
+  const [smtpTestRecipient, setSmtpTestRecipient] = useState("");
+  const [isTestingSmtp, setIsTestingSmtp] = useState(false);
+  const [smtpTestResult, setSmtpTestResult] = useState<{ success: boolean; message?: string; error?: string; hint?: string } | null>(null);
+
+  // SAML states
+  const [samlProvider, setSamlProvider] = useState<"okta" | "azure" | "google">("google");
+  const [samlSsoUrl, setSamlSsoUrl] = useState("");
+  const [samlEntityId, setSamlEntityId] = useState("");
+  const [samlCertificate, setSamlCertificate] = useState("");
+  const [showSamlModal, setShowSamlModal] = useState(false);
+
+  // MNC++ policies states
+  const [ipRestriction, setIpRestriction] = useState<"Disabled" | "Enabled" | "Office Only">("Disabled");
+  const [deviceTrust, setDeviceTrust] = useState<"Active" | "Disabled" | "Enforced">("Active");
+  const [sessionExpiry, setSessionExpiry] = useState<"12 Hours" | "8 Hours" | "24 Hours" | "7 Days">("12 Hours");
+  const [ipWhitelist, setIpWhitelist] = useState("");
+  const [editingPolicy, setEditingPolicy] = useState<"ip" | "device" | "session" | null>(null);
+
   const handleAddDomain = async () => {
     if (newDomain && !whitelistedDomains.includes(newDomain)) {
       const updated = [...whitelistedDomains, newDomain];
@@ -155,6 +182,98 @@ export default function Organization() {
     }
   };
 
+  const handleTestSmtp = async () => {
+    if (!smtpHost || !smtpUser || !smtpPassword) {
+      toast.error("SMTP Host, Username and Password are required to test connection.");
+      return;
+    }
+    setIsTestingSmtp(true);
+    setSmtpTestResult(null);
+    try {
+      const res = await fetch('/api/v1/organization/test-smtp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          smtp_host: smtpHost,
+          smtp_port: smtpPort,
+          smtp_user: smtpUser,
+          smtp_password: smtpPassword,
+          from_email: fromEmail || smtpUser,
+          from_name: fromName || "Vivexa Mail Diagnostics",
+          recipient: smtpTestRecipient || smtpUser
+        })
+      });
+      const json = await safeFetchJson(res);
+      if (json.success) {
+        setSmtpTestResult({
+          success: true,
+          message: `Connection established. Diagnostic test email delivered successfully. Message ID: ${json.data?.messageId || "N/A"}`
+        });
+        toast.success("SMTP Connection Verified! Test email dispatched.");
+      } else {
+        const errMeta = json.meta || {};
+        setSmtpTestResult({
+          success: false,
+          error: errMeta.error || "Connection refused by remote host.",
+          hint: errMeta.hint
+        });
+        toast.error("SMTP Authentication Refused");
+      }
+    } catch (e: any) {
+      setSmtpTestResult({
+        success: false,
+        error: e.message || "Failed to initiate SMTP test request."
+      });
+      toast.error("Test execution failed");
+    } finally {
+      setIsTestingSmtp(false);
+    }
+  };
+
+  const handleSaveSmtpSettings = async () => {
+    await saveWorkspaceSettings({
+      custom_smtp_enabled: customSmtpEnabled,
+      smtp_host: smtpHost,
+      smtp_port: smtpPort,
+      smtp_user: smtpUser,
+      smtp_password: smtpPassword,
+      from_email: fromEmail,
+      from_name: fromName,
+      reply_to_email: replyToEmail
+    });
+  };
+
+  const handleSaveSamlSettings = async () => {
+    await saveWorkspaceSettings({
+      saml_provider: samlProvider,
+      saml_sso_url: samlSsoUrl,
+      saml_entity_id: samlEntityId,
+      saml_certificate: samlCertificate
+    });
+    setShowSamlModal(false);
+  };
+
+  const handleSavePolicy = async (type: "ip" | "device" | "session") => {
+    if (type === "ip") {
+      await saveWorkspaceSettings({
+        ip_restriction: ipRestriction,
+        ip_whitelist: ipWhitelist
+      });
+    } else if (type === "device") {
+      await saveWorkspaceSettings({
+        device_trust: deviceTrust
+      });
+    } else if (type === "session") {
+      await saveWorkspaceSettings({
+        session_expiry: sessionExpiry
+      });
+    }
+    setEditingPolicy(null);
+  };
+
   const token = session?.access_token;
   const selectedWorkspaceId = useWorkspaceStore(state => state.selectedWorkspaceId);
   const setSelectedWorkspaceId = useWorkspaceStore(state => state.setSelectedWorkspaceId);
@@ -186,6 +305,28 @@ export default function Organization() {
         setWhitelistedDomains(meta.whitelisted_domains || []);
         setSsoEnabled(!!meta.sso_enabled);
         if (meta.dept_distribution) setDeptDistribution(meta.dept_distribution);
+
+        // Load custom SMTP settings
+        setCustomSmtpEnabled(!!meta.custom_smtp_enabled);
+        setSmtpHost(meta.smtp_host || "");
+        setSmtpPort(meta.smtp_port || "587");
+        setSmtpUser(meta.smtp_user || "");
+        setSmtpPassword(meta.smtp_password || "");
+        setFromEmail(meta.from_email || "");
+        setFromName(meta.from_name || "");
+        setReplyToEmail(meta.reply_to_email || "");
+
+        // Load SAML settings
+        setSamlProvider(meta.saml_provider || "google");
+        setSamlSsoUrl(meta.saml_sso_url || "");
+        setSamlEntityId(meta.saml_entity_id || "");
+        setSamlCertificate(meta.saml_certificate || "");
+
+        // Load MNC++ policies
+        setIpRestriction(meta.ip_restriction || "Disabled");
+        setDeviceTrust(meta.device_trust || "Active");
+        setSessionExpiry(meta.session_expiry || "12 Hours");
+        setIpWhitelist(meta.ip_whitelist || "");
       }
 
       // Load incoming invitations for user's email
@@ -833,6 +974,7 @@ export default function Organization() {
 
           {activeTab === 'governance' && (
             <div className="space-y-6">
+              {/* Enterprise Access Governance Card */}
               <Card className="bg-slate-900/40 border-slate-800/50 backdrop-blur-xl shadow-xl">
                 <CardHeader className="border-b border-slate-800/50 pb-4">
                   <div className="flex items-center justify-between">
@@ -845,6 +987,7 @@ export default function Organization() {
                 </CardHeader>
                 <CardContent className="p-6 space-y-8">
                   <div className="grid sm:grid-cols-2 gap-8">
+                    {/* Domain Whitelisting */}
                     <div className="space-y-4">
                       <div>
                         <h4 className="text-sm font-bold text-white flex items-center gap-2">
@@ -857,19 +1000,24 @@ export default function Organization() {
                           placeholder="e.g. acme.com" 
                           value={newDomain}
                           onChange={(e) => setNewDomain(e.target.value)}
-                          className="h-9 bg-slate-950 border-slate-800 text-xs" 
+                          className="h-9 bg-slate-950 border-slate-800 text-xs text-slate-200" 
                         />
-                        <Button onClick={handleAddDomain} size="sm" className="bg-slate-800 hover:bg-slate-700">Add</Button>
+                        <Button onClick={handleAddDomain} size="sm" className="bg-slate-800 hover:bg-slate-700 text-white">Add</Button>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {whitelistedDomains.map(d => (
-                          <div key={d} className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-[10px] font-bold text-blue-400 flex items-center gap-1.5">
-                            {d} <X className="h-3 w-3 cursor-pointer hover:text-white" onClick={() => handleRemoveDomain(d)} />
-                          </div>
-                        ))}
+                        {whitelistedDomains.length === 0 ? (
+                          <span className="text-xs italic text-slate-600">No whitelisted domains. Anyone with a valid invitation can join.</span>
+                        ) : (
+                          whitelistedDomains.map(d => (
+                            <div key={d} className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-[10px] font-bold text-blue-400 flex items-center gap-1.5">
+                              {d} <X className="h-3 w-3 cursor-pointer hover:text-white" onClick={() => handleRemoveDomain(d)} />
+                            </div>
+                          ))
+                        )}
                       </div>
                     </div>
 
+                    {/* SSO / SAML Authentication */}
                     <div className="space-y-4">
                       <div>
                         <h4 className="text-sm font-bold text-white flex items-center gap-2">
@@ -887,38 +1035,308 @@ export default function Organization() {
                           disabled={isSavingSettings}
                           className={`relative w-10 h-5 rounded-full transition-colors ${ssoEnabled ? 'bg-emerald-600' : 'bg-slate-800'} ${isSavingSettings ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
-                          <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${ssoEnabled ? 'left-6' : 'left-1'}`} />
+                          <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${ssoEnabled ? 'left-5.5' : 'left-0.5'}`} />
                         </button>
                       </div>
                       {ssoEnabled && (
-                        <Button variant="outline" size="sm" className="w-full text-[10px] uppercase font-black tracking-widest bg-slate-950 border-slate-800">
-                          Configure SAML Metadata
-                        </Button>
+                        <div className="space-y-2 pt-1">
+                          <Button 
+                            onClick={() => setShowSamlModal(true)} 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full text-[10px] uppercase font-black tracking-widest bg-slate-950 border-slate-800 text-indigo-400 hover:text-indigo-300"
+                          >
+                            Configure SAML Metadata
+                          </Button>
+                          {samlSsoUrl && (
+                            <div className="p-3 rounded-lg bg-indigo-500/5 border border-indigo-500/20 text-[10px] space-y-1">
+                              <div className="flex justify-between"><span className="text-slate-500">IdP Provider:</span> <span className="font-bold text-indigo-400 uppercase">{samlProvider}</span></div>
+                              <div className="flex justify-between"><span className="text-slate-500">SSO Entry URL:</span> <span className="font-mono text-slate-300 truncate max-w-[180px]">{samlSsoUrl}</span></div>
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
 
+                  {/* MNC++ Policy Matrix Section */}
                   <div className="pt-6 border-t border-slate-800/50">
-                    <h4 className="text-sm font-bold text-white mb-4">MNC++ Policy Matrix</h4>
+                    <h4 className="text-sm font-bold text-white mb-4 flex items-center justify-between">
+                      <span>MNC++ Policy Matrix</span>
+                      <span className="text-[10px] text-indigo-400 uppercase tracking-widest font-bold">Interactive Rules</span>
+                    </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       {[
-                        { label: "IP Restriction", status: "Disabled", icon: MapPin },
-                        { label: "Device Trust", status: "Active", icon: Shield },
-                        { label: "Session Expiry", status: "12 Hours", icon: Clock }
-                      ].map((p, i) => (
-                        <div key={i} className="p-3 rounded-xl bg-slate-950/30 border border-slate-800/50 flex items-center gap-3">
-                          <p.icon className="h-4 w-4 text-slate-500" />
-                          <div>
-                            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{p.label}</div>
-                            <div className="text-xs font-bold text-slate-300">{p.status}</div>
+                        { key: "ip", label: "IP Restriction", status: ipRestriction, icon: MapPin, desc: "Restricts access to specific IPs" },
+                        { key: "device", label: "Device Trust", status: deviceTrust, icon: Shield, desc: "Requires verified MDM certificates" },
+                        { key: "session", label: "Session Expiry", status: sessionExpiry, icon: Clock, desc: "Forces session re-auth timeouts" }
+                      ].map((p) => (
+                        <div 
+                          key={p.key} 
+                          onClick={() => setEditingPolicy(editingPolicy === p.key ? null : p.key as any)}
+                          className={`p-4 rounded-xl cursor-pointer transition-all border ${editingPolicy === p.key ? 'bg-indigo-950/20 border-indigo-500' : 'bg-slate-950/30 border-slate-800/50 hover:bg-slate-950/50 hover:border-slate-800'} flex flex-col gap-2`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <p.icon className={`h-4 w-4 ${editingPolicy === p.key ? 'text-indigo-400' : 'text-slate-500'}`} />
+                            <div>
+                              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{p.label}</div>
+                              <div className="text-xs font-bold text-slate-200">{p.status}</div>
+                            </div>
                           </div>
+                          <p className="text-[10px] text-slate-500">{p.desc}</p>
                         </div>
                       ))}
                     </div>
+
+                    {/* Policy Editing Block */}
+                    {editingPolicy && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: -10 }} 
+                        animate={{ opacity: 1, y: 0 }} 
+                        className="mt-4 p-4 rounded-xl bg-slate-950 border border-indigo-500/30 space-y-4"
+                      >
+                        {editingPolicy === "ip" && (
+                          <div className="space-y-3">
+                            <h5 className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                              <MapPin className="h-3.5 w-3.5 text-indigo-400" /> Configure IP Restriction Policy
+                            </h5>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase">Policy Mode</label>
+                                <select 
+                                  value={ipRestriction} 
+                                  onChange={(e) => setIpRestriction(e.target.value as any)}
+                                  className="w-full h-9 px-3 rounded-lg bg-slate-905 bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:border-indigo-500 outline-none"
+                                >
+                                  <option value="Disabled">Disabled (Unrestricted)</option>
+                                  <option value="Enabled">Enabled (Strict IP Match)</option>
+                                  <option value="Office Only">Office Only (10.0.0.0/8 & whitelist)</option>
+                                </select>
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase">IP Whitelist (Comma Separated)</label>
+                                <Input 
+                                  placeholder="e.g. 192.168.1.1, 10.240.0.0/16" 
+                                  value={ipWhitelist}
+                                  onChange={(e) => setIpWhitelist(e.target.value)}
+                                  className="h-9 bg-slate-900 border-slate-800 text-xs text-slate-200"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                              <Button size="sm" variant="ghost" onClick={() => setEditingPolicy(null)} className="text-xs text-slate-400">Cancel</Button>
+                              <Button size="sm" onClick={() => handleSavePolicy("ip")} className="bg-indigo-600 hover:bg-indigo-500 text-xs text-white font-bold">Apply Policy</Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {editingPolicy === "device" && (
+                          <div className="space-y-3">
+                            <h5 className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                              <Shield className="h-3.5 w-3.5 text-indigo-400" /> Configure Device Trust Level
+                            </h5>
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase">Required Trust Standard</label>
+                              <div className="grid grid-cols-3 gap-3">
+                                {[
+                                  { value: "Disabled", title: "No Trust Required", desc: "Allows standard web browsers" },
+                                  { value: "Active", title: "Verified Hardware", desc: "Prompts for device fingerprinting" },
+                                  { value: "Enforced", title: "MDM Verified Only", desc: "Blocks devices missing corporate certificates" }
+                                ].map(opt => (
+                                  <div 
+                                    key={opt.value}
+                                    onClick={() => setDeviceTrust(opt.value as any)}
+                                    className={`p-3 rounded-lg cursor-pointer border text-left transition-all ${deviceTrust === opt.value ? 'bg-indigo-950/30 border-indigo-500' : 'bg-slate-900 border-slate-800'}`}
+                                  >
+                                    <div className="text-xs font-bold text-slate-200">{opt.title}</div>
+                                    <p className="text-[9px] text-slate-500 mt-1">{opt.desc}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                              <Button size="sm" variant="ghost" onClick={() => setEditingPolicy(null)} className="text-xs text-slate-400">Cancel</Button>
+                              <Button size="sm" onClick={() => handleSavePolicy("device")} className="bg-indigo-600 hover:bg-indigo-500 text-xs text-white font-bold">Apply Policy</Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {editingPolicy === "session" && (
+                          <div className="space-y-3">
+                            <h5 className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                              <Clock className="h-3.5 w-3.5 text-indigo-400" /> Configure Session Timeout
+                            </h5>
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase">Max Inactivity Expiry Limit</label>
+                              <div className="grid grid-cols-4 gap-3">
+                                {["8 Hours", "12 Hours", "24 Hours", "7 Days"].map(opt => (
+                                  <div 
+                                    key={opt}
+                                    onClick={() => setSessionExpiry(opt as any)}
+                                    className={`p-3 rounded-lg cursor-pointer border text-center transition-all ${sessionExpiry === opt ? 'bg-indigo-950/30 border-indigo-500' : 'bg-slate-900 border-slate-800'}`}
+                                  >
+                                    <div className="text-xs font-bold text-slate-200">{opt}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                              <Button size="sm" variant="ghost" onClick={() => setEditingPolicy(null)} className="text-xs text-slate-400">Cancel</Button>
+                              <Button size="sm" onClick={() => handleSavePolicy("session")} className="bg-indigo-600 hover:bg-indigo-500 text-xs text-white font-bold">Apply Policy</Button>
+                            </div>
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
 
+              {/* Workspace-Specific Custom SMTP Gateway */}
+              <Card className="bg-slate-900/40 border-slate-800/50 backdrop-blur-xl shadow-xl">
+                <CardHeader className="border-b border-slate-800/50 pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Mail className="h-5 w-5 text-indigo-400" /> Workspace Custom SMTP Gateway
+                      </CardTitle>
+                      <CardDescription>Configure and test your custom corporate mail servers to route workspace invitations and alerts.</CardDescription>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold">Enable Gateway</span>
+                      <button 
+                        onClick={() => setCustomSmtpEnabled(!customSmtpEnabled)}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${customSmtpEnabled ? 'bg-indigo-600' : 'bg-slate-800'}`}
+                      >
+                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${customSmtpEnabled ? 'left-5.5' : 'left-0.5'}`} />
+                      </button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6 space-y-6">
+                  <div className={`grid sm:grid-cols-3 gap-4 transition-all duration-300 ${customSmtpEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase font-sans">SMTP Host</label>
+                      <Input 
+                        placeholder="e.g. smtp.gmail.com" 
+                        value={smtpHost}
+                        onChange={(e) => setSmtpHost(e.target.value)}
+                        className="h-9 bg-slate-950 border-slate-800 text-xs text-slate-200 font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase font-sans">SMTP Port</label>
+                      <Input 
+                        placeholder="e.g. 587 (TLS) or 465 (SSL)" 
+                        value={smtpPort}
+                        onChange={(e) => setSmtpPort(e.target.value)}
+                        className="h-9 bg-slate-950 border-slate-800 text-xs text-slate-200 font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase font-sans">Authorized Username</label>
+                      <Input 
+                        placeholder="e.g. info.vivexa@gmail.com" 
+                        value={smtpUser}
+                        onChange={(e) => setSmtpUser(e.target.value)}
+                        className="h-9 bg-slate-950 border-slate-800 text-xs text-slate-200 font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase font-sans">Secure Password / App Key</label>
+                      <Input 
+                        type="password"
+                        placeholder="••••••••••••••••" 
+                        value={smtpPassword}
+                        onChange={(e) => setSmtpPassword(e.target.value)}
+                        className="h-9 bg-slate-950 border-slate-800 text-xs text-slate-200 font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase font-sans">Sender Display Name</label>
+                      <Input 
+                        placeholder="e.g. Vivexa Analytics" 
+                        value={fromName}
+                        onChange={(e) => setFromName(e.target.value)}
+                        className="h-9 bg-slate-950 border-slate-800 text-xs text-slate-200"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase font-sans">Sender Email Address</label>
+                      <Input 
+                        placeholder="e.g. notifications@acme.com" 
+                        value={fromEmail}
+                        onChange={(e) => setFromEmail(e.target.value)}
+                        className="h-9 bg-slate-950 border-slate-800 text-xs text-slate-200 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-4">
+                    <h5 className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                      <Activity className="h-3.5 w-3.5 text-indigo-400" /> Deliverability Diagnostics Console
+                    </h5>
+                    <p className="text-[10px] text-slate-400">
+                      Validate connection settings and credential authorization on-the-fly. Enter a target recipient to send a live cryptographic test payload.
+                    </p>
+                    
+                    <div className="flex flex-col sm:flex-row gap-3 items-end">
+                      <div className="flex-1 space-y-1 w-full">
+                        <label className="text-[9px] font-bold text-slate-500 uppercase font-sans">Test Recipient Address</label>
+                        <Input 
+                          placeholder="e.g. user@example.com" 
+                          value={smtpTestRecipient}
+                          onChange={(e) => setSmtpTestRecipient(e.target.value)}
+                          className="h-9 bg-slate-900 border-slate-800 text-xs text-slate-200"
+                        />
+                      </div>
+                      <Button 
+                        onClick={handleTestSmtp} 
+                        disabled={isTestingSmtp}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-xs h-9 min-w-[150px] text-white font-bold flex items-center justify-center gap-2"
+                      >
+                        {isTestingSmtp ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Verifying...
+                          </>
+                        ) : (
+                          "Run Diagnostic Test"
+                        )}
+                      </Button>
+                    </div>
+
+                    {smtpTestResult && (
+                      <div className={`p-4 rounded-lg border text-xs ${smtpTestResult.success ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400' : 'bg-rose-500/5 border-rose-500/20 text-rose-400'} space-y-2`}>
+                        <div className="flex items-start gap-2">
+                          {smtpTestResult.success ? (
+                            <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+                          ) : (
+                            <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                          )}
+                          <div className="space-y-1">
+                            <span className="font-bold">{smtpTestResult.success ? "Connection Verified" : "Authentication Fail / Host Unreachable"}</span>
+                            <p className="text-[11px] text-slate-300">{smtpTestResult.success ? smtpTestResult.message : smtpTestResult.error}</p>
+                          </div>
+                        </div>
+                        {smtpTestResult.hint && (
+                          <div className="p-3 rounded bg-slate-900/80 border border-slate-800/80 text-[10px] text-slate-200 font-sans leading-relaxed">
+                            <span className="font-bold text-indigo-400 uppercase tracking-wider text-[8px] block mb-1">Smart Troubleshooter Hint:</span>
+                            {smtpTestResult.hint}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button onClick={handleSaveSmtpSettings} disabled={isSavingSettings} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-6 h-9">
+                      {isSavingSettings ? "Synchronizing..." : "Save SMTP Gateway Settings"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Resource Allocation Tagging Card */}
               <Card className="bg-slate-900/40 border-slate-800/50 backdrop-blur-xl shadow-xl overflow-hidden">
                 <CardHeader className="pb-2">
                    <CardTitle className="text-lg">Resource Allocation Tagging</CardTitle>
@@ -1213,6 +1631,91 @@ export default function Organization() {
               <Button onClick={handleSaveRole} className="bg-blue-600 hover:bg-blue-500 text-white">Save Role</Button>
             </div>
           </Card>
+        </div>
+      )}
+
+      {/* SAML Settings Overlay Modal */}
+      {showSamlModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden"
+          >
+            <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Fingerprint className="h-5 w-5 text-purple-400" />
+                <div>
+                  <h3 className="text-sm font-bold text-white">Configure SAML SSO Metadata</h3>
+                  <p className="text-[10px] text-slate-500 font-sans">Provide identity provider credentials for federated authentication.</p>
+                </div>
+              </div>
+              <button onClick={() => setShowSamlModal(false)} className="text-slate-500 hover:text-white transition-colors">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase font-sans">SSO Identity Provider</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: "google", name: "Google Workspace" },
+                    { id: "okta", name: "Okta" },
+                    { id: "azure", name: "Azure Active Directory" }
+                  ].map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => setSamlProvider(p.id as any)}
+                      className={`py-2 px-3 text-center rounded-lg border text-xs transition-all font-bold ${samlProvider === p.id ? 'bg-indigo-500/10 border-indigo-500 text-indigo-400' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
+                    >
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase font-sans">IdP Single Sign-On Service URL</label>
+                <Input 
+                  placeholder="https://sso.yourcompany.com/saml2/http-post" 
+                  value={samlSsoUrl}
+                  onChange={(e) => setSamlSsoUrl(e.target.value)}
+                  className="h-9 bg-slate-950 border-slate-800 text-xs text-slate-200 font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase font-sans">IdP Entity ID (Issuer URI)</label>
+                <Input 
+                  placeholder="urn:service:yourcompany:auth" 
+                  value={samlEntityId}
+                  onChange={(e) => setSamlEntityId(e.target.value)}
+                  className="h-9 bg-slate-950 border-slate-800 text-xs text-slate-200 font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase font-sans">X.509 Public Certificate (PEM format)</label>
+                <textarea 
+                  rows={4}
+                  placeholder="-----BEGIN CERTIFICATE-----&#10;MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...&#10;-----END CERTIFICATE-----" 
+                  value={samlCertificate}
+                  onChange={(e) => setSamlCertificate(e.target.value)}
+                  className="w-full p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 font-mono focus:border-purple-500 outline-none resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-950 border-t border-slate-800/80 flex justify-end gap-2">
+              <Button size="sm" variant="ghost" onClick={() => setShowSamlModal(false)} className="text-slate-400 text-xs font-sans">
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleSaveSamlSettings} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs">
+                Save SAML Configuration
+              </Button>
+            </div>
+          </motion.div>
         </div>
       )}
     </motion.div>

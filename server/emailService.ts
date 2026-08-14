@@ -634,20 +634,53 @@ export async function sendEmail({ recipient, template, subject, data }: SendEmai
   const smtpUser = process.env.SMTP_USER;
   const smtpPassword = process.env.SMTP_PASSWORD;
 
+  let finalProvider = providerName;
+  let finalFromEmail = fromEmail;
+  let finalFromName = fromName;
+  let finalReplyTo = replyTo;
+  let finalSmtpHost = smtpHost;
+  let finalSmtpPort = smtpPort;
+  let finalSmtpUser = smtpUser;
+  let finalSmtpPassword = smtpPassword;
+
+  if (data && data.workspace_id) {
+    try {
+      const { data: ws } = await supabase
+        .from('workspaces')
+        .select('metadata')
+        .eq('id', data.workspace_id)
+        .maybeSingle();
+      const meta = ws?.metadata;
+      if (meta && meta.custom_smtp_enabled) {
+        finalProvider = 'smtp';
+        finalSmtpHost = meta.smtp_host || smtpHost;
+        finalSmtpPort = meta.smtp_port || smtpPort;
+        finalSmtpUser = meta.smtp_user || smtpUser;
+        finalSmtpPassword = meta.smtp_password || smtpPassword;
+        finalFromEmail = meta.from_email || fromEmail;
+        finalFromName = meta.from_name || fromName;
+        finalReplyTo = meta.reply_to_email || replyTo;
+        console.log(`[MAIL SENDER] Loaded workspace-specific custom SMTP for workspace: ${data.workspace_id}`);
+      }
+    } catch (e: any) {
+      console.warn("[MAIL SENDER] Error loading workspace-specific SMTP settings:", e.message);
+    }
+  }
+
   // Verify that a real provider is configured
   const hasResend = !!resendKey;
   const hasSendGrid = !!sendgridKey;
   const hasMailgun = !!(mailgunKey && mailgunDomain);
-  const hasSMTP = !!(smtpHost && smtpPassword);
+  const hasSMTP = !!(finalSmtpHost && finalSmtpPassword);
 
   let activeProvider = "";
-  if (providerName === "resend" && hasResend) activeProvider = "Resend";
-  else if (providerName === "sendgrid" && (hasSendGrid || hasSMTP)) activeProvider = "SendGrid";
-  else if (providerName === "mailgun" && (hasMailgun || hasSMTP)) activeProvider = "Mailgun";
-  else if (providerName === "ses" && hasSMTP) activeProvider = "Amazon SES";
-  else if (providerName === "smtp" && hasSMTP) activeProvider = "SMTP";
+  if (finalProvider === "resend" && hasResend) activeProvider = "Resend";
+  else if (finalProvider === "sendgrid" && (hasSendGrid || hasSMTP)) activeProvider = "SendGrid";
+  else if (finalProvider === "mailgun" && (hasMailgun || hasSMTP)) activeProvider = "Mailgun";
+  else if (finalProvider === "ses" && hasSMTP) activeProvider = "Amazon SES";
+  else if (finalProvider === "smtp" && hasSMTP) activeProvider = "SMTP";
   // Auto-detection as fallback if EMAIL_PROVIDER is not explicitly set
-  else if (!providerName) {
+  else if (!finalProvider) {
     if (hasResend) activeProvider = "Resend";
     else if (hasSMTP) activeProvider = "SMTP";
     else if (hasSendGrid) activeProvider = "SendGrid";
@@ -660,7 +693,7 @@ export async function sendEmail({ recipient, template, subject, data }: SendEmai
   // Initialize raw log payload
   const logData = {
     recipient,
-    sender: `${fromName} <${fromEmail}>`,
+    sender: `${finalFromName} <${finalFromEmail}>`,
     template,
     status: "queued" as "queued" | "sent" | "delivered" | "failed",
     provider: activeProvider,
@@ -761,23 +794,23 @@ export async function sendEmail({ recipient, template, subject, data }: SendEmai
     }
     else {
       // SMTP fallback for SMTP, Amazon SES, or custom SMTP configurations
-      const portVal = parseInt(smtpPort || "587");
+      const portVal = parseInt(finalSmtpPort || "587");
       const transporter = nodemailer.createTransport({
-        host: smtpHost,
+        host: finalSmtpHost,
         port: portVal,
         secure: portVal === 465,
         auth: {
-          user: smtpUser,
-          pass: smtpPassword
+          user: finalSmtpUser,
+          pass: finalSmtpPassword
         }
       });
 
       const info = await transporter.sendMail({
-        from: `"${fromName}" <${fromEmail}>`,
+        from: `"${finalFromName}" <${finalFromEmail}>`,
         to: recipient,
         subject: subject,
         html: htmlContent,
-        replyTo: replyTo
+        replyTo: finalReplyTo
       });
 
       logData.status = "delivered";

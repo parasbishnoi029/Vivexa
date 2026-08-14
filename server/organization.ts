@@ -528,6 +528,7 @@ organizationRouter.post('/invite', async (req: express.Request, res: express.Res
       template: "invite",
       subject: `Invitation to join ${workspaceName} on Vivexa`,
       data: {
+        workspace_id: targetWorkspaceId,
         inviter_name: user.email?.split('@')[0] || "A collaborator",
         inviter_email: user.email || "partner@vivexa.com",
         role,
@@ -1062,6 +1063,100 @@ organizationRouter.post('/transfer-owner', async (req: express.Request, res: exp
     });
 
     return res.json(successResponse({ success: true, workspace_id, new_owner_id }));
+  } catch (err: any) {
+    return res.status(500).json(successResponse(null, { error: err.message }));
+  }
+});
+
+// 12. POST /api/v1/organization/test-smtp - Test custom SMTP connection settings
+organizationRouter.post('/test-smtp', async (req: express.Request, res: express.Response) => {
+  try {
+    const user = (req as any).user;
+    if (!user) return res.status(401).json(successResponse(null, { error: 'Unauthorized' }));
+
+    const { smtp_host, smtp_port, smtp_user, smtp_password, from_email, from_name, recipient } = req.body;
+
+    if (!smtp_host || !smtp_user || !smtp_password) {
+      return res.status(400).json(successResponse(null, { error: 'Host, Username, and Password are required to test connection.' }));
+    }
+
+    const nodemailer = await import("nodemailer");
+    const portVal = parseInt(smtp_port || "587");
+    
+    const transporter = nodemailer.createTransport({
+      host: smtp_host,
+      port: portVal,
+      secure: portVal === 465,
+      auth: {
+        user: smtp_user,
+        pass: smtp_password
+      },
+      connectTimeout: 5000
+    });
+
+    const targetRecipient = recipient || user.email || "info.vivexa@gmail.com";
+    const senderEmail = from_email || smtp_user;
+    const senderName = from_name || "Vivexa Mail Diagnostics";
+
+    console.log(`[SMTP TEST] Attempting connection test to ${smtp_host}:${portVal} for ${smtp_user}...`);
+
+    try {
+      await transporter.verify();
+      
+      const info = await transporter.sendMail({
+        from: `"${senderName}" <${senderEmail}>`,
+        to: targetRecipient,
+        subject: "Vivexa Enterprise SMTP Test Connection - Success ✔",
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #0b0f19; color: #f3f4f6; border-radius: 12px; border: 1px solid #1f2937;">
+            <h1 style="color: #6366f1; font-size: 20px; font-weight: 700; margin-top: 0;">✔ SMTP Connection Verified</h1>
+            <p style="color: #d1d5db; font-size: 14px; line-height: 1.6;">Your custom SMTP server has been successfully configured and authenticated inside Vivexa.</p>
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background-color: #030712; border-radius: 8px; overflow: hidden;">
+              <tr>
+                <td style="padding: 12px; border-bottom: 1px solid #1f2937; color: #9ca3af; font-size: 12px; font-weight: 600;">SMTP Host</td>
+                <td style="padding: 12px; border-bottom: 1px solid #1f2937; color: #ffffff; font-size: 12px; font-family: monospace;">${smtp_host}</td>
+              </tr>
+              <tr>
+                <td style="padding: 12px; border-bottom: 1px solid #1f2937; color: #9ca3af; font-size: 12px; font-weight: 600;">SMTP Port</td>
+                <td style="padding: 12px; border-bottom: 1px solid #1f2937; color: #ffffff; font-size: 12px; font-family: monospace;">${portVal}</td>
+              </tr>
+              <tr>
+                <td style="padding: 12px; border-bottom: 1px solid #1f2937; color: #9ca3af; font-size: 12px; font-weight: 600;">Authorized User</td>
+                <td style="padding: 12px; border-bottom: 1px solid #1f2937; color: #ffffff; font-size: 12px; font-family: monospace;">${smtp_user}</td>
+              </tr>
+              <tr>
+                <td style="padding: 12px; color: #9ca3af; font-size: 12px; font-weight: 600;">Sender Address</td>
+                <td style="padding: 12px; color: #ffffff; font-size: 12px; font-family: monospace;">${senderEmail}</td>
+              </tr>
+            </table>
+            <p style="color: #9ca3af; font-size: 11px; margin-bottom: 0;">This is an automated diagnostic transmission. You do not need to reply to this message.</p>
+          </div>
+        `
+      });
+
+      console.log(`[SMTP TEST] Successful! Message ID: ${info.messageId}`);
+      return res.json(successResponse({ success: true, messageId: info.messageId }));
+    } catch (testErr: any) {
+      console.error("[SMTP TEST] Connection failed:", testErr);
+      
+      let hint = "";
+      const lowerHost = smtp_host.toLowerCase();
+      const lowerUser = smtp_user.toLowerCase();
+      
+      if (lowerHost.includes("gmail") || lowerUser.includes("gmail.com")) {
+        hint = "Gmail SMTP requires generating a 16-character Google App Password (2-Step Verification must be enabled in your Google Account). Standard account passwords will be blocked.";
+      } else if (lowerHost.includes("brevo") || lowerHost.includes("sendinblue")) {
+        hint = "Brevo SMTP requires your master SMTP Key as the password, and your registered account email as the user. Make sure your 'Sender Address' is fully authorized in Brevo Senders dashboard.";
+      } else if (lowerHost.includes("outlook") || lowerHost.includes("office365")) {
+        hint = "Office 365 / Outlook SMTP requires App Passwords if Multi-Factor Authentication is active.";
+      }
+
+      return res.status(400).json(successResponse(null, { 
+        error: testErr.message || "Failed to establish SMTP connection", 
+        code: testErr.code, 
+        hint 
+      }));
+    }
   } catch (err: any) {
     return res.status(500).json(successResponse(null, { error: err.message }));
   }
