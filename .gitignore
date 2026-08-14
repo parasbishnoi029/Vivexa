@@ -1,0 +1,32 @@
+# Development environment
+.env
+.env.*.local
+
+# Node modules
+node_modules/
+dist/
+build/
+.next/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+
+# Build artifacts
+*.log
+coverage/
+.nyc_output/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
