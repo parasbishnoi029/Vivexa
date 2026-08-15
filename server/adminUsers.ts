@@ -758,20 +758,20 @@ adminUsersRouter.get('/stats', async (req: express.Request, res: express.Respons
 
     // Compute metrics with robust fallbacks
     const activeUsersData = activeUsersRes.data;
-    const totalUsers = Math.max(totalUsersRes.count || 0, activeUsersData?.length || 0, 3); // minimum 3: Paras, Karunya, test_uploader
+    const totalUsers = totalUsersRes.count || activeUsersData?.length || 0;
     
     const activeUsersCount = activeUsersData 
       ? activeUsersData.filter((p: any) => p.status === 'active').length 
-      : 3;
-    const activeUsers = Math.max(activeUsersCount, 3);
+      : 0;
+    const activeUsers = activeUsersCount;
 
     const monthlyActiveUsersCount = activeUsersData
       ? activeUsersData.filter((p: any) => {
           const limitDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
           return new Date(p.updated_at) >= limitDate;
         }).length
-      : 3;
-    const monthlyActiveUsers = Math.max(monthlyActiveUsersCount, 3);
+      : 0;
+    const monthlyActiveUsers = monthlyActiveUsersCount;
 
     // Dynamic Invitation Service Detection
     let pendingInvitations: any = 0;
@@ -789,13 +789,13 @@ adminUsersRouter.get('/stats', async (req: express.Request, res: express.Respons
       pendingInvitations = "Invitation service not configured";
     }
 
-    const organizations = Math.max(organizationsRes.data?.length || 0, 1);
-    const workspaces = Math.max(workspacesRes.data?.length || 0, 1);
+    const organizations = organizationsRes.data?.length || 0;
+    const workspaces = workspacesRes.data?.length || 0;
 
     const adminAccountsCount = activeUsersData
       ? activeUsersData.filter((p: any) => p.role === 'Super Admin' || p.role === 'Admin' || p.role === 'CTO').length
-      : 2;
-    const adminAccounts = Math.max(adminAccountsCount, 2); // Paras and Karunya
+      : 0;
+    const adminAccounts = adminAccountsCount;
 
     const datasetsSizeData = datasetsSizeRes.data;
     const totalStorageBytes = datasetsSizeData

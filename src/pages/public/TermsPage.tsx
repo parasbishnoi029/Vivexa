@@ -20,6 +20,8 @@ import {
   Cpu
 } from "lucide-react";
 
+import { SEOHead } from "@/components/seo/SEOHead";
+
 export default function TermsPage() {
   const [activeSection, setActiveSection] = useState<string>("sec-1");
 
@@ -45,6 +47,16 @@ export default function TermsPage() {
 
   return (
     <div className="relative min-h-screen bg-[#030712] text-slate-100 selection:bg-indigo-500/30">
+      <SEOHead
+        title="Terms of Service & Enterprise SLA | Vivexa AI"
+        description="Review the terms of service, acceptable use policy, and service level agreements (SLA) for the Vivexa enterprise decision intelligence platform."
+        keywords={[
+          "Vivexa Terms of Service",
+          "Enterprise AI SLA",
+          "AI Legal Terms",
+          "B2B SaaS Terms"
+        ]}
+      />
       <AppBackground centered={false}>
         <PublicNavbar />
 

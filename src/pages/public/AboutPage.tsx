@@ -1,13 +1,26 @@
-import { motion } from "motion/react";
 import { PublicNavbar } from "@/components/landing/PublicNavbar";
 import { PublicFooter } from "@/components/landing/PublicFooter";
 import { AppBackground } from "@/components/layout/AppBackground";
+import { SEOHead } from "@/components/seo/SEOHead";
 import { Link } from "react-router-dom";
-import { Building2, Globe, Shield, Sparkles, Target, Users, Award, Heart, Rocket } from "lucide-react";
+import { Building2, Globe, Shield, Target, ArrowRight, Award, CheckCircle2 } from "lucide-react";
 
 export default function AboutPage() {
   return (
     <div className="relative min-h-screen bg-[#030712] text-white selection:bg-indigo-500/30">
+      <SEOHead
+        title="About Vivexa | The Enterprise AI Decision Operating System"
+        description="Learn how Vivexa was founded by IIT Jodhpur AI researchers to eliminate corporate data bottlenecks through autonomous data science and causal intelligence."
+        keywords={[
+          "About Vivexa",
+          "Vivexa Founders",
+          "Paras Bishnoi",
+          "Karunya Sharma",
+          "IIT Jodhpur AI",
+          "Enterprise AI Company",
+          "Autonomous Data Science Platform"
+        ]}
+      />
       <AppBackground centered={false}>
         <PublicNavbar />
 
@@ -15,7 +28,7 @@ export default function AboutPage() {
           {/* Hero */}
           <div className="text-center max-w-3xl mx-auto space-y-4">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-bold">
-              <Building2 className="h-4 w-4" /> About Vivexa
+              <Building2 className="h-4 w-4" /> About Vivexa AI
             </div>
             <h1 className="text-4xl sm:text-6xl font-black tracking-tight">
               Empowering Leaders with <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400">Autonomous Intelligence</span>
@@ -33,8 +46,8 @@ export default function AboutPage() {
               { label: "SOC2 & GDPR Compliant", val: "100%" },
               { label: "Enterprise Uptime SLA", val: "99.99%" }
             ].map((st, i) => (
-              <div key={i} className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 text-center space-y-1">
-                <div className="text-3xl font-black text-indigo-400">{st.val}</div>
+              <div key={i} className="enterprise-card rounded-2xl p-6 text-center space-y-1">
+                <div className="text-3xl font-black text-indigo-400 font-mono">{st.val}</div>
                 <div className="text-xs text-slate-400 font-medium">{st.label}</div>
               </div>
             ))}
@@ -42,9 +55,9 @@ export default function AboutPage() {
 
           {/* Core Values */}
           <div className="space-y-8">
-            <div className="text-center">
+            <div className="text-center space-y-1">
               <h2 className="text-2xl font-bold text-white">Our Core Principles</h2>
-              <p className="text-xs text-slate-400">Guiding every line of code and AI prompt guardrail we build.</p>
+              <p className="text-xs text-slate-400">Guiding every line of code, kernel execution, and prompt guardrail.</p>
             </div>
 
             <div className="grid md:grid-cols-3 gap-6">
@@ -55,7 +68,7 @@ export default function AboutPage() {
               ].map((val, idx) => {
                 const Icon = val.icon;
                 return (
-                  <div key={idx} className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 space-y-3">
+                  <div key={idx} className="enterprise-card rounded-2xl p-6 space-y-3">
                     <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-400 w-fit">
                       <Icon className="h-5 w-5" />
                     </div>
@@ -76,8 +89,8 @@ export default function AboutPage() {
                 Learn more about Paras (Founder & CEO) and Karunya Sharma (Co-Founder & CTO) and their mission to democratize enterprise decision science.
               </p>
             </div>
-            <Link to="/founders" className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shrink-0 transition-all">
-              View Founders Page
+            <Link to="/founders" className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shrink-0 transition-colors flex items-center gap-2">
+              View Founders Page <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
         </main>

@@ -3,14 +3,14 @@ import { useSearchParams, Link } from "react-router-dom";
 import { PublicNavbar } from "@/components/landing/PublicNavbar";
 import { PublicFooter } from "@/components/landing/PublicFooter";
 import { AppBackground } from "@/components/layout/AppBackground";
+import { SEOHead } from "@/components/seo/SEOHead";
 import {
-  FileText, Code2, HelpCircle, Activity, BookOpen, Terminal, CheckCircle2, Search, ArrowRight, ExternalLink
+  FileText, Code2, HelpCircle, BookOpen, ArrowRight
 } from "lucide-react";
 
 export default function ResourcesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "docs";
-  const [query, setQuery] = useState("");
 
   const faqs = [
     { q: "How does Vivexa connect to my database?", a: "Vivexa connects via secure SSL/TLS read-only connection pooling. We support Snowflake, BigQuery, PostgreSQL, MySQL, Redshift, and SAP without requiring ETL pipeline configuration." },
@@ -21,6 +21,29 @@ export default function ResourcesPage() {
 
   return (
     <div className="relative min-h-screen bg-[#030712] text-white selection:bg-indigo-500/30">
+      <SEOHead
+        title="Developer Resources, Documentation & FAQ | Vivexa"
+        description="Comprehensive developer resources, API references, Python SDK guides, and frequently asked questions for the Vivexa Decision Intelligence Platform."
+        keywords={[
+          "Vivexa Documentation",
+          "Vivexa API",
+          "Vivexa Python SDK",
+          "AI Data Science Guides",
+          "Decision Intelligence Documentation"
+        ]}
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          "mainEntity": faqs.map(f => ({
+            "@type": "Question",
+            "name": f.q,
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": f.a
+            }
+          }))
+        }}
+      />
       <AppBackground centered={false}>
         <PublicNavbar />
 
@@ -51,7 +74,7 @@ export default function ResourcesPage() {
                 <button
                   key={t.id}
                   onClick={() => setSearchParams({ tab: t.id })}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-colors ${
                     isActive
                       ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
                       : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
@@ -72,7 +95,7 @@ export default function ResourcesPage() {
                 { title: "AI Analyst Query Syntax", desc: "Best practices for framing natural language questions to generate accurate SQL joins and forecasts." },
                 { title: "User Manual & Workflows", desc: "Step-by-step documentation for Notebooks, Automations, Plugins, and Observability." }
               ].map((card, i) => (
-                <div key={i} className="p-6 bg-slate-900/50 border border-slate-800 rounded-3xl space-y-3">
+                <div key={i} className="p-6 enterprise-card rounded-3xl space-y-3">
                   <div className="text-lg font-bold text-white">{card.title}</div>
                   <div className="text-xs text-slate-400 leading-relaxed">{card.desc}</div>
                   <Link to="/workspace/manual" className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-400 hover:text-indigo-300 pt-2">
@@ -84,7 +107,7 @@ export default function ResourcesPage() {
           )}
 
           {activeTab === "developer" && (
-            <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8 backdrop-blur-xl space-y-6">
+            <div className="enterprise-card rounded-3xl p-8 space-y-6">
               <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                 <div>
                   <h3 className="text-xl font-bold text-white">Vivexa Python & REST SDK</h3>
@@ -98,26 +121,23 @@ export default function ResourcesPage() {
               <div className="p-5 bg-slate-950 rounded-2xl border border-slate-800 font-mono text-xs text-slate-300 space-y-2">
                 <div className="text-indigo-400"># Example Python SDK Snippet</div>
                 <div>from vivexa import Client</div>
-                <br />
-                <div>client = Client(api_key="vx_live_998273645")</div>
-                <div>response = client.query(</div>
-                <div className="pl-4">dataset_id="ds_revenue_2026",</div>
-                <div className="pl-4">prompt="Forecast Q3 revenue growth by region"</div>
+                <div>client = Client(api_key="vx_live_...")</div>
+                <div className="text-slate-500"># Query autonomous decision engine</div>
+                <div>result = client.analyst.query(</div>
+                <div className="pl-4">dataset_id="ds_enterprise_sales",</div>
+                <div className="pl-4">prompt="Forecast Q4 churn probability by cohort"</div>
                 <div>)</div>
-                <div>print(response.sql, response.forecast_summary)</div>
+                <div className="text-emerald-400">print(result.insights, result.confidence_score)</div>
               </div>
             </div>
           )}
 
           {activeTab === "faq" && (
             <div className="space-y-4 max-w-3xl mx-auto">
-              {faqs.map((f, i) => (
-                <div key={i} className="p-6 bg-slate-900/50 border border-slate-800 rounded-2xl space-y-2">
-                  <div className="text-base font-bold text-white flex items-center gap-2">
-                    <HelpCircle className="h-5 w-5 text-indigo-400 shrink-0" />
-                    {f.q}
-                  </div>
-                  <div className="text-xs text-slate-300 leading-relaxed pl-7">{f.a}</div>
+              {faqs.map((faq, i) => (
+                <div key={i} className="p-6 enterprise-card rounded-2xl space-y-2">
+                  <h3 className="text-base font-bold text-white">{faq.q}</h3>
+                  <p className="text-xs text-slate-300 leading-relaxed">{faq.a}</p>
                 </div>
               ))}
             </div>

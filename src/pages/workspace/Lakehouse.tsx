@@ -634,7 +634,7 @@ export default function Lakehouse() {
                       {catalogSubTab === 'schema' && (
                         <Button
                           variant="ghost"
-                          size="xs"
+                          size="sm"
                           onClick={runOptimizeDelta}
                           className="text-[10px] uppercase font-bold tracking-widest text-indigo-400 hover:bg-slate-800 h-7"
                         >
@@ -861,7 +861,7 @@ export default function Lakehouse() {
                                 </div>
                                 <Button
                                   variant="ghost"
-                                  size="xs"
+                                  size="sm"
                                   onClick={() => setActiveQueryExplanation(!activeQueryExplanation)}
                                   className="text-[10px] uppercase font-bold tracking-widest text-slate-400"
                                 >

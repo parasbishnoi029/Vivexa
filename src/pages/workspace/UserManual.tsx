@@ -191,7 +191,7 @@ const FAQS = [
   },
   {
     q: "How do I invite team members and assign RBAC roles?",
-    a: "Go to Organisation & Governance > Members and click 'Invite Member'. Select roles ranging from Viewer to Workspace Admin."
+    a: "Go to Organisation > Members and click 'Add Talent' or 'Invite Member'. Select roles ranging from Viewer to Workspace Admin."
   }
 ];
 

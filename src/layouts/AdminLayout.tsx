@@ -1,4 +1,5 @@
-import { Outlet, Link, NavLink } from "react-router-dom";
+import { Outlet, Link, NavLink, useLocation } from "react-router-dom";
+import { AnimatePresence, motion } from "motion/react";
 import { useState, useEffect } from "react";
 import { Users, CreditCard, Activity, Database, ShieldAlert, FileWarning, Shield, Server, HardDrive, Loader2, Mail, Bell, Menu, X } from "lucide-react";
 import { AppBackground } from "@/components/layout/AppBackground";
@@ -44,6 +45,8 @@ export default function AdminLayout() {
 
     checkRole();
   }, [user]);
+
+  const location = useLocation();
 
   if (checkingRole) {
     return (
@@ -276,7 +279,18 @@ export default function AdminLayout() {
           </header>
 
           <main className="flex-1 overflow-y-auto p-4 md:p-6 relative z-10 scrollbar-hide">
-             <Outlet />
+             <AnimatePresence mode="wait">
+               <motion.div
+                 key={location.pathname}
+                 initial={{ opacity: 0, y: 15, scale: 0.99 }}
+                 animate={{ opacity: 1, y: 0, scale: 1 }}
+                 exit={{ opacity: 0, y: -15, scale: 0.99 }}
+                 transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                 className="h-full"
+               >
+                 <Outlet />
+               </motion.div>
+             </AnimatePresence>
           </main>
         </div>
         <NotificationDrawer 

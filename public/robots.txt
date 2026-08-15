@@ -1,0 +1,23 @@
+# Vivexa Enterprise AI Robots Configuration
+User-agent: *
+Allow: /
+Allow: /platform
+Allow: /solutions
+Allow: /enterprise
+Allow: /resources
+Allow: /pricing
+Allow: /product-tour
+Allow: /book-demo
+Allow: /about
+Allow: /founders
+Allow: /privacy
+Allow: /terms
+
+# Disallow authenticated private workspace telemetry and sensitive API endpoints
+Disallow: /api/
+Disallow: /workspace/
+Disallow: /admin/
+Disallow: /auth/reset-password
+
+# Search Engines Sitemap
+Sitemap: https://vivexa.ai/sitemap.xml

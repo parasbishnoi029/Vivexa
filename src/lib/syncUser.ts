@@ -87,6 +87,28 @@ export async function syncUserAndWorkspace(user: User) {
       }
     }
 
+    // 4.5 If user joined via invitation with an invited workspace_id in user_metadata
+    const invitedWorkspaceId = user.user_metadata?.workspace_id;
+    if (invitedWorkspaceId && invitedWorkspaceId !== workspaceId) {
+      const { data: existingInvitedMember } = await supabase
+        .from('workspace_members')
+        .select('id')
+        .eq('workspace_id', invitedWorkspaceId)
+        .eq('user_id', user.id)
+        .limit(1);
+
+      if (!existingInvitedMember || existingInvitedMember.length === 0) {
+        try {
+          await supabase.from('workspace_members').insert({
+            workspace_id: invitedWorkspaceId,
+            user_id: user.id,
+            role: user.user_metadata?.role || 'Analyst',
+            status: 'active'
+          });
+        } catch (_) {}
+      }
+    }
+
     // 5. Sync subscriptions
     const { data: existingSubs } = await supabase.from('subscriptions').select('id').eq('user_id', user.id).limit(1);
     if (!existingSubs || existingSubs.length === 0) {

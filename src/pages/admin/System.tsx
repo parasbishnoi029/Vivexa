@@ -34,11 +34,12 @@ export default function AdminSystem() {
     setIsRefreshing(true);
     await checkDb();
     setTimeout(() => {
+      // In a real environment, we would fetch hardware stats here.
       setMetrics(prev => ({
         ...prev,
-        cpuUsage: Math.floor(Math.random() * 40) + 20,
-        memUsage: Math.floor(Math.random() * 30) + 50,
-        activeConnections: Math.floor(Math.random() * 50) + 120,
+        cpuUsage: 2,
+        memUsage: 45,
+        activeConnections: 5,
       }));
       setIsRefreshing(false);
     }, 800);

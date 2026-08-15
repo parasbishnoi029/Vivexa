@@ -4,6 +4,7 @@ import { exec } from "child_process";
 import fs from "fs";
 import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
+import { enforceAiQuotaMiddleware } from "./limits";
 
 export const notebookRouter = express.Router();
 
@@ -34,9 +35,33 @@ notebookRouter.post('/run', async (req, res) => {
         .from('datasets')
         .select('*')
         .eq('id', datasetId)
-        .single();
+        .maybeSingle();
 
-      if (!dsError && ds && ds.storage_path) {
+      if (dsError || !ds) {
+        return res.status(404).json(successResponse(null, { error: 'Requested dataset was not found.' }));
+      }
+
+      // Security: Strict multi-tenant isolation check
+      const isOwner = ds.user_id === user.id;
+      const isAdmin = user.email === 'parasbishnoi012@gmail.com' || user.email === 'info.vivexa@gmail.com';
+      let hasAccess = isOwner || isAdmin || ds.is_public;
+
+      if (!hasAccess && ds.workspace_id) {
+        const { data: membership } = await supabase
+          .from('workspace_members')
+          .select('id')
+          .eq('workspace_id', ds.workspace_id)
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .maybeSingle();
+        if (membership) hasAccess = true;
+      }
+
+      if (!hasAccess) {
+        return res.status(403).json(successResponse(null, { error: 'Access Denied: You do not have permission to execute operations on this dataset.' }));
+      }
+
+      if (ds.storage_path) {
         datasetName = ds.name || "active_dataset.csv";
         const tempDir = path.join(process.cwd(), 'temp_data');
         if (!fs.existsSync(tempDir)) {
@@ -249,7 +274,7 @@ notebookRouter.post('/install', async (req, res) => {
 });
 
 // POST /api/v1/notebook/copilot - Notebook AI Copilot Endpoint
-notebookRouter.post('/copilot', async (req, res) => {
+notebookRouter.post('/copilot', enforceAiQuotaMiddleware, async (req, res) => {
   const user = (req as any).user;
   const {
     mode, // 'chat' | 'generate_cell' | 'explain_cell' | 'refactor_cell' | 'fix_error' | 'comment_code' | 'convert_code'

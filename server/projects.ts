@@ -15,6 +15,32 @@ const successResponse = (data: any, meta?: any) => {
 projectsRouter.get('/:id/milestones', async (req: express.Request, res: express.Response) => {
   try {
     const { id } = req.params;
+    const user = (req as any).user;
+    if (!user) return res.status(401).json(successResponse(null, { error: 'Unauthorized' }));
+
+    // Verify user has access to project
+    const { data: project } = await supabase
+      .from('projects')
+      .select('owner_id, workspace_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (project && project.owner_id !== user.id) {
+      // Check workspace membership
+      if (project.workspace_id) {
+        const { data: member } = await supabase
+          .from('workspace_members')
+          .select('id')
+          .eq('workspace_id', project.workspace_id)
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .maybeSingle();
+        if (!member && user.email !== 'parasbishnoi012@gmail.com' && user.email !== 'info.vivexa@gmail.com') {
+          return res.status(403).json(successResponse(null, { error: 'Access denied to this project.' }));
+        }
+      }
+    }
+
     const { data, error } = await supabase
       .from('project_milestones')
       .select('*')
@@ -22,7 +48,6 @@ projectsRouter.get('/:id/milestones', async (req: express.Request, res: express.
       .order('created_at', { ascending: true });
 
     if (error) {
-      // If table doesn't exist yet, return defaults
       if (error.code === 'PGRST116' || error.message.includes('not found')) {
         return res.json(successResponse([]));
       }
@@ -44,11 +69,34 @@ projectsRouter.post('/:id/milestones', async (req: express.Request, res: express
 
     if (!user) return res.status(401).json(successResponse(null, { error: 'Unauthorized' }));
 
+    // Verify user has edit access to project
+    const { data: project } = await supabase
+      .from('projects')
+      .select('owner_id, workspace_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (project && project.owner_id !== user.id) {
+      if (project.workspace_id) {
+        const { data: member } = await supabase
+          .from('workspace_members')
+          .select('role')
+          .eq('workspace_id', project.workspace_id)
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .maybeSingle();
+        const role = member?.role?.toLowerCase();
+        const isEditor = role === 'owner' || role === 'admin' || role === 'manager' || role === 'analyst';
+        if (!isEditor && user.email !== 'parasbishnoi012@gmail.com' && user.email !== 'info.vivexa@gmail.com') {
+          return res.status(403).json(successResponse(null, { error: 'Access denied to modify milestones for this project.' }));
+        }
+      }
+    }
+
     // Delete existing milestones and re-insert or use upsert if milestones have IDs
-    // For simplicity, we'll wipe and re-insert for the roadmap
     await supabase.from('project_milestones').delete().eq('project_id', id);
 
-    const toInsert = milestones.map((m: any) => ({
+    const toInsert = (milestones || []).map((m: any) => ({
       project_id: id,
       user_id: user.id,
       label: m.label,

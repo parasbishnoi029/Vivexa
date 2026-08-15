@@ -9,15 +9,20 @@ import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/lib/supabase";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
-const DUMMY_CHART_DATA = [
-  { name: 'Mon', requests: 4000, users: 2400 },
-  { name: 'Tue', requests: 3000, users: 1398 },
-  { name: 'Wed', requests: 2000, users: 9800 },
-  { name: 'Thu', requests: 2780, users: 3908 },
-  { name: 'Fri', requests: 1890, users: 4800 },
-  { name: 'Sat', requests: 2390, users: 3800 },
-  { name: 'Sun', requests: 3490, users: 4300 },
-];
+const generateEmptyChartData = () => {
+  const jsDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const newChartData = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().split('T')[0];
+    const dayName = jsDays[d.getDay()];
+    newChartData.push({ name: dayName, dateStr, requests: 0, users: 0 });
+  }
+  return newChartData;
+};
+
+const INITIAL_CHART_DATA = generateEmptyChartData();
 
 const container = {
   hidden: { opacity: 0 },
@@ -55,7 +60,7 @@ export default function AdminDashboard() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [chartData, setChartData] = useState(DUMMY_CHART_DATA);
+  const [chartData, setChartData] = useState(INITIAL_CHART_DATA);
 
   useEffect(() => {
     async function loadStats() {
@@ -131,13 +136,13 @@ export default function AdminDashboard() {
 
           // Graceful fallback values derived directly from live database counts
           setStats({
-            totalUsers: Math.max(userCount || 0, 3), // min 3 platform users (Paras, Karunya, test_uploader)
-            activeUsers: Math.max(userCount || 0, 3),
-            monthlyActiveUsers: Math.max(userCount || 0, 3),
+            totalUsers: userCount || 0,
+            activeUsers: userCount || 0,
+            monthlyActiveUsers: userCount || 0,
             pendingInvitations: 0,
-            organizations: Math.max(orgCount || 0, 1),
-            workspaces: Math.max(workspaceCount || 0, 1),
-            adminAccounts: 2, // Paras & Karunya are admins
+            organizations: orgCount || 0,
+            workspaces: workspaceCount || 0,
+            adminAccounts: 0,
             storageUsageGB: storageUsageGB,
             aiUsage: aiCount || 0,
             apiUsage: 0,

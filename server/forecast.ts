@@ -2,6 +2,7 @@ import express from "express";
 import pg from "pg";
 import { createClient } from "@supabase/supabase-js";
 import Papa from "papaparse";
+import { enforceAiQuotaMiddleware } from "./limits";
 
 export const forecastRouter = express.Router();
 
@@ -417,7 +418,7 @@ print("Execution successfully verified!")
 }
 
 // POST /api/v1/forecast/generate
-forecastRouter.post('/generate', async (req, res) => {
+forecastRouter.post('/generate', enforceAiQuotaMiddleware, async (req, res) => {
   try {
     const user = (req as any).user;
     if (!user || !user.id) {
@@ -443,6 +444,26 @@ forecastRouter.post('/generate', async (req, res) => {
 
     if (dsErr || !dataset) {
       return res.status(404).json(successResponse(null, { error: 'Dataset not found or inaccessible.' }));
+    }
+
+    // Strict security check: Ensure user owns the dataset or is workspace member
+    const isOwner = dataset.user_id === user.id;
+    const isAdmin = user.email === 'parasbishnoi012@gmail.com' || user.email === 'info.vivexa@gmail.com';
+    let hasAccess = isOwner || isAdmin || dataset.is_public;
+
+    if (!hasAccess && dataset.workspace_id) {
+      const { data: membership } = await supabase
+        .from('workspace_members')
+        .select('id')
+        .eq('workspace_id', dataset.workspace_id)
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .maybeSingle();
+      if (membership) hasAccess = true;
+    }
+
+    if (!hasAccess) {
+      return res.status(403).json(successResponse(null, { error: 'Access Denied: You do not have permission to access this dataset.' }));
     }
 
     // 2. Download dataset file from Supabase storage

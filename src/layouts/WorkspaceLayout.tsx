@@ -358,7 +358,7 @@ export default function WorkspaceLayout() {
               </div>
 
               <div className="mt-6 relative z-10">
-                <div className="px-6 text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-2 opacity-80">Organisation & Governance</div>
+                <div className="px-6 text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-2 opacity-80">Organisation</div>
                 <nav className="space-y-1 px-3">
                   <NavItem to="/workspace/global-search" icon={Search}>Global Search</NavItem>
                   <NavItem to="/workspace/ontology" icon={Boxes}>Enterprise Ontology</NavItem>
@@ -526,7 +526,7 @@ export default function WorkspaceLayout() {
                   </div>
 
                   <div className="mt-6 relative z-10">
-                    <div className="px-3 text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-2 opacity-80">Organisation & Governance</div>
+                    <div className="px-3 text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-2 opacity-80">Organisation</div>
                     <nav className="space-y-1 px-1">
                       <NavItem to="/workspace/global-search" icon={Search} onClick={() => setIsMobileSidebarOpen(false)}>Global Search</NavItem>
                       <NavItem to="/workspace/ontology" icon={Boxes} onClick={() => setIsMobileSidebarOpen(false)}>Enterprise Ontology</NavItem>

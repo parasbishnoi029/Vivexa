@@ -519,7 +519,13 @@ print(df.describe())`,
 
       const result = await response.json();
       if (!result.success || !result.data) {
-        throw new Error(result.error || "Failed to receive response from decision intelligence officer");
+        if (response.status === 429 || result.error === "AI_QUOTA_EXCEEDED" || result.code === "LIMIT_CONTROL_BLOCKED") {
+          triggerQuotaModal();
+          toast.error(result.message || "Monthly AI API quota reached for your plan. Please upgrade.");
+          setIsStreaming(false);
+          return;
+        }
+        throw new Error(result.error || result.message || "Failed to receive response from decision intelligence officer");
       }
 
       incrementAiUsage(1);

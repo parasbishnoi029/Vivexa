@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { ProjectWizard } from "@/components/ui/project-wizard";
 import { ShareDialog } from "@/components/ShareDialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useWorkspaceRealtime } from "@/hooks/useWorkspaceRealtime";
 
 const container = {
   hidden: { opacity: 0 },
@@ -67,11 +68,16 @@ export default function WorkspaceDashboard() {
   const navigate = useNavigate();
   const selectedWorkspaceId = useWorkspaceStore(state => state.selectedWorkspaceId);
 
-  // Core State
-  const [stats, setStats] = useState({ projects: 0, datasets: 0, reports: 0, ai: 0, storage: 0 });
-  const [recentProjects, setRecentProjects] = useState<any[]>([]);
-  const [recentDatasets, setRecentDatasets] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Real-time synchronization hook for live counts across active devices
+  const {
+    stats,
+    recentProjects,
+    recentDatasets,
+    loading,
+    isLive,
+    refetch
+  } = useWorkspaceRealtime({ enableToasts: false });
+
   const [latestProfile, setLatestProfile] = useState<DatasetProfile | null>(null);
 
   // Modals
@@ -99,6 +105,26 @@ export default function WorkspaceDashboard() {
 
   // Seeding Sample Datasets state
   const [isSeeding, setIsSeeding] = useState(false);
+
+  // Process latest dataset profile for validation report
+  useEffect(() => {
+    if (recentDatasets && recentDatasets.length > 0) {
+      const ds = recentDatasets[0];
+      let prof: DatasetProfile | null = null;
+      if (ds.profile_json) {
+        try {
+          prof = typeof ds.profile_json === 'string' ? JSON.parse(ds.profile_json) : ds.profile_json;
+        } catch (e) {
+          prof = null;
+        }
+      }
+      if (prof) {
+        const report = AnalysisValidator.runFullMultiPassValidation(prof);
+        prof.validationReport = report;
+        setLatestProfile(prof);
+      }
+    }
+  }, [recentDatasets]);
 
   // Live Metric Simulation Effect
   useEffect(() => {
@@ -178,111 +204,6 @@ export default function WorkspaceDashboard() {
     }
   };
 
-  // Fetch Supabase Data
-  useEffect(() => {
-    if (!user) return;
-
-    async function loadData() {
-      setLoading(true);
-      try {
-        let projectsQuery = supabase.from('projects').select('*');
-        let projectsCountQuery = supabase.from('projects').select('*', { count: 'exact', head: true });
-        let datasetsQuery = supabase.from('datasets').select('*');
-        let datasetsCountQuery = supabase.from('datasets').select('*', { count: 'exact', head: true });
-        let datasetsStorageQuery = supabase.from('datasets').select('size_bytes');
-        let reportsCountQuery = supabase.from('reports').select('*', { count: 'exact', head: true });
-        let aiConversationsQuery = supabase.from('ai_conversations').select('*', { count: 'exact', head: true });
-
-        if (selectedWorkspaceId && selectedWorkspaceId !== "all") {
-          projectsQuery = projectsQuery.eq('workspace_id', selectedWorkspaceId);
-          projectsCountQuery = projectsCountQuery.eq('workspace_id', selectedWorkspaceId);
-
-          const { data: workspaceProjects } = await supabase
-            .from('projects')
-            .select('id')
-            .eq('workspace_id', selectedWorkspaceId);
-          const projectIds = workspaceProjects?.map(p => p.id) || [];
-
-          if (projectIds.length > 0) {
-            const projectFilterStr = `project_id.in.(${projectIds.join(',')}),and(user_id.eq.${user.id},project_id.is.null)`;
-            datasetsQuery = datasetsQuery.or(projectFilterStr);
-            datasetsCountQuery = datasetsCountQuery.or(projectFilterStr);
-            datasetsStorageQuery = datasetsStorageQuery.or(projectFilterStr);
-            reportsCountQuery = reportsCountQuery.or(`project_id.in.(${projectIds.join(',')}),and(user_id.eq.${user.id},project_id.is.null)`);
-          } else {
-            datasetsQuery = datasetsQuery.eq('user_id', user.id).is('project_id', null);
-            datasetsCountQuery = datasetsCountQuery.eq('user_id', user.id).is('project_id', null);
-            datasetsStorageQuery = datasetsStorageQuery.eq('user_id', user.id).is('project_id', null);
-            reportsCountQuery = reportsCountQuery.eq('user_id', user.id).is('project_id', null);
-          }
-          
-          aiConversationsQuery = aiConversationsQuery.eq('user_id', user.id);
-        } else {
-          projectsQuery = projectsQuery.eq('owner_id', user?.id);
-          projectsCountQuery = projectsCountQuery.eq('owner_id', user?.id);
-          datasetsQuery = datasetsQuery.eq('user_id', user?.id);
-          datasetsCountQuery = datasetsCountQuery.eq('user_id', user?.id);
-          datasetsStorageQuery = datasetsStorageQuery.eq('user_id', user?.id);
-          reportsCountQuery = reportsCountQuery.eq('user_id', user?.id);
-          aiConversationsQuery = aiConversationsQuery.eq('user_id', user?.id);
-        }
-
-        const [
-          { count: projectsCount },
-          { count: datasetsCount },
-          { count: reportsCount },
-          { count: aiCount },
-          { data: storageData },
-          { data: recentProjs },
-          { data: recentDS }
-        ] = await Promise.all([
-          projectsCountQuery,
-          datasetsCountQuery,
-          reportsCountQuery,
-          aiConversationsQuery,
-          datasetsStorageQuery,
-          projectsQuery.order('updated_at', { ascending: false }).limit(4),
-          datasetsQuery.order('created_at', { ascending: false }).limit(4)
-        ]);
-
-        if (recentDS && recentDS.length > 0) {
-          const ds = recentDS[0];
-          let prof: DatasetProfile | null = null;
-          if (ds.profile_json) {
-            try {
-              prof = typeof ds.profile_json === 'string' ? JSON.parse(ds.profile_json) : ds.profile_json;
-            } catch (e) {
-              prof = null;
-            }
-          }
-          if (prof) {
-            const report = AnalysisValidator.runFullMultiPassValidation(prof);
-            prof.validationReport = report;
-            setLatestProfile(prof);
-          }
-        }
-
-        const storageUsed = storageData?.reduce((acc, curr) => acc + (curr.size_bytes || 0), 0) || 0;
-        setStats({
-          projects: projectsCount || 0,
-          datasets: datasetsCount || 0,
-          reports: reportsCount || 0,
-          ai: aiCount || 0,
-          storage: storageUsed / (1024 * 1024 * 1024)
-        });
-
-        setRecentProjects(recentProjs || []);
-        setRecentDatasets(recentDS || []);
-      } catch (err) {
-        console.error("Failed to load dashboard data", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadData();
-  }, [user, selectedWorkspaceId]);
-
   // Handle AI Query Submission
   const handleGenerateInsight = (customPrompt?: string) => {
     const targetQuery = customPrompt || chatQuery;
@@ -337,8 +258,7 @@ export default function WorkspaceDashboard() {
       if (error) throw error;
 
       toast.success("Successfully created 3 Enterprise Datasets!");
-      setRecentDatasets(data || []);
-      setStats(prev => ({ ...prev, datasets: prev.datasets + (data?.length || 0) }));
+      refetch();
     } catch (err: any) {
       toast.error(err.message || "Failed to seed datasets");
     } finally {
@@ -457,6 +377,11 @@ export default function WorkspaceDashboard() {
                 <Sparkles className="h-3 w-3" /> AI Analytics OS
               </span>
               <span className="text-xs text-slate-500 font-mono">NODE: ASIA-EAST1</span>
+              <span className="text-xs text-slate-500">•</span>
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                {isLive ? "Supabase Realtime: Live" : "Supabase Realtime: Syncing"}
+              </span>
             </div>
             <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
               {welcomeGreeting}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-300 to-cyan-400">{userName}</span>
@@ -467,6 +392,13 @@ export default function WorkspaceDashboard() {
           </motion.div>
 
           <motion.div variants={item} className="flex flex-wrap items-center gap-3">
+            <Button 
+              onClick={() => navigate('/workspace/organization')}
+              variant="outline"
+              className="h-11 px-5 rounded-xl bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-800 hover:text-white text-xs font-bold transition-all"
+            >
+              <Users className="mr-2 h-4 w-4 text-indigo-400" /> Manage Talent
+            </Button>
             <Button 
               onClick={() => navigate('/workspace/datasets')}
               variant="outline"
@@ -499,7 +431,7 @@ export default function WorkspaceDashboard() {
         </div>
 
         {/* TOP KPI CARDS */}
-        <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <Card 
             onClick={() => navigate('/workspace/projects')}
             className="bg-slate-900/50 border-slate-800/80 hover:border-indigo-500/50 transition-all cursor-pointer group rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl"
@@ -585,6 +517,28 @@ export default function WorkspaceDashboard() {
             <div className="mt-3 pt-3 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-500">
               <span>View Forecasting Models</span>
               <ChevronRight className="h-3.5 w-3.5 text-slate-600 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
+            </div>
+          </Card>
+
+          <Card 
+            onClick={() => navigate('/workspace/organization')}
+            className="bg-slate-900/50 border-slate-800/80 hover:border-indigo-500/50 transition-all cursor-pointer group rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl"
+          >
+            <div className="flex items-center justify-between">
+              <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 group-hover:scale-110 transition-transform">
+                <Users className="h-5 w-5" />
+              </div>
+              <span className="text-[10px] font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
+                {stats.pendingInvites} Pending
+              </span>
+            </div>
+            <div className="mt-4">
+              <div className="text-3xl font-black text-white tracking-tight">{stats.members}</div>
+              <div className="text-xs font-bold text-slate-400 mt-0.5">Team & Talent Members</div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-500">
+              <span>Manage Organisation</span>
+              <ChevronRight className="h-3.5 w-3.5 text-slate-600 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
             </div>
           </Card>
         </motion.div>

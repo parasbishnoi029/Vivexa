@@ -10,6 +10,7 @@ import { PublicNavbar } from "@/components/landing/PublicNavbar";
 import { PublicFooter } from "@/components/landing/PublicFooter";
 import { Founders } from "@/components/landing/Founders";
 import { AppBackground } from "@/components/layout/AppBackground";
+import { SEOHead } from "@/components/seo/SEOHead";
 
 export default function LandingPage() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -83,6 +84,23 @@ export default function LandingPage() {
 
   return (
     <div className="relative min-h-screen bg-[#030712] overflow-hidden selection:bg-indigo-500/30 text-white" ref={containerRef}>
+      <SEOHead
+        title="Vivexa | Enterprise AI Decision Intelligence & Autonomous Analytics Operating System"
+        description="Transform multi-source databases into explainable, automated, and audited business decisions. Natural language SQL, neural time-series forecasting, collaborative notebooks, and multi-agent workflows."
+        keywords={[
+          "Enterprise AI Decision Intelligence",
+          "Autonomous Data Science",
+          "Enterprise Analytics Operating System",
+          "Natural Language SQL Synthesis",
+          "Predictive Time-Series Forecasting",
+          "Unified Lakehouse Analytics",
+          "Looker Databricks Alternative",
+          "Zero Hallucination BI",
+          "IIT Jodhpur AI",
+          "Paras Bishnoi",
+          "Karunya Sharma"
+        ]}
+      />
       <AppBackground centered={false}>
         <PublicNavbar />
 
@@ -99,19 +117,19 @@ export default function LandingPage() {
               
               {/* Eye-catching Startup Version Badge */}
               <motion.div
-                initial={{ opacity: 0, y: -15 }}
+                initial={{ opacity: 0, y: -8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
+                transition={{ duration: 0.35, ease: "easeOut" }}
                 className="mb-8 inline-flex items-center gap-2 rounded-full border border-indigo-500/20 bg-indigo-500/5 px-4 py-1.5 text-[11px] font-semibold text-indigo-300 backdrop-blur-md"
               >
-                <Sparkles className="h-3.5 w-3.5 text-indigo-400 animate-pulse" />
+                <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
                 <span>Enterprise Decision Intelligence Platform v3.5</span>
               </motion.div>
 
               <motion.h1
-                initial={{ opacity: 0, y: 25 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.1 }}
+                transition={{ duration: 0.45, delay: 0.05, ease: "easeOut" }}
                 className="max-w-5xl text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-none text-slate-100"
               >
                 The Autonomous Data Science <br />
@@ -121,9 +139,9 @@ export default function LandingPage() {
               </motion.h1>
 
               <motion.p
-                initial={{ opacity: 0, y: 25 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.2 }}
+                transition={{ duration: 0.45, delay: 0.1, ease: "easeOut" }}
                 className="mt-6 max-w-3xl text-sm sm:text-base md:text-lg leading-relaxed text-slate-400 font-normal"
               >
                 Vivexa acts as an on-demand, secure AI Data Science Team—synthesizing raw queries, auditing relational models, and deploying automated predictive forecasts directly to executive decision boards.
@@ -131,9 +149,9 @@ export default function LandingPage() {
 
               {/* Core CTAs */}
               <motion.div
-                initial={{ opacity: 0, y: 25 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.3 }}
+                transition={{ duration: 0.45, delay: 0.15, ease: "easeOut" }}
                 className="mt-10 flex flex-wrap items-center justify-center gap-4"
               >
                 <Link

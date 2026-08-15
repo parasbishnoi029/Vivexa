@@ -2,6 +2,7 @@ import { useState } from "react";
 import { PublicNavbar } from "@/components/landing/PublicNavbar";
 import { PublicFooter } from "@/components/landing/PublicFooter";
 import { AppBackground } from "@/components/layout/AppBackground";
+import { SEOHead } from "@/components/seo/SEOHead";
 import { Calendar, Clock, CheckCircle2, Building2, User, Mail, ShieldCheck, ArrowRight, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
@@ -49,6 +50,16 @@ export default function BookDemoPage() {
 
   return (
     <div className="relative min-h-screen bg-[#030712] text-white selection:bg-indigo-500/30">
+      <SEOHead
+        title="Book an Executive 1-on-1 Demo | Vivexa AI"
+        description="Schedule a technical walkthrough with Vivexa's founders. Explore how our autonomous decision intelligence platform fits into your enterprise data architecture."
+        keywords={[
+          "Book Vivexa Demo",
+          "Enterprise AI Analytics Demo",
+          "Decision Intelligence Walkthrough",
+          "Talk to AI Researchers"
+        ]}
+      />
       <AppBackground centered={false}>
         <PublicNavbar />
 
@@ -68,7 +79,7 @@ export default function BookDemoPage() {
 
           <div className="grid lg:grid-cols-2 gap-8 items-start max-w-5xl mx-auto">
             {/* Form */}
-            <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8 backdrop-blur-xl shadow-2xl space-y-6">
+            <div className="enterprise-card rounded-3xl p-8 shadow-2xl space-y-6">
               {submitted ? (
                 <div className="text-center py-12 space-y-4">
                   <div className="h-16 w-16 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-full flex items-center justify-center mx-auto">
@@ -111,23 +122,24 @@ export default function BookDemoPage() {
                       <label className="text-xs font-bold text-slate-300 mb-1 block">Company Name</label>
                       <input
                         type="text"
-                        placeholder="Acme Corp"
+                        placeholder="Acme Enterprises"
                         value={formData.companyName}
                         onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
                         className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-500"
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-slate-300 mb-1 block">Role / Title</label>
+                      <label className="text-xs font-bold text-slate-300 mb-1 block">Your Role</label>
                       <select
                         value={formData.jobTitle}
                         onChange={(e) => setFormData({ ...formData, jobTitle: e.target.value })}
                         className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
                       >
-                        <option>CTO / CIO / Head of Data</option>
-                        <option>Data Scientist / Engineer</option>
-                        <option>CEO / Founder / Executive</option>
-                        <option>Product / Analytics Manager</option>
+                        <option value="CTO / CIO / Head of Data">CTO / CIO / Head of Data</option>
+                        <option value="Senior Data Scientist">Senior Data Scientist</option>
+                        <option value="VP of Product / Analytics">VP of Product / Analytics</option>
+                        <option value="Executive / Founder">Executive / Founder</option>
+                        <option value="Engineering Manager">Engineering Manager</option>
                       </select>
                     </div>
                   </div>
@@ -143,55 +155,53 @@ export default function BookDemoPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-slate-300 mb-1 block">Deployment Architecture</label>
-                      <select
-                        value={formData.deploymentNeed}
-                        onChange={(e) => setFormData({ ...formData, deploymentNeed: e.target.value })}
+                      <label className="text-xs font-bold text-slate-300 mb-1 block">Preferred Time</label>
+                      <input
+                        type="text"
+                        value={formData.preferredTime}
+                        onChange={(e) => setFormData({ ...formData, preferredTime: e.target.value })}
                         className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
-                      >
-                        <option>Multi-Tenant SaaS Cloud</option>
-                        <option>Dedicated Private VPC</option>
-                        <option>Air-Gapped On-Premise Kubernetes</option>
-                      </select>
+                      />
                     </div>
                   </div>
 
-                  <button
-                    type="submit"
-                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition-all pt-3"
-                  >
-                    Confirm Demo Booking <ArrowRight className="h-4 w-4" />
-                  </button>
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition-colors flex items-center justify-center gap-2"
+                    >
+                      Confirm Walkthrough <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
                 </form>
               )}
             </div>
 
-            {/* What to Expect Side Panel */}
+            {/* Sidebar info */}
             <div className="space-y-6">
-              <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-6 space-y-4 backdrop-blur-xl">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-indigo-400" /> What to Expect in Your Session
-                </h3>
+              <div className="enterprise-card rounded-3xl p-6 space-y-4">
+                <div className="text-sm font-bold text-white">What We Cover in the Demo:</div>
                 <div className="space-y-3 text-xs text-slate-300">
-                  <div className="flex items-start gap-3">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>30-minute tailored architecture review with our core founders</span>
+                  <div className="flex items-start gap-2.5">
+                    <CheckCircle2 className="h-4 w-4 text-indigo-400 shrink-0 mt-0.5" />
+                    <span>Live multi-table schema inference on your specific industry schemas</span>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>Live query benchmarking against your sample dataset schemas</span>
+                  <div className="flex items-start gap-2.5">
+                    <CheckCircle2 className="h-4 w-4 text-indigo-400 shrink-0 mt-0.5" />
+                    <span>Air-gapped VPC and zero data retention deployment options</span>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>Custom security, SOC2, and zero-retention SLA verification</span>
+                  <div className="flex items-start gap-2.5">
+                    <CheckCircle2 className="h-4 w-4 text-indigo-400 shrink-0 mt-0.5" />
+                    <span>Custom model fine-tuning and proprietary connector integrations</span>
                   </div>
                 </div>
               </div>
 
-              <div className="p-6 bg-slate-950 rounded-3xl border border-slate-800 space-y-2 text-center">
-                <ShieldCheck className="h-8 w-8 text-rose-400 mx-auto" />
-                <div className="text-xs font-bold text-white">Zero Pressure Guarantee</div>
-                <div className="text-[11px] text-slate-400">No pushy sales reps. You speak directly with our engineering founders.</div>
+              <div className="p-6 bg-indigo-950/20 border border-indigo-500/20 rounded-3xl space-y-2">
+                <div className="text-xs font-bold text-indigo-300">Direct Founder Access</div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  You will meet directly with IIT Jodhpur founding researchers to discuss technical architecture, custom SQL/Python plugins, and enterprise security SLAs.
+                </p>
               </div>
             </div>
           </div>

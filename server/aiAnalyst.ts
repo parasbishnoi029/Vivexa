@@ -1,5 +1,6 @@
 import express from "express";
 import { GoogleGenAI, Type } from "@google/genai";
+import { enforceAiQuotaMiddleware } from "./limits";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
@@ -81,6 +82,7 @@ async function callGeminiWithFallback(options: CallGeminiOptions) {
 }
 
 export const aiAnalystRouter = express.Router();
+aiAnalystRouter.use(enforceAiQuotaMiddleware);
 
 const successResponse = (data: any, meta?: any) => {
   return { success: true, data, meta: meta || null, error: null };

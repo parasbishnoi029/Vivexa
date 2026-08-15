@@ -4,7 +4,7 @@
  */
 
 import { Suspense, lazy, useEffect } from "react";
-import { RouterProvider, createBrowserRouter, Navigate } from "react-router-dom";
+import { RouterProvider, createBrowserRouter, Navigate, Outlet, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "./providers/ThemeProvider";
@@ -12,10 +12,12 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Skeleton } from "./components/ui/skeleton";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { useAuthStore } from "./stores/authStore";
+import { AnimatePresence, motion } from "motion/react";
 
 // Core layouts
 import WorkspaceLayout from "./layouts/WorkspaceLayout";
 import AdminLayout from "./layouts/AdminLayout";
+import PublicLayout from "./layouts/PublicLayout";
 
 // Helper for resilient lazy imports
 function lazyWithRetry<T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>) {
@@ -244,6 +246,24 @@ const PageLoader = () => {
   );
 };
 
+function RootLayout() {
+  const location = useLocation();
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={location.pathname}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+        className="w-full h-full"
+      >
+        <Outlet />
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -255,56 +275,64 @@ const queryClient = new QueryClient({
 
 const router = createBrowserRouter([
   {
-    path: "/",
-    element: <Suspense fallback={<PageLoader />}><LandingPage /></Suspense>,
-  },
-  {
-    path: "/founders",
-    element: <Suspense fallback={<PageLoader />}><FoundersPage /></Suspense>,
-  },
-  {
-    path: "/about",
-    element: <Suspense fallback={<PageLoader />}><AboutPage /></Suspense>,
-  },
-  {
-    path: "/platform",
-    element: <Suspense fallback={<PageLoader />}><PlatformPage /></Suspense>,
-  },
-  {
-    path: "/solutions",
-    element: <Suspense fallback={<PageLoader />}><SolutionsPage /></Suspense>,
-  },
-  {
-    path: "/enterprise",
-    element: <Suspense fallback={<PageLoader />}><EnterprisePage /></Suspense>,
-  },
-  {
-    path: "/resources",
-    element: <Suspense fallback={<PageLoader />}><ResourcesPage /></Suspense>,
-  },
-  {
-    path: "/docs",
-    element: <Suspense fallback={<PageLoader />}><ResourcesPage /></Suspense>,
-  },
-  {
-    path: "/pricing",
-    element: <Suspense fallback={<PageLoader />}><PricingPage /></Suspense>,
-  },
-  {
-    path: "/product-tour",
-    element: <Suspense fallback={<PageLoader />}><ProductTourPage /></Suspense>,
-  },
-  {
-    path: "/book-demo",
-    element: <Suspense fallback={<PageLoader />}><BookDemoPage /></Suspense>,
-  },
-  {
-    path: "/terms",
-    element: <Suspense fallback={<PageLoader />}><TermsPage /></Suspense>,
-  },
-  {
-    path: "/privacy",
-    element: <Suspense fallback={<PageLoader />}><PrivacyPage /></Suspense>,
+    element: <RootLayout />,
+    children: [
+      {
+        element: <PublicLayout />,
+        children: [
+      {
+        path: "/",
+        element: <Suspense fallback={<PageLoader />}><LandingPage /></Suspense>,
+      },
+      {
+        path: "/founders",
+        element: <Suspense fallback={<PageLoader />}><FoundersPage /></Suspense>,
+      },
+      {
+        path: "/about",
+        element: <Suspense fallback={<PageLoader />}><AboutPage /></Suspense>,
+      },
+      {
+        path: "/platform",
+        element: <Suspense fallback={<PageLoader />}><PlatformPage /></Suspense>,
+      },
+      {
+        path: "/solutions",
+        element: <Suspense fallback={<PageLoader />}><SolutionsPage /></Suspense>,
+      },
+      {
+        path: "/enterprise",
+        element: <Suspense fallback={<PageLoader />}><EnterprisePage /></Suspense>,
+      },
+      {
+        path: "/resources",
+        element: <Suspense fallback={<PageLoader />}><ResourcesPage /></Suspense>,
+      },
+      {
+        path: "/docs",
+        element: <Suspense fallback={<PageLoader />}><ResourcesPage /></Suspense>,
+      },
+      {
+        path: "/pricing",
+        element: <Suspense fallback={<PageLoader />}><PricingPage /></Suspense>,
+      },
+      {
+        path: "/product-tour",
+        element: <Suspense fallback={<PageLoader />}><ProductTourPage /></Suspense>,
+      },
+      {
+        path: "/book-demo",
+        element: <Suspense fallback={<PageLoader />}><BookDemoPage /></Suspense>,
+      },
+      {
+        path: "/terms",
+        element: <Suspense fallback={<PageLoader />}><TermsPage /></Suspense>,
+      },
+      {
+        path: "/privacy",
+        element: <Suspense fallback={<PageLoader />}><PrivacyPage /></Suspense>,
+      },
+    ]
   },
   {
     path: "/login",
@@ -312,6 +340,14 @@ const router = createBrowserRouter([
   },
   {
     path: "/register",
+    element: <Suspense fallback={<PageLoader />}><Register /></Suspense>,
+  },
+  {
+    path: "/invite",
+    element: <Suspense fallback={<PageLoader />}><Register /></Suspense>,
+  },
+  {
+    path: "/invite/accept",
     element: <Suspense fallback={<PageLoader />}><Register /></Suspense>,
   },
   {
@@ -544,7 +580,11 @@ const router = createBrowserRouter([
     path: "*",
     element: <Suspense fallback={<PageLoader />}><NotFound /></Suspense>,
   }
+  ] // end of RootLayout children
+  }
 ]);
+
+import { HelmetProvider } from "react-helmet-async";
 
 export default function App() {
   useEffect(() => {
@@ -553,12 +593,25 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider defaultTheme="system" storageKey="vivexa-ui-theme">
-          <RouterProvider router={router} />
-          <Toaster position="top-right" theme="dark" />
-        </ThemeProvider>
-      </QueryClientProvider>
+      <HelmetProvider>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider defaultTheme="system" storageKey="vivexa-ui-theme">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key="app-router-wrapper"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                className="w-full h-full"
+              >
+                <RouterProvider router={router} />
+              </motion.div>
+            </AnimatePresence>
+            <Toaster position="top-right" theme="dark" />
+          </ThemeProvider>
+        </QueryClientProvider>
+      </HelmetProvider>
     </ErrorBoundary>
   );
 }

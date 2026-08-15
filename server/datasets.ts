@@ -1,6 +1,7 @@
 import express from "express";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
+import { checkDatasetUploadLimit } from "./limits";
 
 const upload = multer({ limits: { fileSize: 100 * 1024 * 1024 } });
 export const datasetsRouter = express.Router({ mergeParams: true });
@@ -64,6 +65,17 @@ datasetsRouter.post('/upload', upload.single("file"), async (req, res) => {
 
   if (!req.file) {
     return res.status(400).json(successResponse(null, { error: 'No file uploaded' }));
+  }
+
+  // Enforce tier limit for datasets count & file size
+  const limitCheck = await checkDatasetUploadLimit(user, req.file.size);
+  if (!limitCheck.allowed) {
+    return res.status(403).json({
+      success: false,
+      error: limitCheck.code || "LIMIT_EXCEEDED",
+      message: limitCheck.error,
+      data: null
+    });
   }
 
   try {

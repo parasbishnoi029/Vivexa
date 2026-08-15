@@ -1,20 +1,119 @@
 @import "tailwindcss";
 
+@layer base {
+  :root {
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    letter-spacing: -0.011em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    font-weight: 800;
+  }
+  
+  h1 {
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    line-height: 1.1;
+  }
+
+  h2 {
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.15;
+  }
+
+  h3 {
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+  }
+
+  p, span, div, li {
+    line-height: 1.6;
+  }
+
+  code, kbd, samp, pre {
+    font-family: var(--font-mono);
+  }
+}
+
+/* Custom Minimal Enterprise Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
+}
+
+/* Minimalist Enterprise Glass & Border Styles */
+.enterprise-card {
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.enterprise-card:hover {
+  border-color: rgba(99, 102, 241, 0.35);
+}
+
+/* Focus and Outline States */
+*:focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.6);
+  outline-offset: 2px;
+}
+
+/* Accessibility: Respect Reduced Motion Preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Fluid Theme Switch Transition */
 .theme-transitioning,
 .theme-transitioning * {
-  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
-              border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
-              color 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
-              box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
-              fill 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
-              stroke 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              color 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              fill 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              stroke 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
   transition-delay: 0s !important;
 }
 
 /* Print-Specific Media Query for High-Fidelity PDF and Paper Reports */
 @media print {
-  /* Hide typical non-printable elements such as sidebar navigation, chat floats, headers, footers and action triggers */
   header, 
   footer, 
   aside, 
@@ -28,7 +127,6 @@
     display: none !important;
   }
 
-  /* Reset layout for full width page output */
   body, 
   html, 
   main, 
@@ -44,7 +142,6 @@
     overflow: visible !important;
   }
 
-  /* Enforce dark-on-light theme contrast for print readability */
   * {
     color-scheme: light !important;
     color: #0f172a !important;
@@ -54,14 +151,12 @@
     box-shadow: none !important;
   }
 
-  /* Force page breaks on designated sections or tables */
   .page-break,
   .print-page-break {
     page-break-before: always !important;
     break-before: page !important;
   }
 
-  /* Keep table rows and cards together where possible */
   tr, 
   .card,
   .print-keep-together {
@@ -69,7 +164,6 @@
     break-inside: avoid !important;
   }
 
-  /* Ensure maps, charts and diagrams fill the visible container and print perfectly */
   .recharts-responsive-container,
   .chart-container,
   svg {
@@ -78,18 +172,14 @@
     break-inside: avoid !important;
   }
 
-  /* Display clean explicit links next to anchored tags */
   a[href]:after {
     content: " (" attr(href) ")";
     font-size: 0.8rem;
     color: #64748b;
   }
 
-  /* Suppress links that are internal references or empty anchors */
   a[href^="#"]:after,
   a[href^="javascript:"]:after {
     content: "" !important;
   }
 }
-
-

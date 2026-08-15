@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { PublicNavbar } from "@/components/landing/PublicNavbar";
 import { PublicFooter } from "@/components/landing/PublicFooter";
 import { AppBackground } from "@/components/layout/AppBackground";
+import { SEOHead } from "@/components/seo/SEOHead";
 import {
   Github, Linkedin, ExternalLink, Code2, Brain, Sparkles, Rocket,
   Award, BookOpen, Layers, CheckCircle2, ArrowRight, ShieldCheck,
@@ -88,6 +89,52 @@ export default function FoundersPage() {
 
   return (
     <div className="relative min-h-screen bg-[#030712] text-white selection:bg-indigo-500/30">
+      <SEOHead
+        title="Meet the Founders | Paras & Karunya Sharma (IIT Jodhpur) - Vivexa"
+        description="Meet the visionaries behind Vivexa AI: Paras (Founder & CEO) and Karunya Sharma (Co-Founder & CTO), AI and Data Science researchers from IIT Jodhpur."
+        keywords={[
+          "Paras Bishnoi",
+          "Karunya Sharma",
+          "IIT Jodhpur AI Founders",
+          "Vivexa Founders",
+          "Applied AI IIT Jodhpur",
+          "Enterprise Decision Intelligence Founders"
+        ]}
+        structuredData={[
+          {
+            "@context": "https://schema.org",
+            "@type": "Person",
+            "name": "Paras",
+            "jobTitle": "Founder & CEO",
+            "affiliation": {
+              "@type": "Organization",
+              "name": "Vivexa AI"
+            },
+            "alumniOf": "Indian Institute of Technology Jodhpur",
+            "url": "https://parasfolio.qd.je/",
+            "sameAs": [
+              "https://www.linkedin.com/in/paras029",
+              "https://github.com/parasbishnoi029"
+            ]
+          },
+          {
+            "@context": "https://schema.org",
+            "@type": "Person",
+            "name": "Karunya Sharma",
+            "jobTitle": "Co-Founder & CTO",
+            "affiliation": {
+              "@type": "Organization",
+              "name": "Vivexa AI"
+            },
+            "alumniOf": "Indian Institute of Technology Jodhpur",
+            "url": "https://karunyasharma.github.io/Karunyafolio/",
+            "sameAs": [
+              "https://www.linkedin.com/in/karunyasharma",
+              "https://github.com/karunyasharma"
+            ]
+          }
+        ]}
+      />
       <AppBackground centered={false}>
         <PublicNavbar />
 
@@ -96,18 +143,19 @@ export default function FoundersPage() {
           {/* Header Banner */}
           <div className="text-center max-w-3xl mx-auto space-y-6">
             <motion.div
-              initial={{ opacity: 0, y: 15 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35 }}
               className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-bold"
             >
-              <Sparkles className="h-4 w-4 text-indigo-400 animate-pulse" />
+              <Sparkles className="h-4 w-4 text-indigo-400" />
               <span>Academic Innovators & Founders</span>
             </motion.div>
 
             <motion.h1
-              initial={{ opacity: 0, y: 15 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
+              transition={{ duration: 0.45, delay: 0.05 }}
               className="text-4xl sm:text-6xl font-black tracking-tight leading-tight"
             >
               The Minds Behind <br />
@@ -117,9 +165,9 @@ export default function FoundersPage() {
             </motion.h1>
 
             <motion.p
-              initial={{ opacity: 0, y: 15 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
+              transition={{ duration: 0.45, delay: 0.1 }}
               className="text-slate-400 text-xs sm:text-sm md:text-base leading-relaxed"
             >
               Vivexa was founded by pioneering AI researchers and systems developers from **IIT Jodhpur**. We are obsessed with replacing complex business bottlenecks with audited, secure, and blazing-fast autonomous agents.

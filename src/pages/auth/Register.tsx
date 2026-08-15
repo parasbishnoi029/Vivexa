@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { AppBackground } from "@/components/layout/AppBackground";
-import { Loader2, CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
+import { Loader2, CheckCircle2, ShieldCheck, Sparkles, Building2, UserCheck } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
 import { Logo } from "@/components/ui/Logo";
 import { AUTH_CONFIG, isSocialLoginEnabled } from "@/config/authConfig";
+import { validateInvitationToken, acceptWorkspaceInvitation } from "@/lib/invitations";
 import HCaptcha from '@hcaptcha/react-hcaptcha';
 
 export default function Register() {
@@ -14,6 +15,15 @@ export default function Register() {
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [inviteInfo, setInviteInfo] = useState<{
+    id: string;
+    workspace_name: string;
+    role: string;
+    department?: string;
+    organization_id?: string;
+    workspace_id?: string;
+  } | null>(null);
+
   const captchaRef = useRef<HCaptcha>(null);
   const navigate = useNavigate();
   const { user, loginAsDemo } = useAuthStore();
@@ -31,6 +41,24 @@ export default function Register() {
 
     if (inviteId) {
       localStorage.setItem("pending_invite_id", inviteId);
+      // Validate invite token asynchronously
+      validateInvitationToken(inviteId).then((validData) => {
+        if (validData && validData.is_valid) {
+          setInviteInfo({
+            id: validData.id,
+            workspace_name: validData.workspace_name,
+            role: validData.role,
+            department: validData.department,
+            organization_id: validData.organization_id || validData.workspace_id,
+            workspace_id: validData.workspace_id
+          });
+          setFormData((prev) => ({
+            ...prev,
+            email: validData.email || prev.email,
+            company: validData.workspace_name || prev.company
+          }));
+        }
+      });
     }
     if (emailParam) {
       setFormData(prev => ({ ...prev, email: decodeURIComponent(emailParam) }));
@@ -55,7 +83,22 @@ export default function Register() {
     setStatus("idle");
     setErrorMessage("");
     
-    console.log("Submitting with:", formData.email);
+    console.log("Submitting registration with:", formData.email);
+
+    // Build user_metadata payload ensuring organization_id association
+    const metadataPayload: Record<string, any> = {
+      first_name: formData.firstName,
+      last_name: formData.lastName,
+      company: inviteInfo?.workspace_name || formData.company || `${formData.firstName}'s Workspace`,
+    };
+
+    if (inviteInfo) {
+      metadataPayload.organization_id = inviteInfo.organization_id || inviteInfo.workspace_id;
+      metadataPayload.workspace_id = inviteInfo.workspace_id;
+      metadataPayload.role = inviteInfo.role;
+      metadataPayload.department = inviteInfo.department;
+      metadataPayload.invitation_id = inviteInfo.id;
+    }
 
     const { data, error } = await supabase.auth.signUp({
       email: formData.email,
@@ -63,11 +106,7 @@ export default function Register() {
       options: {
         captchaToken: captchaToken || undefined,
         emailRedirectTo: `${window.location.origin}/workspace`,
-        data: {
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          company: formData.company,
-        }
+        data: metadataPayload
       }
     });
 
@@ -100,6 +139,11 @@ export default function Register() {
         });
 
         if (!signInError && signInData.session) {
+          if (inviteInfo?.id) {
+            try {
+              await acceptWorkspaceInvitation(inviteInfo.id);
+            } catch (_) {}
+          }
           setStatus("success");
           setTimeout(() => {
             navigate("/workspace");
@@ -121,6 +165,15 @@ export default function Register() {
 
       setErrorMessage(finalErrorMessage);
       return;
+    }
+
+    // Auto-accept invitation if user registered with valid invite
+    if (inviteInfo?.id) {
+      try {
+        await acceptWorkspaceInvitation(inviteInfo.id);
+      } catch (acceptErr) {
+        console.warn("Post-signup invitation accept notice:", acceptErr);
+      }
     }
 
     setIsLoading(false);
@@ -174,6 +227,20 @@ export default function Register() {
       <div className="backdrop-blur-xl bg-slate-900/60 border border-slate-800/60 rounded-2xl shadow-2xl p-8 relative overflow-hidden">
         {/* Subtle top border highlight */}
         <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
+
+        {inviteInfo && (
+          <div className="mb-6 p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-200 text-xs space-y-1.5 flex items-start gap-3">
+            <UserCheck className="h-5 w-5 text-indigo-400 shrink-0 mt-0.5" />
+            <div>
+              <div className="font-semibold text-white text-sm">
+                Team Invitation Active
+              </div>
+              <p className="text-slate-300 leading-relaxed">
+                You have been invited to join <span className="text-indigo-300 font-semibold">{inviteInfo.workspace_name}</span> as <span className="text-indigo-300 font-semibold">{inviteInfo.role}</span> in <span className="text-indigo-300 font-semibold">{inviteInfo.department || 'Analytical Operations'}</span>.
+              </p>
+            </div>
+          </div>
+        )}
 
         {status === "error" && errorMessage && (
           <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm space-y-3">

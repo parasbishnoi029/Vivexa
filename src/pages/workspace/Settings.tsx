@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { createNotification } from "@/lib/notifications";
 import { getAiUsageCount, getQuotaLimit } from "@/lib/telemetry";
 import { useTheme } from "@/providers/ThemeProvider";
+import { safeFetchJson } from "@/lib/utils";
 
 const TABS = [
   { id: "overview", label: "Settings Overview", icon: LayoutDashboard },
@@ -77,6 +78,11 @@ export default function WorkspaceSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Support Ticket states
+  const [ticketCategory, setTicketCategory] = useState("Technical Issue / Bug");
+  const [ticketMessage, setTicketMessage] = useState("");
+  const [submittingTicket, setSubmittingTicket] = useState(false);
 
   // Workspace Settings
   const [workspaceName, setWorkspaceName] = useState("Vivexa Enterprise Workspace");
@@ -490,6 +496,47 @@ Thank you for scaling with Vivexa!
       console.error(err);
     }
   }
+
+  const handleSubmitTicket = async () => {
+    if (!ticketMessage.trim()) {
+      toast.error("Please enter a detailed message describing your issue.");
+      return;
+    }
+    setSubmittingTicket(true);
+    try {
+      const res = await fetch("/api/v1/support/ticket", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          category: ticketCategory,
+          message: ticketMessage
+        })
+      });
+
+      const json = await safeFetchJson(res);
+      if (json.success) {
+        toast.success("Priority support ticket dispatched to Vivexa Engineering team!");
+        setTicketMessage("");
+        await createNotification({
+          userId: user?.id || "",
+          title: "Support Ticket Dispatched",
+          message: `Your priority support ticket (${ticketCategory}) was successfully logged and sent to engineering founders.`,
+          type: "system"
+        });
+        loadAuditLogs();
+      } else {
+        toast.error(json.error || "Failed to dispatch ticket.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error("An unexpected error occurred while sending ticket.");
+    } finally {
+      setSubmittingTicket(false);
+    }
+  };
 
   const handleSaveProfile = async () => {
     if (!user) return;
@@ -1649,19 +1696,34 @@ Thank you for scaling with Vivexa!
                     <div className="space-y-3">
                       <div className="space-y-1.5">
                         <label className="text-slate-400">Issue Category</label>
-                        <select className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white">
-                          <option>Technical Issue / Bug</option>
-                          <option>Account & Billing</option>
-                          <option>Feature Request</option>
-                          <option>Security Vulnerability</option>
+                        <select 
+                          value={ticketCategory}
+                          onChange={(e) => setTicketCategory(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
+                        >
+                          <option value="Technical Issue / Bug">Technical Issue / Bug</option>
+                          <option value="Account & Billing">Account & Billing</option>
+                          <option value="Feature Request">Feature Request</option>
+                          <option value="Security Vulnerability">Security Vulnerability</option>
                         </select>
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-slate-400">Message</label>
-                        <textarea placeholder="Describe your issue in detail..." rows={4} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white" />
+                        <textarea 
+                          placeholder="Describe your issue in detail..." 
+                          rows={4} 
+                          value={ticketMessage}
+                          onChange={(e) => setTicketMessage(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:ring-1 focus:ring-indigo-500 outline-none resize-none"
+                        />
                       </div>
-                      <Button onClick={() => toast.success("Priority support ticket dispatched to Vivexa Engineering team!")} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold">
-                        Dispatch Ticket
+                      <Button 
+                        onClick={handleSubmitTicket} 
+                        disabled={submittingTicket}
+                        className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold flex items-center justify-center gap-2"
+                      >
+                        {submittingTicket ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                        {submittingTicket ? "Dispatching..." : "Dispatch Ticket"}
                       </Button>
                     </div>
                   </div>

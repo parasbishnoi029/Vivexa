@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { useAuthStore } from "@/stores/authStore";
 import { useWorkspaceStore, Notebook, Cell, VariableInfo } from "@/stores/workspaceStore";
 import { supabase } from "@/lib/supabase";
+import { checkAndConsumeQuota, triggerLimitModal } from "@/lib/limits";
 
 const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#3b82f6'];
 
@@ -879,6 +880,14 @@ export default function Notebooks() {
   };
 
   const handleAiAutoFix = async (cellId: string, errMessage: string) => {
+    // Quota Enforcement Check
+    const quota = checkAndConsumeQuota(1, (session?.user as any)?.id);
+    if (!quota.allowed) {
+      triggerLimitModal();
+      toast.error("Monthly AI API quota limit reached for your plan. Please upgrade.");
+      return;
+    }
+
     toast.info("AI Copilot Error Doctor analyzing trace & generating fix...");
     const cell = activeNb.cells.find(c => c.id === cellId);
     if (!cell) return;
@@ -957,6 +966,15 @@ export default function Notebooks() {
 
   const handleAiGenerate = async () => {
     if (!aiPrompt.trim()) return;
+
+    // Quota Enforcement Check
+    const quota = checkAndConsumeQuota(1, (session?.user as any)?.id);
+    if (!quota.allowed) {
+      triggerLimitModal();
+      toast.error("Monthly AI API quota limit reached for your plan. Please upgrade.");
+      return;
+    }
+
     toast.info("AI Copilot generating interactive notebook logic...");
     
     try {

@@ -13,7 +13,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { parseDatasetFile } from "@/lib/datasetParser";
-import { incrementAiUsage } from "@/lib/telemetry";
+import { incrementAiUsage, checkAndConsumeQuota, triggerLimitModal } from "@/lib/limits";
 import { 
   ResponsiveContainer, Area, XAxis, YAxis, CartesianGrid, 
   Tooltip as ChartTooltip, Legend, ComposedChart, Line 
@@ -306,6 +306,14 @@ export default function Forecasting() {
   async function handleGenerateForecast() {
     if (!selectedDatasetId || !targetColumn || !dateColumn) {
       toast.error("Please configure all target, date, and dataset fields.");
+      return;
+    }
+
+    // Quota Enforcement Check
+    const quota = checkAndConsumeQuota(1, user?.id);
+    if (!quota.allowed) {
+      triggerLimitModal();
+      toast.error("Monthly AI API quota limit reached for your plan. Please upgrade.");
       return;
     }
 

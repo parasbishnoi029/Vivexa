@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { PublicNavbar } from "@/components/landing/PublicNavbar";
 import { PublicFooter } from "@/components/landing/PublicFooter";
 import { AppBackground } from "@/components/layout/AppBackground";
+import { SEOHead } from "@/components/seo/SEOHead";
 import { Link } from "react-router-dom";
 import {
   ShieldCheck, Lock, Key, FileCheck, Server, Cpu, CheckCircle2,
@@ -111,6 +112,30 @@ export default function EnterprisePage() {
 
   return (
     <div className="relative min-h-screen bg-[#030712] text-white selection:bg-rose-500/20">
+      <SEOHead
+        title="Enterprise Security, Compliance & SSO | Vivexa AI"
+        description="Bank-grade zero-trust architecture. SOC 2 Type II, GDPR, HIPAA BAA compliance, SAML 2.0 / OIDC Single Sign-On (SSO), RBAC access controls, and BYOK encryption."
+        keywords={[
+          "Enterprise AI Security",
+          "SOC 2 Type II AI Platform",
+          "GDPR Compliant Analytics",
+          "SAML 2.0 SSO Enterprise",
+          "RBAC Access Control",
+          "Air-Gapped Data Science",
+          "BYOK Encryption"
+        ]}
+        ogType="website"
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "WebPage",
+          "name": "Enterprise Security, Compliance & SSO | Vivexa AI",
+          "description": "Bank-grade zero-trust architecture. SOC 2 Type II, GDPR, HIPAA BAA compliance.",
+          "publisher": {
+            "@type": "Organization",
+            "name": "Vivexa AI"
+          }
+        }}
+      />
       <AppBackground centered={false}>
         <PublicNavbar />
 
@@ -119,18 +144,19 @@ export default function EnterprisePage() {
           {/* Header */}
           <div className="text-center max-w-3xl mx-auto space-y-6">
             <motion.div
-              initial={{ opacity: 0, y: 15 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35 }}
               className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-bold"
             >
-              <ShieldCheck className="h-4 w-4 text-rose-400 animate-pulse" />
+              <ShieldCheck className="h-4 w-4 text-rose-400" />
               <span>Zero-Trust Enterprise Compliance Architecture</span>
             </motion.div>
 
             <motion.h1
-              initial={{ opacity: 0, y: 15 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
+              transition={{ duration: 0.4, delay: 0.05 }}
               className="text-4xl sm:text-6xl font-black tracking-tight leading-none"
             >
               Enterprise Security <br />
@@ -140,9 +166,9 @@ export default function EnterprisePage() {
             </motion.h1>
 
             <motion.p
-              initial={{ opacity: 0, y: 15 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
+              transition={{ duration: 0.4, delay: 0.1 }}
               className="text-slate-400 text-xs sm:text-sm md:text-base leading-relaxed"
             >
               Designed for regulated enterprise networks requiring complete data sovereignty, customized single sign-on federation, granular access controls, and real-time security logs.

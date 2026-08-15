@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
+    "prebuild": "node scripts/generate-sitemap.js",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js",
@@ -42,13 +43,14 @@
     "pptxgenjs": "^4.0.1",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
+    "react-helmet-async": "^3.0.0",
     "react-hook-form": "^7.85.0",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.2",
     "recharts": "^3.10.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz",
+    "xlsx": "^0.18.5",
     "zod": "^4.4.3",
     "zustand": "^5.0.14"
   },
@@ -57,6 +59,7 @@
     "@types/node": "^22.14.0",
     "@types/nodemailer": "^8.0.1",
     "@types/papaparse": "^5.5.2",
+    "@types/react-helmet-async": "^1.0.1",
     "@types/react-router-dom": "^5.3.3",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
@@ -64,10 +67,5 @@
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.3"
-  },
-  "overrides": {
-    "pptxgenjs": {
-      "image-size": "^0.13.0"
-    }
   }
 }

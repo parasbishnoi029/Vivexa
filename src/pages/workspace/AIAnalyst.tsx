@@ -18,6 +18,7 @@ import { profileDataset, DatasetProfile } from "@/lib/dataEngine";
 import { parseDatasetFile } from "@/lib/datasetParser";
 import { checkAndConsumeQuota } from "@/lib/telemetry";
 import { triggerQuotaModal } from "@/components/workspace/QuotaLimitModal";
+import { toast } from "sonner";
 import { AnalysisValidatorCard } from "@/components/workspace/AnalysisValidatorCard";
 import { ConfidenceScoreMetricCard } from "@/components/workspace/ConfidenceScoreMetricCard";
 import { AnalysisValidator, DataEntryErrorCheckResult } from "@/lib/analysisValidator";
@@ -134,6 +135,12 @@ export default function AIAnalyst() {
       });
 
       const json = await res.json();
+      if (res.status === 429 || json.error === "AI_QUOTA_EXCEEDED" || json.code === "LIMIT_CONTROL_BLOCKED") {
+        triggerQuotaModal();
+        toast.error(json.message || "Monthly AI API quota reached for your plan. Please upgrade.");
+        return;
+      }
+
       if (json.success && json.data) {
         setAnalysisResult(json.data);
         // Run Pass 3 Anti-Hallucination validation against generated AI summary
@@ -155,6 +162,11 @@ export default function AIAnalyst() {
         })
       });
       const entJson = await entRes.json();
+      if (entRes.status === 429 || entJson.error === "AI_QUOTA_EXCEEDED" || entJson.code === "LIMIT_CONTROL_BLOCKED") {
+        triggerQuotaModal();
+        toast.error(entJson.message || "Monthly AI API quota reached for your plan.");
+        return;
+      }
       if (entJson.success && entJson.data) {
         setEnterpriseIntelligence(entJson.data);
       }

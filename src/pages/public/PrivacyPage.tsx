@@ -21,6 +21,8 @@ import {
   Sparkles
 } from "lucide-react";
 
+import { SEOHead } from "@/components/seo/SEOHead";
+
 export default function PrivacyPage() {
   const [activeTab, setActiveTab] = useState<string>("sec-1");
 
@@ -46,6 +48,16 @@ export default function PrivacyPage() {
 
   return (
     <div className="relative min-h-screen bg-[#030712] text-slate-100 selection:bg-indigo-500/30">
+      <SEOHead
+        title="Privacy Policy & Security | Vivexa AI"
+        description="Review Vivexa's comprehensive privacy policy and enterprise security architecture. Read about our zero-training SLA, SOC 2 compliance, and zero data retention models."
+        keywords={[
+          "Vivexa Privacy Policy",
+          "Enterprise AI Security",
+          "Zero Training SLA",
+          "AI Data Privacy"
+        ]}
+      />
       <AppBackground centered={false}>
         <PublicNavbar />
 

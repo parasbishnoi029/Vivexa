@@ -1,5 +1,6 @@
 import express from "express";
 import { createClient } from "@supabase/supabase-js";
+import { enforceAiQuotaMiddleware } from "./limits";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
@@ -68,7 +69,7 @@ agentsRouter.post('/', async (req: express.Request, res: express.Response) => {
 });
 
 // 3. POST /api/v1/agents/execute - Simulate an agent execution
-agentsRouter.post('/execute', async (req: express.Request, res: express.Response) => {
+agentsRouter.post('/execute', enforceAiQuotaMiddleware, async (req: express.Request, res: express.Response) => {
   try {
     const { agent_id, dataset_id, directive, mode } = req.body;
     

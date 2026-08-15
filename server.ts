@@ -16,6 +16,7 @@ import { agentsRouter } from "./server/agents";
 import { connectorsRouter } from "./server/connectors";
 import { sdkRouter } from "./server/sdk";
 import { sendEmail } from "./server/emailService";
+import { rateLimiterMiddleware, getUserUsage, resetUserUsage, SERVER_PLAN_LIMITS, resolveUserPlanTier } from "./server/limits";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
@@ -94,6 +95,52 @@ async function startServer() {
 
   const apiRouter = express.Router();
   apiRouter.use(express.json());
+  apiRouter.use(rateLimiterMiddleware);
+
+  // Protected Limit Control Status API
+  apiRouter.get('/limits/status', requireAuth, (req, res) => {
+    const user = (req as any).user;
+    const tier = resolveUserPlanTier(user);
+    const limits = SERVER_PLAN_LIMITS[tier];
+    const used = getUserUsage(user.id);
+
+    res.json(successResponse({
+      plan: limits.name,
+      tier,
+      ai_calls: {
+        used,
+        limit: limits.aiCallsLimit,
+        remaining: Math.max(0, limits.aiCallsLimit - used),
+        percentage: Math.min(100, Math.round((used / limits.aiCallsLimit) * 100)),
+        is_exceeded: used >= limits.aiCallsLimit
+      },
+      datasets: {
+        limit: limits.maxDatasets,
+        max_file_size_mb: limits.maxFileSizeMB
+      },
+      projects: {
+        limit: limits.maxProjects
+      },
+      workspaces: {
+        limit: limits.maxWorkspaces
+      },
+      seats: {
+        limit: limits.maxSeats
+      },
+      rate_limit: {
+        requests_per_min: limits.rateLimitPerMin
+      }
+    }));
+  });
+
+  // Admin Reset Quota Counter API
+  apiRouter.post('/limits/reset', requireAuth, requireAdmin, (req, res) => {
+    const { targetUserId } = req.body;
+    const user = (req as any).user;
+    const uid = targetUserId || user.id;
+    resetUserUsage(uid);
+    res.json(successResponse({ message: `Usage meter successfully reset for user: ${uid}` }));
+  });
 
   // Public Health Endpoint
   apiRouter.get('/inspect-env', (req, res) => {
@@ -169,38 +216,41 @@ async function startServer() {
 
 // Helper functions for recovery URL resolution
 function getPublicOrigin(req: express.Request): string {
-  if (req.headers.origin && !req.headers.origin.includes('localhost') && !req.headers.origin.includes('127.0.0.1')) {
-    return req.headers.origin.replace(/\/$/, '');
+  const envUrl = process.env.PUBLIC_APP_URL || process.env.APP_URL || process.env.VITE_APP_URL;
+  if (envUrl && envUrl.startsWith('http')) {
+    return envUrl.replace(/\/+$/, '');
   }
 
-  if (req.headers.referer) {
+  let origin = '';
+  if (req.headers.origin && typeof req.headers.origin === 'string') {
+    origin = req.headers.origin.replace(/\/+$/, '');
+  } else if (req.headers.referer && typeof req.headers.referer === 'string') {
     try {
-      const refUrl = new URL(req.headers.referer);
-      if (!refUrl.host.includes('localhost') && !refUrl.host.includes('127.0.0.1')) {
-        return refUrl.origin;
-      }
-    } catch (e) {}
+      origin = new URL(req.headers.referer).origin;
+    } catch (e) {
+      origin = req.headers.referer.replace(/\/+$/, '');
+    }
+  } else {
+    const fwdHost = req.headers['x-forwarded-host'] as string;
+    const fwdProto = (req.headers['x-forwarded-proto'] as string) || 'https';
+    if (fwdHost) {
+      origin = `${fwdProto}://${fwdHost}`;
+    } else {
+      const host = req.get('host') || 'localhost:3000';
+      origin = `${req.protocol}://${host}`;
+    }
   }
 
-  const fwdHost = req.headers['x-forwarded-host'] as string;
-  const fwdProto = (req.headers['x-forwarded-proto'] as string) || 'https';
-  if (fwdHost && !fwdHost.includes('localhost') && !fwdHost.includes('127.0.0.1')) {
-    return `${fwdProto}://${fwdHost}`;
-  }
+  // Convert ais-dev- to ais-pre- so email recipients do not encounter Google Cloud IAM 403 Forbidden
+  try {
+    const parsed = new URL(origin);
+    if (parsed.hostname.startsWith('ais-dev-')) {
+      parsed.hostname = parsed.hostname.replace('ais-dev-', 'ais-pre-');
+      origin = parsed.origin;
+    }
+  } catch (_) {}
 
-  const host = req.get('host') || '';
-  if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
-    return `${req.protocol}://${host}`;
-  }
-
-  if (req.headers.origin) return req.headers.origin.replace(/\/$/, '');
-  if (req.headers.referer) {
-    try {
-      return new URL(req.headers.referer).origin;
-    } catch (e) {}
-  }
-
-  return 'http://localhost:3000';
+  return origin || 'http://localhost:3000';
 }
 
 async function resolveRecoveryUrl(actionLink: string, publicOrigin: string): Promise<string> {
@@ -320,13 +370,14 @@ async function resolveRecoveryUrl(actionLink: string, publicOrigin: string): Pro
         return res.status(400).json(successResponse(null, { error: 'Valid email address is required' }));
       }
       
+      const publicOrigin = getPublicOrigin(req);
       const emailResult = await sendEmail({
         recipient: email.trim().toLowerCase(),
         template: 'welcome',
         subject: 'Welcome to Vivexa Platforms',
         data: {
           first_name: firstName || 'there',
-          login_url: `${req.protocol}://${req.get('host')}/login`
+          login_url: `${publicOrigin}/login`
         }
       });
 
@@ -348,11 +399,12 @@ async function resolveRecoveryUrl(actionLink: string, publicOrigin: string): Pro
         return res.status(400).json(successResponse(null, { error: 'Valid email address is required' }));
       }
 
+      const publicOrigin = getPublicOrigin(req);
       console.log(`[AUTH API] Generating verification link for: ${email}`);
       const { data, error } = await supabase.auth.admin.generateLink({
         type: 'signup',
         email: email.trim().toLowerCase(),
-        options: { redirectTo: redirectTo || `${req.protocol}://${req.get('host')}/workspace` }
+        options: { redirectTo: redirectTo || `${publicOrigin}/workspace` }
       } as any);
 
       if (error || !data?.properties?.action_link) {
@@ -472,6 +524,57 @@ async function resolveRecoveryUrl(actionLink: string, publicOrigin: string): Pro
       return res.json(successResponse({ message: "System alert email delivered successfully." }));
     } catch (err: any) {
       return res.status(500).json(successResponse(null, { error: err.message }));
+    }
+  });
+
+  // Protected Support Ticket API
+  apiRouter.post('/support/ticket', async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const { category, message } = req.body;
+
+      if (!message || !message.trim()) {
+        return res.status(400).json(successResponse(null, { error: 'Detailed message is required.' }));
+      }
+
+      console.log(`[SUPPORT TICKET] New ${category} from ${user.email}`);
+
+      // 1. Log to audit_logs
+      await supabase.from('audit_logs').insert({
+        user_id: user.id,
+        action: 'SUPPORT_TICKET_SUBMITTED',
+        resource_type: 'SUPPORT',
+        payload: { category, message: message.substring(0, 500) }
+      });
+
+      // 2. Dispatch email to Vivexa Engineering & Founders
+      const adminEmails = [
+        process.env.VITE_CEO_EMAIL || 'parasbishnoi012@gmail.com',
+        process.env.VITE_CTO_EMAIL || 'karunyasharma029@gmail.com',
+        'info.vivexa@gmail.com'
+      ];
+
+      for (const adminEmail of adminEmails) {
+        try {
+          await sendEmail({
+            recipient: adminEmail,
+            template: 'support_ticket_admin',
+            subject: `🎫 [SUPPORT TICKET] [${category}] from ${user.email}`,
+            data: {
+              email: user.email,
+              category,
+              message
+            }
+          });
+        } catch (adminErr: any) {
+          console.error(`[SUPPORT TICKET] Failed to notify admin ${adminEmail}:`, adminErr.message);
+        }
+      }
+
+      return res.json(successResponse({ message: "Priority support ticket successfully dispatched." }));
+    } catch (err: any) {
+      console.error('[SUPPORT TICKET API] Handler error:', err);
+      return res.status(500).json(successResponse(null, { error: err.message || 'Internal Server Error' }));
     }
   });
 

@@ -274,22 +274,164 @@ export function generateTemplateHtml(template: string, data: Record<string, any>
       bodyHtml = `
         <h1>Invitation to Join Vivexa</h1>
         <p>Hello,</p>
-        <p>You have been invited by <strong>${data.inviter_name || "a team member"}</strong> to join the Vivexa Enterprise Platform as an <strong>${data.role || "Analyst"}</strong>.</p>
+        <p>You have been invited by <strong>${data.inviter_name || "a team member"}</strong> to join the Vivexa Enterprise Platform as an <strong>${data.role || "Analyst"}</strong> in <strong>${data.department || "Analytical Operations"}</strong>.</p>
         <table class="metadata-table">
           <tr>
             <td class="metadata-label">Invited By</td>
             <td class="metadata-value" style="font-family: inherit;">${data.inviter_email || SENDER_EMAIL}</td>
           </tr>
           <tr>
+            <td class="metadata-label">Workspace</td>
+            <td class="metadata-value" style="font-family: inherit;">${data.workspace_name || "Enterprise Workspace"}</td>
+          </tr>
+          <tr>
             <td class="metadata-label">Assigned Role</td>
             <td class="metadata-value" style="font-family: inherit;">${data.role || "Analyst"}</td>
           </tr>
+          <tr>
+            <td class="metadata-label">Department</td>
+            <td class="metadata-value" style="font-family: inherit;">${data.department || "Analytical Operations"}</td>
+          </tr>
         </table>
-        <p>Click the button below to accept your invitation and create your secure credential mapping:</p>
+        <p>Click the button below to accept your invitation and activate your account. You will receive a full onboarding guide upon joining:</p>
         <div class="btn-container">
-          <a href="${data.invite_url || "https://vivexa.ai/invite/accept"}" class="btn">Accept Invitation</a>
+          <a href="${data.invite_url || "https://vivexa.ai/invite"}" class="btn">Accept Invitation & Join</a>
         </div>
-        <p>This invitation link will expire on <strong>${data.expires_at || "next 7 days"}</strong>.</p>
+        <p style="font-size: 13px; color: ${textMuted};">This invitation link will expire on <strong>${data.expires_at || "in 7 days"}</strong>.</p>
+      `;
+      break;
+
+    case "invite_accepted_onboarding":
+      bodyHtml = `
+        <div style="text-align: center; margin-bottom: 24px;">
+          <div style="display: inline-block; background-color: rgba(79, 70, 229, 0.15); border: 1px solid rgba(79, 70, 229, 0.3); color: #818cf8; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;">
+            Workspace Access Activated
+          </div>
+          <h1 style="margin-bottom: 8px;">Welcome to ${data.workspace_name || "Vivexa Enterprise"}</h1>
+          <p style="color: #9ca3af; margin-bottom: 0;">Your enterprise credentials and access policies are now active.</p>
+        </div>
+
+        <p>Dear <strong>${data.name || "Colleague"}</strong>,</p>
+        <p>Congratulations! You have successfully accepted your invitation and joined <strong>${data.workspace_name || "Enterprise Workspace"}</strong> on the Vivexa Decision Intelligence Platform.</p>
+
+        <table class="metadata-table" style="margin: 24px 0;">
+          <tr>
+            <td class="metadata-label">Workspace</td>
+            <td class="metadata-value" style="font-family: inherit; font-weight: 600; color: #ffffff;">${data.workspace_name || "Enterprise Workspace"}</td>
+          </tr>
+          <tr>
+            <td class="metadata-label">Assigned Role</td>
+            <td class="metadata-value" style="font-family: inherit;"><span style="background-color: #312e81; color: #c7d2fe; padding: 2px 8px; border-radius: 4px; font-weight: 600;">${data.role || "Analyst"}</span></td>
+          </tr>
+          <tr>
+            <td class="metadata-label">Department</td>
+            <td class="metadata-value" style="font-family: inherit;">${data.department || "Analytical Operations"}</td>
+          </tr>
+          <tr>
+            <td class="metadata-label">Account Email</td>
+            <td class="metadata-value" style="font-family: inherit;">${data.email || ""}</td>
+          </tr>
+          <tr>
+            <td class="metadata-label">Security Clearance</td>
+            <td class="metadata-value" style="font-family: inherit; color: #34d399;">SOC2 Type II &bull; 256-Bit Encrypted</td>
+          </tr>
+          <tr>
+            <td class="metadata-label">Activated On</td>
+            <td class="metadata-value" style="font-family: inherit;">${data.onboarded_at || new Date().toLocaleDateString()}</td>
+          </tr>
+        </table>
+
+        <div class="btn-container">
+          <a href="${data.workspace_url || "https://vivexa.ai/workspace"}" class="btn" style="padding: 14px 36px; font-size: 15px; box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);">Launch Workspace Dashboard &rarr;</a>
+        </div>
+
+        <div class="divider"></div>
+
+        <h2 style="font-size: 16px; font-weight: 700; color: #ffffff; margin-bottom: 16px; letter-spacing: -0.01em;">Enterprise Quick Start Guide</h2>
+        
+        <div style="background-color: #030712; border: 1px solid #1f2937; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+          <div style="font-weight: 600; color: #818cf8; font-size: 14px; margin-bottom: 4px;">1. Multi-Agent AI Analytics & Copilot</div>
+          <p style="font-size: 13px; color: #9ca3af; margin: 0;">Interact naturally with autonomous SQL, Python, Forecasting, and Research agents to query databases and generate strategic insights.</p>
+        </div>
+
+        <div style="background-color: #030712; border: 1px solid #1f2937; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+          <div style="font-weight: 600; color: #818cf8; font-size: 14px; margin-bottom: 4px;">2. Unified Lakehouse & Connectors</div>
+          <p style="font-size: 13px; color: #9ca3af; margin: 0;">Explore pre-built semantic data models, or connect live data streams including PostgreSQL, Snowflake, BigQuery, and S3.</p>
+        </div>
+
+        <div style="background-color: #030712; border: 1px solid #1f2937; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+          <div style="font-weight: 600; color: #818cf8; font-size: 14px; margin-bottom: 4px;">3. Executive Reports & Briefings</div>
+          <p style="font-size: 13px; color: #9ca3af; margin: 0;">Access automated diagnostic briefings, anomaly detection trackers, and prescriptive operational playbooks tailored to your department.</p>
+        </div>
+
+        <div style="background-color: #030712; border: 1px solid #1f2937; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+          <div style="font-weight: 600; color: #818cf8; font-size: 14px; margin-bottom: 4px;">4. Interactive Python Notebooks</div>
+          <p style="font-size: 13px; color: #9ca3af; margin: 0;">Build collaborative notebooks with real-time live execution, custom data transforms, and Recharts interactive visualizations.</p>
+        </div>
+
+        <div class="divider"></div>
+
+        <h3 style="font-size: 14px; font-weight: 600; color: #ffffff; margin-bottom: 12px;">Direct Navigation Links</h3>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+          <tr>
+            <td style="padding: 6px 4px; width: 50%;">
+              <a href="${data.datasets_url || data.workspace_url || "https://vivexa.ai/workspace/datasets"}" style="color: #60a5fa; text-decoration: none; font-size: 13px; font-weight: 500;">&bull; Data Studio & Lakehouse &rarr;</a>
+            </td>
+            <td style="padding: 6px 4px; width: 50%;">
+              <a href="${data.ai_chat_url || data.workspace_url || "https://vivexa.ai/workspace/ai/chat"}" style="color: #60a5fa; text-decoration: none; font-size: 13px; font-weight: 500;">&bull; AI Decision Copilot &rarr;</a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 4px;">
+              <a href="${data.reports_url || data.workspace_url || "https://vivexa.ai/workspace/reports"}" style="color: #60a5fa; text-decoration: none; font-size: 13px; font-weight: 500;">&bull; Executive Briefings &rarr;</a>
+            </td>
+            <td style="padding: 6px 4px;">
+              <a href="${data.manual_url || data.workspace_url || "https://vivexa.ai/workspace/manual"}" style="color: #60a5fa; text-decoration: none; font-size: 13px; font-weight: 500;">&bull; Interactive User Manual &rarr;</a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 4px;">
+              <a href="${data.help_url || data.workspace_url || "https://vivexa.ai/workspace/help"}" style="color: #60a5fa; text-decoration: none; font-size: 13px; font-weight: 500;">&bull; Help Center & FAQ &rarr;</a>
+            </td>
+            <td style="padding: 6px 4px;">
+              <a href="${data.settings_url || data.workspace_url || "https://vivexa.ai/workspace/settings"}" style="color: #60a5fa; text-decoration: none; font-size: 13px; font-weight: 500;">&bull; Account & Security Settings &rarr;</a>
+            </td>
+          </tr>
+        </table>
+
+        <div style="background-color: rgba(31, 41, 55, 0.4); border: 1px solid #1f2937; border-radius: 8px; padding: 14px 16px; font-size: 12px; color: #9ca3af; line-height: 1.5;">
+          <strong>Need assistance?</strong> If you have questions regarding your data permissions or need help setting up custom lakehouse integrations, please contact our enterprise support team at <a href="mailto:${SUPPORT_EMAIL}" style="color: #818cf8; text-decoration: underline;">${SUPPORT_EMAIL}</a>.
+        </div>
+      `;
+      break;
+
+    case "member_joined_notification":
+      bodyHtml = `
+        <h1>Team Member Joined Your Workspace</h1>
+        <p>Hello,</p>
+        <p><strong>${data.member_name || "A new collaborator"}</strong> (${data.member_email || ""}) has accepted your invitation and is now an active member of <strong>${data.workspace_name || "Enterprise Workspace"}</strong>.</p>
+        <table class="metadata-table">
+          <tr>
+            <td class="metadata-label">Team Member</td>
+            <td class="metadata-value" style="font-family: inherit; font-weight: 600; color: #ffffff;">${data.member_name || "Member"} (${data.member_email})</td>
+          </tr>
+          <tr>
+            <td class="metadata-label">Assigned Role</td>
+            <td class="metadata-value" style="font-family: inherit;"><span style="background-color: #312e81; color: #c7d2fe; padding: 2px 8px; border-radius: 4px; font-weight: 600;">${data.role || "Analyst"}</span></td>
+          </tr>
+          <tr>
+            <td class="metadata-label">Department</td>
+            <td class="metadata-value" style="font-family: inherit;">${data.department || "Analytical Operations"}</td>
+          </tr>
+          <tr>
+            <td class="metadata-label">Joined On</td>
+            <td class="metadata-value" style="font-family: inherit;">${new Date().toLocaleDateString()}</td>
+          </tr>
+        </table>
+        <div class="btn-container">
+          <a href="${data.workspace_url || "https://vivexa.ai/workspace/organization"}" class="btn">View Organization & Roles</a>
+        </div>
+        <p style="font-size: 13px; color: ${textMuted};">You can manage member roles, departmental assignments, and permissions at any time in the Organization dashboard.</p>
       `;
       break;
 

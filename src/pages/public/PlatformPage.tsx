@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { PublicNavbar } from "@/components/landing/PublicNavbar";
 import { PublicFooter } from "@/components/landing/PublicFooter";
 import { AppBackground } from "@/components/layout/AppBackground";
+import { SEOHead } from "@/components/seo/SEOHead";
 import {
   Brain, Sparkles, Database, BarChart3, Terminal, Workflow,
   ShieldCheck, ArrowRight, CheckCircle2, Rocket, Code2, Zap, Layers, Activity
@@ -103,6 +104,33 @@ export default function PlatformPage() {
 
   return (
     <div className="relative min-h-screen bg-[#030712] text-white selection:bg-indigo-500/30">
+      <SEOHead
+        title={`${currentModule.name} | Vivexa Platform Architecture`}
+        description={currentModule.description}
+        keywords={[
+          currentModule.name,
+          "Vivexa Platform",
+          "Enterprise AI Analytics",
+          "Autonomous Decision Intelligence",
+          "Data Lakehouse",
+          "Python SQL Notebooks",
+          "Time-Series Forecasting"
+        ]}
+        ogType="website"
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          "name": "Vivexa OS",
+          "applicationCategory": "BusinessIntelligence",
+          "operatingSystem": "Web",
+          "description": "Enterprise decision intelligence and autonomous analytics platform.",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          }
+        }}
+      />
       <AppBackground centered={false}>
         <PublicNavbar />
 
@@ -129,7 +157,7 @@ export default function PlatformPage() {
                 <button
                   key={m.id}
                   onClick={() => setSearchParams({ tab: m.id })}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-colors ${
                     isActive
                       ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
                       : "bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800"
@@ -143,7 +171,7 @@ export default function PlatformPage() {
           </div>
 
           {/* Selected Module Detail */}
-          <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8 backdrop-blur-xl grid lg:grid-cols-2 gap-8 items-center">
+          <div className="enterprise-card rounded-3xl p-8 grid lg:grid-cols-2 gap-8 items-center">
             <div className="space-y-6">
               <div className="px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-bold w-fit">
                 {currentModule.tag}
@@ -162,20 +190,20 @@ export default function PlatformPage() {
               </div>
 
               <div className="flex gap-4 pt-4">
-                <Link to="/product-tour" className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center gap-2">
+                <Link to="/product-tour" className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-colors">
                   Launch Product Tour <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
-                <Link to="/register" className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs rounded-xl">
+                <Link to="/register" className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs rounded-xl transition-colors">
                   Try Live in Workspace
                 </Link>
               </div>
             </div>
 
             {/* Visual Box */}
-            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 space-y-4 font-mono text-xs text-slate-300 shadow-2xl relative overflow-hidden">
+            <div className="bg-slate-950 border border-slate-800/80 rounded-2xl p-6 space-y-4 font-mono text-xs text-slate-300 shadow-2xl relative overflow-hidden">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3 text-[11px] text-slate-500 font-bold">
                 <span className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
                   Kernel Execution Log: {currentModule.id}.py
                 </span>
                 <span>LATENCY: 18ms</span>

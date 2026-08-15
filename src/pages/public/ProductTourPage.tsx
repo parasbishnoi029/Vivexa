@@ -3,9 +3,10 @@ import { Link } from "react-router-dom";
 import { PublicNavbar } from "@/components/landing/PublicNavbar";
 import { PublicFooter } from "@/components/landing/PublicFooter";
 import { AppBackground } from "@/components/layout/AppBackground";
+import { SEOHead } from "@/components/seo/SEOHead";
 import {
-  LayoutDashboard, Sparkles, MessageSquare, Terminal, BarChart3, FileText, Settings,
-  ArrowRight, Play, CheckCircle2, RefreshCw
+  LayoutDashboard, Sparkles, MessageSquare, Terminal, BarChart3, FileText,
+  ArrowRight, Play, CheckCircle2
 } from "lucide-react";
 
 export default function ProductTourPage() {
@@ -20,8 +21,20 @@ export default function ProductTourPage() {
     { id: "reports", name: "Executive Reports", icon: FileText, desc: "Automated executive summary briefs formatted for board presentations." }
   ];
 
+  const currentScreen = screens.find((s) => s.id === activeScreen) || screens[0];
+
   return (
     <div className="relative min-h-screen bg-[#030712] text-white selection:bg-indigo-500/30">
+      <SEOHead
+        title="Interactive Product Tour | Vivexa Decision Intelligence"
+        description="Experience Vivexa's AI decision intelligence platform in action. Explore AI analyst studios, predictive forecasting, collaborative notebooks, and automated executive reports."
+        keywords={[
+          "Vivexa Product Tour",
+          "AI Analytics Demo",
+          "Autonomous Data Science Tour",
+          "Interactive BI Showcase"
+        ]}
+      />
       <AppBackground centered={false}>
         <PublicNavbar />
 
@@ -48,7 +61,7 @@ export default function ProductTourPage() {
                 <button
                   key={sc.id}
                   onClick={() => setActiveScreen(sc.id)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-colors ${
                     isActive
                       ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
                       : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
@@ -61,83 +74,47 @@ export default function ProductTourPage() {
             })}
           </div>
 
-          {/* Interactive Screen Preview Container */}
-          <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-2xl shadow-2xl space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="flex gap-1.5">
-                  <div className="h-3 w-3 rounded-full bg-red-500/80" />
-                  <div className="h-3 w-3 rounded-full bg-yellow-500/80" />
-                  <div className="h-3 w-3 rounded-full bg-green-500/80" />
-                </div>
-                <span className="font-mono text-xs text-slate-400 bg-slate-950 px-3 py-1 rounded-lg border border-slate-800">
-                  https://app.vivexa.ai/workspace/{activeScreen}
-                </span>
+          {/* Screen Showcase */}
+          <div className="enterprise-card rounded-3xl p-8 space-y-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-white">{currentScreen.name}</h2>
+                <p className="text-xs text-slate-400 mt-1">{currentScreen.desc}</p>
               </div>
-
-              <Link to="/register" className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5">
-                Launch Live Session <ArrowRight className="h-3.5 w-3.5" />
+              <Link to="/register" className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-colors">
+                Launch Full Workspace <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </div>
 
-            {/* Simulated Live Interface */}
-            <div className="min-h-[420px] bg-slate-950 rounded-2xl border border-slate-800 p-6 flex flex-col justify-between space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-indigo-400" />
-                    Preview: {screens.find((s) => s.id === activeScreen)?.name}
-                  </h3>
-                  <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-md">
-                    LIVE DEMO ENVIRONMENT
-                  </span>
-                </div>
-
-                <p className="text-xs text-slate-300">
-                  {screens.find((s) => s.id === activeScreen)?.desc}
-                </p>
-
-                {/* Simulated Content Based on Selection */}
-                {activeScreen === "dashboard" && (
-                  <div className="grid sm:grid-cols-3 gap-4 pt-4">
-                    <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
-                      <div className="text-[11px] text-slate-400">Total Datasets Ingested</div>
-                      <div className="text-2xl font-bold text-white mt-1">142 Tables</div>
-                    </div>
-                    <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
-                      <div className="text-[11px] text-slate-400">Monthly Query Latency</div>
-                      <div className="text-2xl font-bold text-emerald-400 mt-1">14.2 ms</div>
-                    </div>
-                    <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
-                      <div className="text-[11px] text-slate-400">Active AI Agents</div>
-                      <div className="text-2xl font-bold text-indigo-400 mt-1">8 Running</div>
-                    </div>
-                  </div>
-                )}
-
-                {activeScreen === "ai" && (
-                  <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 font-mono text-xs text-slate-300 space-y-2">
-                    <div className="text-indigo-400">&gt; User Prompt: "Analyze customer churn drivers in Q2"</div>
-                    <div className="text-slate-400">&gt; Synthesizing SQL join across `users` and `subscriptions`...</div>
-                    <div className="text-emerald-400">&gt; Result: Churn is 3.4x higher for users without SSO enabled.</div>
-                  </div>
-                )}
-
-                {activeScreen === "forecasting" && (
-                  <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 space-y-2">
-                    <div className="text-xs font-bold text-white">Q3 Revenue Prophet Projection</div>
-                    <div className="h-24 bg-slate-950 rounded-lg border border-slate-800/80 flex items-center justify-center text-xs text-slate-500 font-mono">
-                      [ Interactive Recharts Trend Line with Upper Bound $4.2M & Lower Bound $3.8M ]
-                    </div>
-                  </div>
-                )}
+            {/* Interactive Preview Canvas */}
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 min-h-[380px] flex flex-col justify-between font-mono text-xs text-slate-300 relative overflow-hidden">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3 text-slate-500 font-bold">
+                <span className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                  VIVEXA ENGINE PREVIEW // {currentScreen.id.toUpperCase()}
+                </span>
+                <span className="text-indigo-400">STATUS: READY</span>
               </div>
 
-              <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-                <span>Want full read/write access to your own databases?</span>
-                <Link to="/register" className="text-indigo-400 font-bold hover:underline">
-                  Create Free Account Now &rarr;
-                </Link>
+              <div className="py-8 space-y-4 max-w-2xl">
+                <div className="p-4 bg-slate-900/80 rounded-xl border border-slate-800 space-y-2">
+                  <div className="text-indigo-400 font-bold"># Active Environment Context</div>
+                  <div className="text-slate-300">&gt; Loaded Schema: enterprise_analytics_v3</div>
+                  <div className="text-slate-300">&gt; Query Engine: In-Memory DuckDB + Gemini Causal Kernel</div>
+                  <div className="text-emerald-400 font-bold">&gt; Ready for natural language query execution</div>
+                </div>
+
+                <div className="p-4 bg-indigo-950/30 border border-indigo-500/20 rounded-xl space-y-2">
+                  <div className="text-xs font-bold text-white font-sans">Prompt Example:</div>
+                  <div className="text-slate-300 italic font-sans text-xs">
+                    "Identify underperforming regional product segments and forecast impact of 5% price reduction."
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t border-slate-800/80 text-slate-500 text-[11px]">
+                <span>GPU Acceleration: Enabled</span>
+                <span>Latency: 12ms</span>
               </div>
             </div>
           </div>

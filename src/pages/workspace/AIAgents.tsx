@@ -22,6 +22,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/lib/supabase";
 import { parseDatasetFile } from "@/lib/datasetParser";
 import { profileDataset } from "@/lib/dataEngine";
+import { checkAndConsumeQuota, triggerLimitModal } from "@/lib/limits";
 
 // =========================================================================
 // INTERFACE DEFINITIONS
@@ -107,7 +108,7 @@ export default function AIAgents() {
   const [orchestrationLevel, setOrchestrationLevel] = useState<"standard" | "exhaustive">("standard");
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
 
-  const { session } = useAuthStore();
+  const { session, user } = useAuthStore();
 
   const loadAgentConfigs = async () => {
     try {
@@ -181,6 +182,14 @@ export default function AIAgents() {
   // MULTI-AGENT ORCHESTRATION PIPELINE SIMULATION (NOW BACKEND POWERED)
   // =========================================================================
   const handleRunOrchestration = async () => {
+    // Quota Enforcement Check
+    const quota = checkAndConsumeQuota(1, user?.id);
+    if (!quota.allowed) {
+      triggerLimitModal();
+      toast.error("Monthly AI API quota limit reached for your plan. Please upgrade.");
+      return;
+    }
+
     setIsOrchestrating(true);
     setCurrentActiveAgentIndex(0);
     setOrchestrationLogs([
@@ -796,6 +805,14 @@ function InteractiveCapabilitySection({ id, onClose }: { id: string; onClose: ()
   }, [id]);
 
   const triggerExecution = async () => {
+    // Quota Enforcement Check
+    const quota = checkAndConsumeQuota(1, user?.id);
+    if (!quota.allowed) {
+      triggerLimitModal();
+      toast.error("Monthly AI API quota limit reached for your plan. Please upgrade.");
+      return;
+    }
+
     setLoading(true);
     setSimResults(null);
     setIsSandboxMode(false);
