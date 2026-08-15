@@ -29,6 +29,7 @@ import { ProjectWizard } from "@/components/ui/project-wizard";
 import { ShareDialog } from "@/components/ShareDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkspaceRealtime } from "@/hooks/useWorkspaceRealtime";
+import { useQueryClient } from "@tanstack/react-query";
 
 const container = {
   hidden: { opacity: 0 },
@@ -46,15 +47,18 @@ const item = {
 };
 
 // Initial Analytics Chart Data
-const INITIAL_ANALYTICS_DATA = [
-  { time: "00:00", throughput: 120, queries: 45, inferenceMs: 28, accuracy: 98.2 },
-  { time: "04:00", throughput: 95, queries: 32, inferenceMs: 24, accuracy: 98.6 },
-  { time: "08:00", throughput: 280, queries: 140, inferenceMs: 38, accuracy: 99.1 },
-  { time: "12:00", throughput: 420, queries: 310, inferenceMs: 45, accuracy: 98.9 },
-  { time: "16:00", throughput: 380, queries: 270, inferenceMs: 32, accuracy: 99.4 },
-  { time: "20:00", throughput: 210, queries: 110, inferenceMs: 26, accuracy: 99.0 },
-  { time: "23:59", throughput: 160, queries: 65, inferenceMs: 22, accuracy: 99.2 },
-];
+const generateEmptyAnalyticsData = () => {
+  const data = [];
+  const now = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 4 * 60 * 60 * 1000);
+    const time = d.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+    data.push({ time, throughput: 0, queries: 0, inferenceMs: 0, accuracy: 100.0 });
+  }
+  return data;
+};
+
+const INITIAL_ANALYTICS_DATA = generateEmptyAnalyticsData();
 
 const QUICK_PROMPTS = [
   { label: "Forecast Q4 Revenue", query: "Forecast Q4 revenue trends across top 5 product categories", icon: TrendingUp },
@@ -66,6 +70,7 @@ const QUICK_PROMPTS = [
 export default function WorkspaceDashboard() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const selectedWorkspaceId = useWorkspaceStore(state => state.selectedWorkspaceId);
 
   // Real-time synchronization hook for live counts across active devices
@@ -93,6 +98,24 @@ export default function WorkspaceDashboard() {
   const [isStreaming, setIsStreaming] = useState(true);
   const [analyticsData, setAnalyticsData] = useState(INITIAL_ANALYTICS_DATA);
 
+  useEffect(() => {
+    const fetchTelemetry = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch('/api/v1/telemetry', {
+          headers: { 'Authorization': `Bearer ${session?.access_token}` }
+        });
+        const json = await res.json();
+        if (json.success && json.data) {
+          setAnalyticsData(json.data);
+        }
+      } catch (err) {}
+    };
+    fetchTelemetry();
+    const interval = setInterval(fetchTelemetry, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Diagnostics Console State
   const [isDiagnosing, setIsDiagnosing] = useState(false);
   const [nodeStatus, setNodeStatus] = useState<"Online" | "Degraded" | "Syncing">("Online");
@@ -104,7 +127,6 @@ export default function WorkspaceDashboard() {
   ]);
 
   // Seeding Sample Datasets state
-  const [isSeeding, setIsSeeding] = useState(false);
 
   // Process latest dataset profile for validation report
   useEffect(() => {
@@ -126,25 +148,8 @@ export default function WorkspaceDashboard() {
     }
   }, [recentDatasets]);
 
-  // Live Metric Simulation Effect
-  useEffect(() => {
-    if (!isStreaming) return;
-    const interval = setInterval(() => {
-      setAnalyticsData(prev => {
-        const last = prev[prev.length - 1];
-        const nextTime = new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
-        const newThru = Math.max(100, Math.min(600, last.throughput + Math.floor(Math.random() * 40 - 20)));
-        const newQueries = Math.max(30, Math.min(400, last.queries + Math.floor(Math.random() * 30 - 15)));
-        const newMs = Math.max(15, Math.min(60, last.inferenceMs + Math.floor(Math.random() * 6 - 3)));
-        const newAcc = parseFloat((Math.max(97.5, Math.min(99.9, last.accuracy + (Math.random() * 0.4 - 0.2)))).toFixed(1));
-
-        const newRow = { time: nextTime, throughput: newThru, queries: newQueries, inferenceMs: newMs, accuracy: newAcc };
-        return [...prev.slice(1), newRow];
-      });
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, [isStreaming]);
+  // In a real application, we would subscribe to a live telemetry stream here.
+  // Analytics data is now fetched from the live telemetry endpoint based on real workspace usage.
 
   // Export Telemetry / Report Metrics to CSV
   const handleExportMetricsCsv = () => {
@@ -185,8 +190,8 @@ export default function WorkspaceDashboard() {
         `"${(ds.name || 'Unnamed').replace(/"/g, '""')}"`,
         `"${(ds.file_type || 'Dataset').replace(/"/g, '""')}"`,
         `"${(ds.description || 'Uploaded enterprise data pipeline table.').replace(/"/g, '""')}"`,
-        ds.row_count || 12500,
-        ds.column_count || 16
+        ds.row_count || 0,
+        ds.column_count || 0
       ]);
       
       const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.join(","))].join("\r\n");
@@ -217,54 +222,7 @@ export default function WorkspaceDashboard() {
     }, 600);
   };
 
-  // Seed Sample Enterprise Datasets
-  const handleSeedSampleDatasets = async () => {
-    if (!user) return;
-    setIsSeeding(true);
-    toast.info("Seeding enterprise sample datasets into your workspace...");
-
-    try {
-      const samples = [
-        {
-          name: "Enterprise Growth & Revenue Strategy 2026.xlsx",
-          description: "Global revenue metrics, regional breakdown, customer acquisition cost, and net retention.",
-          file_type: "xlsx",
-          size_bytes: 4200000,
-          row_count: 14500,
-          column_count: 24,
-          user_id: user.id
-        },
-        {
-          name: "Customer Churn & LTV Predictive Pipeline.csv",
-          description: "Usage frequency, NPS scores, support tickets, monthly recurring revenue, and churn flag.",
-          file_type: "csv",
-          size_bytes: 2800000,
-          row_count: 28000,
-          column_count: 18,
-          user_id: user.id
-        },
-        {
-          name: "Global Supply Chain & Logistics P&L.parquet",
-          description: "Freight transit times, customs latency, warehouse inventory levels, and margin impact.",
-          file_type: "parquet",
-          size_bytes: 8900000,
-          row_count: 92000,
-          column_count: 32,
-          user_id: user.id
-        }
-      ];
-
-      const { data, error } = await supabase.from('datasets').insert(samples).select();
-      if (error) throw error;
-
-      toast.success("Successfully created 3 Enterprise Datasets!");
-      refetch();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to seed datasets");
-    } finally {
-      setIsSeeding(false);
-    }
-  };
+  
 
   // Run System Diagnostics
   const runWorkspaceDiagnostics = async () => {
@@ -325,7 +283,8 @@ export default function WorkspaceDashboard() {
 
       toast.success("Project created successfully");
       setIsWizardOpen(false);
-      window.location.reload();
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      refetch();
     } catch (err: any) {
       toast.error(err.message || "Failed to create project");
     }
@@ -432,6 +391,7 @@ export default function WorkspaceDashboard() {
 
         {/* TOP KPI CARDS */}
         <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <motion.div whileHover={{ y: -4, scale: 1.02 }} transition={{ type: "spring", stiffness: 400, damping: 25 }} className="h-full">
           <Card 
             onClick={() => navigate('/workspace/projects')}
             className="bg-slate-900/50 border-slate-800/80 hover:border-indigo-500/50 transition-all cursor-pointer group rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl"
@@ -453,7 +413,9 @@ export default function WorkspaceDashboard() {
               <ChevronRight className="h-3.5 w-3.5 text-slate-600 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
             </div>
           </Card>
+          </motion.div>
 
+          <motion.div whileHover={{ y: -4, scale: 1.02 }} transition={{ type: "spring", stiffness: 400, damping: 25 }} className="h-full">
           <Card 
             onClick={() => navigate('/workspace/datasets')}
             className="bg-slate-900/50 border-slate-800/80 hover:border-cyan-500/50 transition-all cursor-pointer group rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl"
@@ -475,7 +437,9 @@ export default function WorkspaceDashboard() {
               <ChevronRight className="h-3.5 w-3.5 text-slate-600 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
             </div>
           </Card>
+          </motion.div>
 
+          <motion.div whileHover={{ y: -4, scale: 1.02 }} transition={{ type: "spring", stiffness: 400, damping: 25 }} className="h-full">
           <Card 
             onClick={() => navigate('/workspace/ai')}
             className="bg-slate-900/50 border-slate-800/80 hover:border-purple-500/50 transition-all cursor-pointer group rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl"
@@ -497,7 +461,9 @@ export default function WorkspaceDashboard() {
               <ChevronRight className="h-3.5 w-3.5 text-slate-600 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
             </div>
           </Card>
+          </motion.div>
 
+          <motion.div whileHover={{ y: -4, scale: 1.02 }} transition={{ type: "spring", stiffness: 400, damping: 25 }} className="h-full">
           <Card 
             onClick={() => navigate('/workspace/predictions')}
             className="bg-slate-900/50 border-slate-800/80 hover:border-amber-500/50 transition-all cursor-pointer group rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl"
@@ -519,7 +485,9 @@ export default function WorkspaceDashboard() {
               <ChevronRight className="h-3.5 w-3.5 text-slate-600 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
             </div>
           </Card>
+          </motion.div>
 
+          <motion.div whileHover={{ y: -4, scale: 1.02 }} transition={{ type: "spring", stiffness: 400, damping: 25 }} className="h-full">
           <Card 
             onClick={() => navigate('/workspace/organization')}
             className="bg-slate-900/50 border-slate-800/80 hover:border-indigo-500/50 transition-all cursor-pointer group rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl"
@@ -541,6 +509,7 @@ export default function WorkspaceDashboard() {
               <ChevronRight className="h-3.5 w-3.5 text-slate-600 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
             </div>
           </Card>
+          </motion.div>
         </motion.div>
 
         {/* NATURAL LANGUAGE AI COPILOT PROMPT BAR */}
@@ -779,15 +748,7 @@ export default function WorkspaceDashboard() {
                   <Download className="mr-2 h-3.5 w-3.5 text-cyan-400" /> Export Summaries
                 </Button>
               )}
-              {recentDatasets.length === 0 && (
-                <Button 
-                  onClick={handleSeedSampleDatasets}
-                  disabled={isSeeding}
-                  className="h-9 px-4 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-cyan-600/20"
-                >
-                  <Sparkles className="mr-2 h-3.5 w-3.5" /> {isSeeding ? "Seeding..." : "Load Sample Enterprise Data"}
-                </Button>
-              )}
+              
               <Link to="/workspace/datasets" className="text-xs font-bold text-indigo-400 hover:underline flex items-center gap-1">
                 Manage All Datasets <ChevronRight className="h-3.5 w-3.5" />
               </Link>
@@ -797,6 +758,7 @@ export default function WorkspaceDashboard() {
           {recentDatasets.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {recentDatasets.map((ds, i) => (
+                <motion.div whileHover={{ y: -4, scale: 1.02 }} transition={{ type: "spring", stiffness: 400, damping: 25 }} className="h-full">
                 <Card key={ds.id || i} className="bg-slate-900/50 border-slate-800/80 hover:border-cyan-500/50 transition-all rounded-2xl p-5 space-y-4 backdrop-blur-xl group">
                   <div className="flex items-center justify-between">
                     <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
@@ -811,8 +773,8 @@ export default function WorkspaceDashboard() {
                   </div>
 
                   <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-2 border-t border-slate-800/60">
-                    <span>Rows: {ds.row_count || 12500}</span>
-                    <span>Cols: {ds.column_count || 16}</span>
+                    <span>Rows: {ds.row_count || 0}</span>
+                    <span>Cols: {ds.column_count || 0}</span>
                   </div>
 
                   <div className="flex items-center gap-2 pt-1">
@@ -832,6 +794,7 @@ export default function WorkspaceDashboard() {
                     </Button>
                   </div>
                 </Card>
+                </motion.div>
               ))}
             </div>
           ) : (
@@ -844,13 +807,7 @@ export default function WorkspaceDashboard() {
                 <p className="text-xs text-slate-400 max-w-md mx-auto">Upload your own CSV, Excel, JSON or Parquet files, or load 3 realistic enterprise sample datasets with one click.</p>
               </div>
               <div className="flex items-center justify-center gap-3 pt-2">
-                <Button 
-                  onClick={handleSeedSampleDatasets}
-                  disabled={isSeeding}
-                  className="h-10 px-6 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold text-xs uppercase tracking-wider"
-                >
-                  <Sparkles className="mr-2 h-4 w-4" /> Load Sample Enterprise Data
-                </Button>
+                
                 <Button 
                   onClick={() => navigate('/workspace/datasets')}
                   variant="outline"

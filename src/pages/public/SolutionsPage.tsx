@@ -17,7 +17,6 @@ export default function SolutionsPage() {
       id: "finance",
       title: "Financial Decision Intelligence",
       icon: DollarSign,
-      roi: "Saved $3.2M in annual cash flow forecasting variance",
       desc: "Automate revenue prediction, expense anomaly detection, and quarterly audit report generation.",
       useCases: ["Liquidity stress testing", "Churn & LTV forecasting", "Automated SOX compliance audits", "Portfolio risk modeling"]
     },
@@ -25,7 +24,6 @@ export default function SolutionsPage() {
       id: "healthcare",
       title: "Healthcare & Clinical Analytics",
       icon: HeartPulse,
-      roi: "Reduced patient readmission risk by 22%",
       desc: "HIPAA-compliant telemetry analytics enabling clinical decision support and hospital bed utilization forecasting.",
       useCases: ["Patient length-of-stay prediction", "Clinical resource allocation", "Medical claim fraud detection", "Drug trial analytics"]
     },
@@ -33,7 +31,6 @@ export default function SolutionsPage() {
       id: "retail",
       title: "Retail & E-commerce Intelligence",
       icon: ShoppingBag,
-      roi: "18% increase in gross profit margins",
       desc: "Dynamic price elasticity modeling, inventory demand forecasting, and automated customer segmentation.",
       useCases: ["Stockout prevention", "Basket affinity analysis", "Personalized promotional targeting", "Return rate reduction"]
     },
@@ -41,7 +38,6 @@ export default function SolutionsPage() {
       id: "manufacturing",
       title: "Manufacturing & Supply Chain",
       icon: Factory,
-      roi: "Prevented 140+ hours of factory downtime",
       desc: "IoT sensor telemetry stream analysis for predictive equipment maintenance and global supply chain routing.",
       useCases: ["Predictive equipment maintenance", "Vendor lead-time optimization", "Defect rate anomaly alerts", "Supply chain bottleneck modeling"]
     },
@@ -49,7 +45,6 @@ export default function SolutionsPage() {
       id: "fraud",
       title: "Fraud & Risk Detection",
       icon: ShieldAlert,
-      roi: "Flagged $8.4M in unauthorized transactions with zero false positives",
       desc: "Real-time anomaly scoring, graph fraud clustering, and regulatory anti-money laundering (AML) detection.",
       useCases: ["Account takeover prevention", "AML pattern discovery", "Credit default estimation", "Synthetic identity scoring"]
     },
@@ -57,7 +52,6 @@ export default function SolutionsPage() {
       id: "government",
       title: "Public Sector & Sovereign AI",
       icon: LandPlot,
-      roi: "Cut policy impact simulation cycle from 6 months to 4 hours",
       desc: "Air-gapped on-premise execution for municipal planning, tax revenue forecasting, and infrastructure budget optimization.",
       useCases: ["Municipal revenue forecasting", "Infrastructure resilience modeling", "Benefit distribution auditing", "Emergency response telemetry"]
     }
@@ -132,11 +126,7 @@ export default function SolutionsPage() {
           {/* Solution Detail */}
           <div className="enterprise-card rounded-3xl p-8 grid lg:grid-cols-2 gap-8 items-center">
             <div className="space-y-6">
-              <div className="px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-bold w-fit">
-                {currentSolution.roi}
-              </div>
-
-              <h2 className="text-3xl font-extrabold text-white">{currentSolution.title}</h2>
+              <h2 className="text-3xl font-extrabold text-white pt-2">{currentSolution.title}</h2>
               <p className="text-slate-300 text-sm leading-relaxed">{currentSolution.desc}</p>
 
               <div className="space-y-2.5 pt-2">
@@ -170,7 +160,7 @@ export default function SolutionsPage() {
                 <div className="text-indigo-400"># Autonomous Pipeline Output</div>
                 <div className="p-4 bg-slate-900/80 rounded-xl border border-slate-800 space-y-2">
                   <div className="text-xs font-bold text-white">Target Metric: Variance Reduction</div>
-                  <div className="text-emerald-400 font-bold">{currentSolution.roi}</div>
+                  <div className="text-emerald-400 font-bold">Optimized for Enterprise Scale</div>
                   <div className="text-[11px] text-slate-400">Confidence Bounds: [95% CI: ±1.2%]</div>
                 </div>
               </div>

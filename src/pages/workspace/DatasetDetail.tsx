@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { profileDataset, DatasetProfile } from "@/lib/dataEngine";
 import { parseDatasetFile } from "@/lib/datasetParser";
+import DataProcessorWorker from "@/workers/dataProcessor?worker";
 import DataCleaningStudio from "@/components/workspace/DataCleaningStudio";
 import InteractiveVisualizationStudio from "@/components/workspace/InteractiveVisualizationStudio";
 import ExportPackModal from "@/components/workspace/ExportPackModal";
@@ -83,15 +84,19 @@ export default function DatasetDetail() {
       list.sort((a, b) => {
         const valA = a[sortCol];
         const valB = b[sortCol];
+        const isNullA = valA === null || valA === undefined || valA === "";
+        const isNullB = valB === null || valB === undefined || valB === "";
+        if (isNullA && isNullB) return 0;
+        if (isNullA) return 1;
+        if (isNullB) return -1;
         const numA = Number(valA);
         const numB = Number(valB);
-
-        if (!isNaN(numA) && !isNaN(numB)) {
-          return sortDir === 'asc' ? numA - numB : numB - numA;
+        if (!isNaN(numA) && !isNaN(numB) && typeof valA !== "boolean" && typeof valB !== "boolean") {
+          return sortDir === "asc" ? numA - numB : numB - numA;
         }
-        const strA = String(valA ?? '').toLowerCase();
-        const strB = String(valB ?? '').toLowerCase();
-        return sortDir === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA);
+        const strA = String(valA).toLowerCase();
+        const strB = String(valB).toLowerCase();
+        return sortDir === "asc" ? strA.localeCompare(strB) : strB.localeCompare(strA);
       });
     }
 
@@ -134,8 +139,25 @@ export default function DatasetDetail() {
               const parsed = await parseDatasetFile(fileData, data.name);
               setFullRows(parsed.rows);
               setPreviewCols(parsed.columns);
-              const computed = profileDataset(parsed.rows, data.name, { fileSize: data.size_bytes });
-              setProfile(computed);
+              
+              const profile = await new Promise<DatasetProfile>((resolve, reject) => {
+                const worker = new DataProcessorWorker();
+                worker.onmessage = (e) => {
+                  if (e.data.type === 'PROFILE_SUCCESS') {
+                    worker.terminate();
+                    resolve(e.data.payload.profileResult);
+                  } else if (e.data.type === 'PROCESS_ERROR') {
+                    worker.terminate();
+                    reject(new Error(e.data.error));
+                  }
+                };
+                worker.postMessage({
+                  type: 'PROFILE_ONLY',
+                  jobId: Date.now(),
+                  payload: { rows: parsed.rows, datasetName: data.name, fileSize: data.size_bytes }
+                });
+              });
+              setProfile(profile);
             } catch (parseErr: any) {
               console.error("[DATASET DETAIL] Parsing error:", parseErr);
               toast.error(`Failed to parse dataset '${data.name}': ${parseErr.message || String(parseErr)}`);
@@ -636,11 +658,11 @@ export default function DatasetDetail() {
             <DataCleaningStudio
               rows={fullRows}
               datasetName={dataset.name}
-              onDatasetCleaned={(res) => {
+              datasetSize={dataset.size_bytes}
+              onDatasetCleaned={(res, profile) => {
                 setFullRows(res.cleanedRows);
                 setPreviewCols(res.columns);
-                const computed = profileDataset(res.cleanedRows, dataset.name, { fileSize: dataset.size_bytes });
-                setProfile(computed);
+                setProfile(profile);
                 setSortCol(null);
                 setCurrentPage(1);
               }}

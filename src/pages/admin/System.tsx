@@ -47,7 +47,7 @@ export default function AdminSystem() {
 
   useEffect(() => {
     checkDb();
-    const interval = setInterval(handleRefresh, 30000);
+    const interval = setInterval(handleRefresh, 60000);
     return () => clearInterval(interval);
   }, []);
 

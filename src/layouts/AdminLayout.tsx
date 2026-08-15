@@ -9,7 +9,6 @@ import { AccessDenied } from "@/components/auth/AccessDenied";
 import { Logo } from "@/components/ui/Logo";
 import NotificationDrawer from "@/components/workspace/NotificationDrawer";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
-import { motion, AnimatePresence } from "motion/react";
 import { useNotifications } from "@/hooks/useNotifications";
 
 export default function AdminLayout() {

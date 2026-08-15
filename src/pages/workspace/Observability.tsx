@@ -11,14 +11,7 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
-const CPU_METRICS_DATA = [
-  { time: "08:00", cpu: 14, mem: 42, latency: 18 },
-  { time: "08:05", cpu: 22, mem: 44, latency: 22 },
-  { time: "08:10", cpu: 38, mem: 48, latency: 31 },
-  { time: "08:15", cpu: 28, mem: 46, latency: 20 },
-  { time: "08:20", cpu: 19, mem: 43, latency: 16 },
-  { time: "08:25", cpu: 25, mem: 45, latency: 19 }
-];
+const CPU_METRICS_DATA: any[] = [];
 
 export default function Observability() {
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -96,7 +89,7 @@ export default function Observability() {
     };
 
     fetchRealTelemetry();
-    const telemetryInterval = setInterval(fetchRealTelemetry, 10000);
+    const telemetryInterval = setInterval(fetchRealTelemetry, 20000);
 
     // Simulated real-time log streaming
     const streamInterval = setInterval(() => {

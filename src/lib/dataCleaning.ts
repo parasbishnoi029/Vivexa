@@ -544,7 +544,8 @@ export function cleanDataset(
   let finalOutlierCount = 0;
 
   for (const c of cols) {
-    const numArr = rows.map(r => Number(r[c])).filter(n => !isNaN(n));
+    const validRows = rows.filter(r => r[c] !== null && r[c] !== undefined && String(r[c]).trim() !== "");
+    const numArr = validRows.map(r => Number(r[c])).filter(n => !isNaN(n));
     if (numArr.length < 10) continue;
 
     numArr.sort((a, b) => a - b);
@@ -556,6 +557,7 @@ export function cleanDataset(
 
     let outlierIndices: number[] = [];
     rows.forEach((r, idx) => {
+      if (r[c] === null || r[c] === undefined || String(r[c]).trim() === "") return;
       const val = Number(r[c]);
       if (!isNaN(val) && (val < lowerFence || val > upperFence)) {
         outlierIndices.push(idx);

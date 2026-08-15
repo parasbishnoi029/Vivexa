@@ -19,6 +19,7 @@ import { parseDatasetFile } from "@/lib/datasetParser";
 import { checkAndConsumeQuota } from "@/lib/telemetry";
 import { triggerQuotaModal } from "@/components/workspace/QuotaLimitModal";
 import { toast } from "sonner";
+import DataProcessorWorker from '@/workers/dataProcessor?worker';
 import { AnalysisValidatorCard } from "@/components/workspace/AnalysisValidatorCard";
 import { ConfidenceScoreMetricCard } from "@/components/workspace/ConfidenceScoreMetricCard";
 import { AnalysisValidator, DataEntryErrorCheckResult } from "@/lib/analysisValidator";
@@ -53,6 +54,7 @@ export default function AIAnalyst() {
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [computedProfile, setComputedProfile] = useState<DatasetProfile | null>(null);
   const [enterpriseIntelligence, setEnterpriseIntelligence] = useState<any>(null);
+  const [datasetCache, setDatasetCache] = useState<Record<string, any[]>>({});
   const [statusText, setStatusText] = useState("");
 
   useEffect(() => {
@@ -68,33 +70,41 @@ export default function AIAnalyst() {
   const runSeniorDataScientistAnalysis = async () => {
     if (!selectedDatasetId) return;
 
-    // Quota Enforcement Check
-    const quota = checkAndConsumeQuota(1, user?.id);
-    if (!quota.allowed) {
-      triggerQuotaModal();
-      return;
-    }
-
-    setIsAnalyzing(true);
-    setStatusText("Loading raw dataset from secure storage...");
-
-    const ds = datasets.find(d => d.id === selectedDatasetId);
-    if (!ds) {
-      setIsAnalyzing(false);
-      return;
-    }
-
     try {
+      setIsAnalyzing(true);
+      setStatusText("Initializing Vivexa Causal Kernel & preparing memory...");
+      setAnalysisResult(null);
+      setEnterpriseIntelligence(null);
+
+      const ds = datasets.find(d => d.id === selectedDatasetId);
+      if (!ds) throw new Error("Dataset not found.");
+
       let rawRows: any[] = [];
 
-      if (ds.storage_path) {
-        const { data: fileData, error: fileError } = await supabase.storage.from('datasets').download(ds.storage_path);
-        if (!fileError && fileData) {
-          try {
-            const parsed = await parseDatasetFile(fileData, ds.name);
-            rawRows = parsed.rows;
-          } catch (pErr) {
-            console.error("Failed to parse dataset in AIAnalyst:", pErr);
+      // MOCK DATA OR REAL FETCH WITH CACHE
+      if (ds.metadata?.is_mock) {
+        if (datasetCache[ds.id]) {
+          rawRows = datasetCache[ds.id];
+        } else {
+          setStatusText(`Generating mock simulation buffers for ${ds.name}...`);
+          const { generateMockDataset } = await import('@/lib/datasetParser');
+          rawRows = generateMockDataset(ds.name, 3500);
+          setDatasetCache(prev => ({ ...prev, [ds.id]: rawRows }));
+        }
+      } else if (ds.storage_path) {
+        if (datasetCache[ds.id]) {
+          rawRows = datasetCache[ds.id];
+        } else {
+          setStatusText(`Downloading dataset buffer ${ds.storage_path}...`);
+          const { data: fileData, error: fileError } = await supabase.storage.from('datasets').download(ds.storage_path);
+          if (!fileError && fileData) {
+            try {
+              const parsed = await parseDatasetFile(fileData, ds.name);
+              rawRows = parsed.rows;
+              setDatasetCache(prev => ({ ...prev, [ds.id]: rawRows }));
+            } catch (pErr) {
+              console.error("Failed to parse dataset in AIAnalyst:", pErr);
+            }
           }
         }
       }
@@ -107,8 +117,31 @@ export default function AIAnalyst() {
         return;
       }
 
-      setStatusText("Calculating multivariate statistics & quality scores...");
-      const profile = profileDataset(rawRows, ds.name, { fileSize: ds.size_bytes });
+      setStatusText("Calculating multivariate statistics & quality scores via Web Worker...");
+      
+      const profile = await new Promise<DatasetProfile>((resolve, reject) => {
+        const worker = new DataProcessorWorker();
+        worker.onmessage = (e) => {
+          const { type, payload, error } = e.data;
+          if (type === 'PROFILE_SUCCESS') {
+            worker.terminate();
+            resolve(payload.profileResult);
+          } else if (type === 'PROCESS_ERROR') {
+            worker.terminate();
+            reject(new Error(error));
+          }
+        };
+        worker.postMessage({
+          type: 'PROFILE_ONLY',
+          jobId: Date.now(),
+          payload: {
+            rows: rawRows,
+            datasetName: ds.name,
+            fileSize: ds.size_bytes
+          }
+        });
+      });
+
       setComputedProfile(profile);
 
       // Check for data entry errors and severe Z-score outliers
@@ -119,8 +152,8 @@ export default function AIAnalyst() {
         setSelectedFeatureCol(profile.numericColumns[0]);
       }
 
-      setStatusText("Consulting Senior Data Scientist Decision Model...");
-      const res = await fetch('/api/v1/gemini/analyze', {
+      setStatusText("Consulting Senior Data Scientist Decision Model & Playbooks (Batch LLM Request)...");
+      const res = await fetch('/api/v1/gemini/batch-analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -130,7 +163,8 @@ export default function AIAnalyst() {
           profile,
           dataset_name: ds.name,
           rows: profile.totalRows,
-          cols: profile.totalCols
+          cols: profile.totalCols,
+          model: 'gemini-3.1-pro-preview'
         })
       });
 
@@ -138,40 +172,27 @@ export default function AIAnalyst() {
       if (res.status === 429 || json.error === "AI_QUOTA_EXCEEDED" || json.code === "LIMIT_CONTROL_BLOCKED") {
         triggerQuotaModal();
         toast.error(json.message || "Monthly AI API quota reached for your plan. Please upgrade.");
+        setIsAnalyzing(false);
         return;
       }
 
       if (json.success && json.data) {
-        setAnalysisResult(json.data);
-        // Run Pass 3 Anti-Hallucination validation against generated AI summary
-        const updatedReport = AnalysisValidator.runFullMultiPassValidation(profile, rawRows, json.data.summary);
-        profile.validationReport = updatedReport;
-        setComputedProfile({ ...profile });
+        if (json.data.analyze) {
+          setAnalysisResult(json.data.analyze);
+          // Run Pass 3 Anti-Hallucination validation against generated AI summary
+          const updatedReport = AnalysisValidator.runFullMultiPassValidation(profile, rawRows, json.data.analyze.summary);
+          profile.validationReport = updatedReport;
+          setComputedProfile({ ...profile });
+        }
+        if (json.data.enterprise) {
+          setEnterpriseIntelligence(json.data.enterprise);
+        }
       }
 
-      setStatusText("Synthesizing Enterprise Business Intelligence & Industry Playbooks...");
-      const entRes = await fetch('/api/v1/gemini/enterprise-intelligence', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
-        },
-        body: JSON.stringify({
-          profile,
-          dataset_name: ds.name
-        })
-      });
-      const entJson = await entRes.json();
-      if (entRes.status === 429 || entJson.error === "AI_QUOTA_EXCEEDED" || entJson.code === "LIMIT_CONTROL_BLOCKED") {
-        triggerQuotaModal();
-        toast.error(entJson.message || "Monthly AI API quota reached for your plan.");
-        return;
-      }
-      if (entJson.success && entJson.data) {
-        setEnterpriseIntelligence(entJson.data);
-      }
-    } catch (err) {
-      console.error(err);
+      await checkAndConsumeQuota(1);
+    } catch (err: any) {
+      console.error("AI Analysis error:", err);
+      toast.error(err.message || "An unexpected error occurred running AI analysis.");
     } finally {
       setIsAnalyzing(false);
       setStatusText("");

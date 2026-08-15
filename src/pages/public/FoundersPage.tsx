@@ -209,7 +209,7 @@ export default function FoundersPage() {
                         {/* Interactive gradient border ring around photo */}
                         <div className="absolute -inset-1 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-500 blur opacity-40 group-hover:opacity-100 transition-opacity" />
                         <div className="relative h-28 w-28 rounded-2xl overflow-hidden border border-slate-800 bg-slate-950">
-                          <img
+                          <img loading="lazy"
                             src={founder.image}
                             alt={founder.name}
                             referrerPolicy="no-referrer"

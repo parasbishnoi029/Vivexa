@@ -19,13 +19,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } 
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/lib/supabase";
 
-export const DEPT_DATA = [
-  { name: 'Organisational Development & Renewal', value: 30, color: '#6366f1' },
-  { name: 'Engineering & Architecture', value: 25, color: '#3b82f6' },
-  { name: 'Product & Strategy', value: 15, color: '#10b981' },
-  { name: 'Data & Analytics', value: 15, color: '#8b5cf6' },
-  { name: 'Executive & Leadership', value: 15, color: '#f59e0b' },
-];
+export const DEPT_DATA: any[] = [];
 
 export const DEPARTMENT_OPTIONS = [
   'Organisational Development & Renewal',

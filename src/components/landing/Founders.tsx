@@ -122,7 +122,7 @@ export function Founders() {
                   <div className="relative shrink-0 group/img mx-auto sm:mx-0">
                     <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-500 blur opacity-20 group-hover/img:opacity-100 transition-opacity" />
                     <div className="h-28 w-28 rounded-2xl overflow-hidden border border-slate-800 bg-slate-950">
-                      <img
+                      <img loading="lazy"
                         src={founder.image}
                         alt={founder.name}
                         referrerPolicy="no-referrer"

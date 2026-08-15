@@ -163,46 +163,6 @@ export default function PricingPage() {
               </div>
             ))}
           </div>
-
-          {/* ROI Calculator Card */}
-          <div className="enterprise-card rounded-3xl p-8 space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-400">
-                <Calculator className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-white">Interactive Enterprise ROI Estimator</h3>
-                <p className="text-xs text-slate-400">Estimate annualized engineering and data science team productivity gains.</p>
-              </div>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-8 items-center pt-2">
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-xs font-bold text-slate-300 mb-2">
-                    <span>Active Analysts / Decision-Makers</span>
-                    <span className="text-indigo-400 font-mono">{teamSize} team members</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="2"
-                    max="100"
-                    value={teamSize}
-                    onChange={(e) => setTeamSize(Number(e.target.value))}
-                    className="w-full accent-indigo-500 bg-slate-950 h-2 rounded-lg cursor-pointer"
-                  />
-                </div>
-              </div>
-
-              <div className="p-6 bg-slate-950 rounded-2xl border border-slate-800 text-center space-y-2">
-                <div className="text-xs text-slate-400 uppercase font-bold tracking-wider">Estimated Annual Value</div>
-                <div className="text-4xl font-black text-emerald-400 font-mono">
-                  ${(teamSize * 18500).toLocaleString()} / yr
-                </div>
-                <div className="text-[11px] text-slate-500">Calculated on ~12.5 engineering hours saved per analyst weekly</div>
-              </div>
-            </div>
-          </div>
         </main>
 
         <PublicFooter />

@@ -98,27 +98,6 @@ export default function NotificationDrawer({
     }
   };
 
-  // Helper to trigger simulated demo notification
-  const handleSimulateAlert = async () => {
-    const types = [
-      { type: "ai_analysis", title: "AI Decision Model Synthesized", msg: "Gemini 2.5 Pro completed Q3 revenue optimization scenario analysis.", url: "/workspace/ai/chat", priority: "high" },
-      { type: "dataset_cleaned", title: "Lakehouse Parquet File Indexed", msg: "1,450,000 rows automatically cleaned and partitioned into Gold Tier.", url: "/workspace/datasets", priority: "medium" },
-      { type: "model_trained", title: "Predictive Forecast Model Ready", msg: "ARIMA time-series model achieves 98.4% accuracy rating.", url: "/workspace/predictions", priority: "high" },
-      { type: "system_maintenance", title: "Security Governance Scan Passed", msg: "Zero RBAC vulnerabilities detected across enterprise workspace.", url: "/workspace/observability", priority: "low" }
-    ] as const;
-
-    const chosen = types[Math.floor(Math.random() * types.length)];
-    await createNotification({
-      title: chosen.title,
-      message: chosen.msg,
-      type: chosen.type,
-      priority: chosen.priority,
-      actionUrl: chosen.url,
-      showToast: true
-    });
-    handleRefresh();
-  };
-
   // Filtering
   const isToday = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -195,15 +174,6 @@ export default function NotificationDrawer({
               </div>
 
               <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleSimulateAlert}
-                  className="h-8 w-8 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 rounded-lg"
-                  title="Simulate incoming alert"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
                 <Button
                   variant="ghost"
                   size="icon"

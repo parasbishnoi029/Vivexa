@@ -836,7 +836,7 @@ Thank you for scaling with Vivexa!
                   <div className="flex items-center gap-6 pb-4 border-b border-slate-850">
                     <div className="relative">
                       <div className="h-20 w-20 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold text-2xl overflow-hidden shadow-lg">
-                        {avatarUrl ? <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" /> : initials}
+                        {avatarUrl ? <img loading="lazy" src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" /> : initials}
                       </div>
                       <button
                         onClick={() => fileInputRef.current?.click()}

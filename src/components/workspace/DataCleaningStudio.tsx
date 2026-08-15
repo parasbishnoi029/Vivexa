@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Settings2, ShieldCheck, Activity, RefreshCw, Download, 
   Trash2, Sparkles, AlertTriangle, CheckCircle2, FileSpreadsheet,
@@ -20,10 +21,11 @@ import {
 interface Props {
   rows: Record<string, any>[];
   datasetName?: string;
-  onDatasetCleaned?: (result: CleanedDatasetResult) => void;
+  onDatasetCleaned?: (result: CleanedDatasetResult, profile: DatasetProfile) => void;
+  datasetSize?: number;
 }
 
-export default function DataCleaningStudio({ rows, datasetName = "Dataset", onDatasetCleaned }: Props) {
+export default function DataCleaningStudio({ rows, datasetName = "Dataset", onDatasetCleaned, datasetSize = 0 }: Props) {
   const [missingStrategy, setMissingStrategy] = useState<CleaningOptions['missingValueStrategy']>('auto');
   const [outlierMethod, setOutlierMethod] = useState<CleaningOptions['outlierMethod']>('iqr');
   const [outlierTreatment, setOutlierTreatment] = useState<CleaningOptions['outlierTreatment']>('cap');
@@ -37,6 +39,8 @@ export default function DataCleaningStudio({ rows, datasetName = "Dataset", onDa
 
   const [cleanedResult, setCleanedResult] = useState<CleanedDatasetResult | null>(null);
   const [isCleaning, setIsCleaning] = useState(false);
+  const [cleaningStep, setCleaningStep] = useState<string>("");
+  const [cleaningProgress, setCleaningProgress] = useState(0);
 
   // Detect initial issues
   const initialIssues = useMemo(() => {
@@ -45,9 +49,66 @@ export default function DataCleaningStudio({ rows, datasetName = "Dataset", onDa
 
   const handleRunCleaning = () => {
     setIsCleaning(true);
-    setTimeout(() => {
-      try {
-        const res = cleanDataset(rows, {
+    setCleaningStep("Initializing batch processing worker...");
+    setCleaningProgress(0);
+
+    const steps = [
+      { msg: "Profiling dataset distributions...", delay: 200 },
+      { msg: "Applying missing value imputations...", delay: 500 },
+      { msg: "Mitigating statistical outliers...", delay: 800 },
+      { msg: "Standardizing encodings & features...", delay: 1100 },
+      { msg: "Finalizing quality audit...", delay: 1400 },
+    ];
+
+    steps.forEach((step, idx) => {
+      setTimeout(() => {
+        setCleaningStep(step.msg);
+        setCleaningProgress(((idx + 1) / steps.length) * 100);
+      }, step.delay);
+    });
+
+    const worker = new DataProcessorWorker();
+    
+    worker.onmessage = (e) => {
+      const { type, payload, error } = e.data;
+      if (type === 'PROCESS_SUCCESS') {
+        const { cleanResult, profileResult } = payload;
+        
+        // Optimistic UI updates
+        setCleanedResult(cleanResult);
+        if (onDatasetCleaned) onDatasetCleaned(cleanResult, profileResult);
+        
+        toast.success("Data cleaning & profiling engine executed successfully via worker!");
+        createNotification({
+          title: "Dataset Cleaned",
+          message: `Data cleaning pipeline executed for "${datasetName}". Quality score improved from ${cleanResult.auditLog.qualityScoreBefore}% to ${cleanResult.auditLog.qualityScoreAfter}%.`,
+          type: "dataset_cleaned",
+          priority: "medium"
+        });
+        
+        setTimeout(() => {
+          setIsCleaning(false);
+          setCleaningStep("");
+          setCleaningProgress(0);
+          worker.terminate();
+        }, 300); // Small delay to let progress bar reach 100%
+      } else if (type === 'PROCESS_ERROR') {
+        toast.error(error || "Failed to execute cleaning");
+        setIsCleaning(false);
+        setCleaningStep("");
+        setCleaningProgress(0);
+        worker.terminate();
+      }
+    };
+
+    worker.postMessage({
+      type: 'PROCESS_DATASET',
+      jobId: Date.now(),
+      payload: {
+        rows,
+        datasetName,
+        fileSize: datasetSize,
+        options: {
           missingValueStrategy: missingStrategy,
           outlierMethod,
           outlierTreatment,
@@ -58,22 +119,9 @@ export default function DataCleaningStudio({ rows, datasetName = "Dataset", onDa
           standardizeDates,
           parseCurrencies,
           removeConstantCols
-        });
-        setCleanedResult(res);
-        if (onDatasetCleaned) onDatasetCleaned(res);
-        toast.success("Data cleaning engine executed successfully!");
-        createNotification({
-          title: "Dataset Cleaned",
-          message: `Data cleaning pipeline executed for "${datasetName}". Quality score improved from ${res.auditLog.qualityScoreBefore}% to ${res.auditLog.qualityScoreAfter}%.`,
-          type: "dataset_cleaned",
-          priority: "medium"
-        });
-      } catch (err: any) {
-        toast.error(err.message || "Failed to execute cleaning");
-      } finally {
-        setIsCleaning(false);
+        }
       }
-    }, 400);
+    });
   };
 
   const handleDownloadCleanedCSV = () => {
@@ -86,7 +134,41 @@ export default function DataCleaningStudio({ rows, datasetName = "Dataset", onDa
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      <AnimatePresence>
+        {isCleaning && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: -10 }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              className="bg-slate-900 border border-indigo-500/30 p-8 rounded-2xl shadow-2xl max-w-sm w-full flex flex-col items-center text-center"
+            >
+              <RefreshCw className="h-10 w-10 text-indigo-400 animate-spin mb-4" />
+              <h3 className="text-lg font-bold text-white mb-2">Processing Data</h3>
+              <p className="text-sm text-slate-400 mb-6 min-h-[20px]">{cleaningStep}</p>
+              <div className="w-full bg-slate-800 rounded-full h-2.5 mb-2 overflow-hidden">
+                <motion.div
+                  className="bg-indigo-500 h-2.5 rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${cleaningProgress}%` }}
+                  transition={{ ease: "easeInOut", duration: 0.3 }}
+                />
+              </div>
+              <div className="w-full text-right">
+                <span className="text-xs font-mono text-indigo-300">{Math.round(cleaningProgress)}%</span>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="bg-slate-900/40 border-slate-800/60 backdrop-blur-xl">

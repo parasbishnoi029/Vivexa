@@ -383,6 +383,7 @@ export class AnalysisValidator {
 
       if (rawRows && rawRows.length > 5 && n > 5) {
         const values = rawRows
+          .filter(r => r[colName] !== null && r[colName] !== undefined && String(r[colName]).trim() !== "")
           .map((r) => Number(String(r[colName]).replace(/[\$,€,£,₹,¥\s,]/g, '')))
           .filter((v) => !isNaN(v));
 

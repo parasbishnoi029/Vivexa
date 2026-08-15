@@ -25,7 +25,7 @@ export const PLAN_LIMITS_CONFIG: Record<PlanTier, PlanLimits> = {
   free: {
     name: "Starter / Free",
     badge: "Free Tier",
-    aiCallsLimit: 250, // Capped monthly quota
+    aiCallsLimit: 375, // Capped monthly quota
     maxDatasets: 5,
     maxFileSizeMB: 50,
     maxTotalStorageMB: 250,
@@ -41,7 +41,7 @@ export const PLAN_LIMITS_CONFIG: Record<PlanTier, PlanLimits> = {
   student: {
     name: "Academic / Student",
     badge: "Student Tier",
-    aiCallsLimit: 1250,
+    aiCallsLimit: 1875,
     maxDatasets: 15,
     maxFileSizeMB: 100,
     maxTotalStorageMB: 1500,
@@ -57,7 +57,7 @@ export const PLAN_LIMITS_CONFIG: Record<PlanTier, PlanLimits> = {
   pro: {
     name: "Professional",
     badge: "Pro Plan",
-    aiCallsLimit: 12500,
+    aiCallsLimit: 18750,
     maxDatasets: 50,
     maxFileSizeMB: 500,
     maxTotalStorageMB: 10000,
@@ -73,7 +73,7 @@ export const PLAN_LIMITS_CONFIG: Record<PlanTier, PlanLimits> = {
   enterprise: {
     name: "Enterprise Global",
     badge: "Enterprise Tier",
-    aiCallsLimit: 125000,
+    aiCallsLimit: 187500,
     maxDatasets: 500,
     maxFileSizeMB: 2048,
     maxTotalStorageMB: 102400,

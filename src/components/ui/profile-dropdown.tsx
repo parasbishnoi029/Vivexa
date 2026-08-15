@@ -77,7 +77,7 @@ export function ProfileDropdown() {
           <div className="h-full w-full rounded-[11px] bg-slate-950 flex items-center justify-center font-bold text-sm text-white relative overflow-hidden group">
             <div className="absolute inset-0 bg-indigo-500/20 group-hover:bg-indigo-500/40 transition-colors pointer-events-none" />
             {profileData.avatar_url ? (
-              <img src={profileData.avatar_url} alt={profileData.full_name} className="h-full w-full object-cover relative z-10" />
+              <img loading="lazy" src={profileData.avatar_url} alt={profileData.full_name} className="h-full w-full object-cover relative z-10" />
             ) : (
               <span className="relative z-10">{initials}</span>
             )}
@@ -101,7 +101,7 @@ export function ProfileDropdown() {
                 <div className="flex items-center gap-3 mb-3">
                   <div className="h-10 w-10 shrink-0 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center font-bold text-indigo-400 overflow-hidden">
                     {profileData.avatar_url ? (
-                      <img src={profileData.avatar_url} alt={profileData.full_name} className="h-full w-full object-cover" />
+                      <img loading="lazy" src={profileData.avatar_url} alt={profileData.full_name} className="h-full w-full object-cover" />
                     ) : (
                       initials
                     )}

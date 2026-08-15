@@ -13,6 +13,7 @@ import { ShareDialog } from "@/components/ShareDialog";
 import { createNotification } from "@/lib/notifications";
 import { useAuthStore } from "@/stores/authStore";
 import { safeFetchJson } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 
 interface WorkflowLog {
   id: string;
@@ -40,75 +41,7 @@ interface AutomationRule {
   webhookEnabled?: boolean;
 }
 
-const DEFAULT_AUTOMATIONS: AutomationRule[] = [
-  {
-    id: "wf-101",
-    name: "Weekly Executive Revenue Digest",
-    triggerType: "Schedule",
-    triggerDetail: "Every Monday at 08:00 AM IST",
-    condition: "If Revenue > $100,000",
-    actionType: "Email PDF Report",
-    actionDetail: "Send compiled PDF report to exec-team@vivexa.io",
-    enabled: true,
-    retryLogic: true,
-    lastRun: "Yesterday, 08:00 AM",
-    successRate: "100%",
-    logs: [
-      { id: "l-1", timestamp: "Yesterday 08:00 AM", status: "Success", duration: "1.4s", triggerEvent: "Cron Schedule", actionResult: "Sent email to 4 recipients" },
-      { id: "l-2", timestamp: "Aug 02, 08:00 AM", status: "Success", duration: "1.8s", triggerEvent: "Cron Schedule", actionResult: "Sent email to 4 recipients" }
-    ]
-  },
-  {
-    id: "wf-102",
-    name: "Automated Data Quality Audit & Clean",
-    triggerType: "Dataset Event",
-    triggerDetail: "When new dataset is uploaded",
-    condition: "If Missing Values > 5%",
-    actionType: "Sync Dataset",
-    actionDetail: "Auto-impute median values and rebuild index",
-    enabled: true,
-    retryLogic: true,
-    lastRun: "2 hours ago",
-    successRate: "98.5%",
-    logs: [
-      { id: "l-3", timestamp: "2 hours ago", status: "Success", duration: "3.1s", triggerEvent: "Dataset: quarterly_sales.csv", actionResult: "Imputed 14 missing rows" }
-    ]
-  },
-  {
-    id: "wf-103",
-    name: "High Churn Anomaly Alert",
-    triggerType: "Model Event",
-    triggerDetail: "When Churn Prediction completes",
-    condition: "If Risk Score > 80%",
-    actionType: "Slack Alert",
-    actionDetail: "Dispatch high priority alert to #customer-success",
-    enabled: true,
-    retryLogic: false,
-    lastRun: "1 day ago",
-    successRate: "100%",
-    logs: [
-      { id: "l-4", timestamp: "1 day ago", status: "Success", duration: "0.8s", triggerEvent: "Model ID #ch-902", actionResult: "Posted Slack webhook" }
-    ]
-  },
-  {
-    id: "wf-104",
-    name: "Outbound Real-time Webhook Notification",
-    triggerType: "Dataset Event",
-    triggerDetail: "When dataset synchronization succeeds",
-    condition: "Always run",
-    actionType: "Trigger Webhook",
-    actionDetail: "POST payload to https://api.enterprise.io/v1/sync/notify",
-    enabled: true,
-    retryLogic: true,
-    lastRun: "3 mins ago",
-    successRate: "100%",
-    webhookUrl: "https://api.enterprise.io/v1/sync/notify",
-    webhookEnabled: true,
-    logs: [
-      { id: "l-5", timestamp: "3 mins ago", status: "Success", duration: "1.1s", triggerEvent: "Dataset: real-time stream sync", actionResult: "Triggered webhook (200 OK)" }
-    ]
-  }
-];
+const DEFAULT_AUTOMATIONS: AutomationRule[] = [];
 
 export default function Automations() {
   const [workflows, setWorkflows] = useState<AutomationRule[]>([]);
@@ -142,23 +75,53 @@ export default function Automations() {
 
   const toggleEnable = async (wf: AutomationRule) => {
     const newEnabled = !wf.enabled;
-    setWorkflows(prev => prev.map(w => w.id === wf.id ? { ...w, enabled: newEnabled } : w));
-    toast.info(`Automation ${newEnabled ? 'enabled' : 'paused'}`);
+    const { data: { session } } = await supabase.auth.getSession();
+    const req = await fetch(`/api/v1/automations/${wf.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ enabled: newEnabled })
+    });
+    const res = await safeFetchJson(req);
+    if (res.success) {
+      setWorkflows(prev => prev.map(w => w.id === wf.id ? { ...w, enabled: newEnabled } : w));
+      toast.info(`Automation ${newEnabled ? 'enabled' : 'paused'}`);
+    } else {
+      toast.error(res.error || "Failed to update workflow");
+    }
   };
 
   const deleteWorkflow = async (id: string) => {
     if (!confirm("Are you sure you want to delete this automation workflow?")) return;
-    setWorkflows(prev => prev.filter(w => w.id !== id));
-    toast.success("Workflow removed");
+    const { data: { session } } = await supabase.auth.getSession();
+    const req = await fetch(`/api/v1/automations/${id}`, { 
+      method: "DELETE",
+      headers: { "Authorization": `Bearer ${session?.access_token}` }
+    });
+    const res = await safeFetchJson(req);
+    if (res.success) {
+      setWorkflows(prev => prev.filter(w => w.id !== id));
+      toast.success("Workflow removed");
+    } else {
+      toast.error(res.error || "Failed to delete workflow");
+    }
   };
 
   const executeNow = async (wf: AutomationRule) => {
     setIsExecutingId(wf.id);
     toast.info(`Executing automation workflow "${wf.name}"...`);
-    setTimeout(() => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const req = await fetch(`/api/v1/automations/${wf.id}/execute`, { 
+      method: "POST",
+      headers: { "Authorization": `Bearer ${session?.access_token}` }
+    });
+    const res = await safeFetchJson(req);
+    setIsExecutingId(null);
+    if (res.success) {
       toast.success(`Workflow "${wf.name}" completed successfully!`);
-      setIsExecutingId(null);
-    }, 2000);
+      loadWorkflows(); // Refresh logs
+    } else {
+      toast.error(res.error || "Failed to execute workflow");
+    }
   };
 
   const handleShareWorkflow = (wf: AutomationRule) => {
@@ -167,26 +130,51 @@ export default function Automations() {
     setIsShareDialogOpen(true);
   };
 
-  const handleCreateWorkflow = (e: React.FormEvent) => {
+  const handleCreateWorkflow = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    const newWf: AutomationRule = {
-      id: `wf-${Math.random().toString(36).substr(2, 9)}`,
+    
+    setIsCreating(true); // Can use for loading state
+    const payload = {
       name,
-      triggerType,
-      triggerDetail,
+      trigger_type: triggerType,
+      trigger_detail: triggerDetail,
       condition,
-      actionType,
-      actionDetail,
+      action_type: actionType,
+      action_detail: actionDetail,
       enabled: true,
-      retryLogic: true,
-      successRate: "100%",
-      logs: []
+      webhook_url: wfWebhookUrl,
+      webhook_enabled: wfWebhookEnabled
     };
-    setWorkflows([newWf, ...workflows]);
-    setIsCreating(false);
-    setName("");
-    toast.success("Workflow created!");
+
+    const { data: { session } } = await supabase.auth.getSession();
+    const req = await fetch("/api/v1/automations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
+      body: JSON.stringify(payload)
+    });
+    const res = await safeFetchJson(req);
+
+    if (res.success) {
+      const newWf = res.data;
+      setWorkflows([{ 
+        ...newWf, 
+        triggerType: newWf.trigger_type, 
+        triggerDetail: newWf.trigger_detail, 
+        actionType: newWf.action_type, 
+        actionDetail: newWf.action_detail, 
+        webhookUrl: newWf.webhook_url, 
+        webhookEnabled: newWf.webhook_enabled,
+        lastRun: newWf.last_run,
+        successRate: newWf.success_rate
+      }, ...workflows]);
+      setIsCreating(false);
+      setName("");
+      toast.success("Workflow created!");
+    } else {
+      toast.error(res.error || "Failed to create workflow");
+      setIsCreating(false);
+    }
   };
 
   const getActionIcon = (type: string) => {

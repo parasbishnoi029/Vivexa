@@ -62,39 +62,7 @@ interface WorkspaceState {
   setKernelStatus: (status: "Idle" | "Busy") => void;
 }
 
-const DEFAULT_NOTEBOOKS: Notebook[] = [
-  {
-    id: "nb-1",
-    name: "Customer Revenue & Churn Analysis",
-    updatedAt: "Just now",
-    cells: [
-      {
-        id: "c-1",
-        type: "markdown",
-        code: "# Executive Revenue & Cohort Analysis\n*Analyzes quarterly recurring revenue (ARR), subscriber churn, and customer lifetime value (LTV) using workspace datasets.*"
-      },
-      {
-        id: "c-2",
-        type: "python",
-        code: `import pandas as pd
-import numpy as np
-
-# Load dataset automatically exposed by kernel
-if df is not None:
-    print(f"Loaded DataFrame: {df.shape[0]} rows, {df.shape[1]} columns")
-    print("Columns available:", list(df.columns))
-    print(df.head())
-else:
-    print("No dataset is currently selected.")`
-      },
-      {
-        id: "c-3",
-        type: "sql",
-        code: `SELECT Segment, COUNT(*) as Count, AVG(Sales) as Avg_Sales \nFROM dataset \nGROUP BY Segment;`
-      }
-    ]
-  }
-];
+const DEFAULT_NOTEBOOKS: Notebook[] = [];
 
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(

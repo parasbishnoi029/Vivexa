@@ -356,21 +356,6 @@ function parseJsonContent(text: string, fileName: string, fileType: string): Par
       }
       val = cleanParsedValue(val);
 
-      // Domain-specific cleanup for "age" column
-      if (col.toLowerCase() === 'age') {
-        if (typeof val === 'number') {
-          if (val < 0 || val > 120) {
-            val = null;
-          }
-        } else if (typeof val === 'string') {
-          const num = Number(val);
-          if (!isNaN(num) && num >= 0 && num <= 120) {
-            val = num;
-          } else {
-            val = null; // Filter out "thirty", "-2", "70000", "-" etc.
-          }
-        }
-      }
       rowObj[col] = val;
     });
     rows.push(rowObj);
@@ -458,25 +443,6 @@ function finalizeParsedResult(
   const uniqueCounts: Record<string, number> = {};
 
   const totalRows = rows.length;
-
-  // Domain-specific cleanup
-  for (const col of columns) {
-    if (col.toLowerCase() === 'age') {
-      for (const row of rows) {
-        let val = row[col];
-        if (typeof val === 'number') {
-          if (val < 0 || val > 120) row[col] = null;
-        } else if (typeof val === 'string') {
-          const num = Number(val);
-          if (!isNaN(num) && num >= 0 && num <= 120) {
-            row[col] = num;
-          } else {
-            row[col] = null;
-          }
-        }
-      }
-    }
-  }
 
   for (const col of columns) {
     const rawVals = rows.map(r => r[col]);

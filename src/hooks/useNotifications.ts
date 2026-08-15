@@ -10,7 +10,7 @@ import {
 } from "@/lib/notifications";
 import { toast } from "sonner";
 
-export function useNotifications(pollIntervalMs: number = 15000) {
+export function useNotifications(pollIntervalMs: number = 60000) {
   const { user } = useAuthStore();
   const userId = user?.id || "default_user";
 

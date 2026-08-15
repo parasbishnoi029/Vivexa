@@ -49,16 +49,7 @@ const ALL_SYSTEM_FEATURES: SearchHit[] = [
   { title: "Project Memory & Context", subtitle: "Long-term AI memory & domain rule storage", type: "Navigation", link: "/workspace/memory", icon: BookOpen, color: "text-sky-400", bg: "bg-sky-500/10 border-sky-500/20" }
 ];
 
-const DATASET_COLUMN_INDEX: SearchHit[] = [
-  { title: "customer_id", subtitle: "Column in Customer Churn dataset (Categorical Unique ID)", type: "Column", link: "/workspace/datasets", icon: Layers, color: "text-indigo-400", bg: "bg-indigo-500/10 border-indigo-500/20" },
-  { title: "tenure", subtitle: "Column in Customer Churn dataset (Numeric - Account Length Months)", type: "Column", link: "/workspace/datasets", icon: Layers, color: "text-indigo-400", bg: "bg-indigo-500/10 border-indigo-500/20" },
-  { title: "monthly_charges", subtitle: "Column in Sales & Subscription dataset (Numeric - $ Recurring)", type: "Column", link: "/workspace/datasets", icon: Layers, color: "text-indigo-400", bg: "bg-indigo-500/10 border-indigo-500/20" },
-  { title: "total_charges", subtitle: "Column in Customer Lifetime Value dataset (Numeric)", type: "Column", link: "/workspace/datasets", icon: Layers, color: "text-indigo-400", bg: "bg-indigo-500/10 border-indigo-500/20" },
-  { title: "churn", subtitle: "Column / Target Label in Churn Prediction (Categorical Binary Yes/No)", type: "Column", link: "/workspace/predictions", icon: Layers, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" },
-  { title: "revenue", subtitle: "Column in Q3 Financial Trajectory dataset (Numeric Sum)", type: "Column", link: "/workspace/forecasting", icon: Layers, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
-  { title: "region", subtitle: "Column in Global Demographics dataset (Categorical Location)", type: "Column", link: "/workspace/datasets", icon: Layers, color: "text-indigo-400", bg: "bg-indigo-500/10 border-indigo-500/20" },
-  { title: "payment_method", subtitle: "Column in Billing Transactions dataset (Credit Card, Bank Wire)", type: "Column", link: "/workspace/datasets", icon: Layers, color: "text-indigo-400", bg: "bg-indigo-500/10 border-indigo-500/20" }
-];
+const DATASET_COLUMN_INDEX: SearchHit[] = [];
 
 import { toast } from "sonner";
 

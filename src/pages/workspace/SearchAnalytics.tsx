@@ -245,128 +245,15 @@ export default function SearchAnalytics() {
             animate={{ opacity: 1, y: 0 }}
             className="space-y-8"
           >
-            {/* Synthetic Summary Header */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-2 bg-slate-900/40 border-slate-800/80 rounded-[32px] overflow-hidden backdrop-blur-xl shadow-2xl">
-                <CardHeader className="border-b border-slate-800/40 p-6 bg-slate-950/20 flex flex-row items-center justify-between">
-                  <CardTitle className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2">
-                    <Target className="h-4 w-4 text-indigo-400" /> Synthesized Visualization
-                  </CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-white"><Share2 className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-white"><ArrowUpRight className="h-4 w-4" /></Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-8">
-                  <div className="h-80 w-full bg-slate-950/50 rounded-3xl border border-slate-800 flex items-center justify-center relative overflow-hidden group">
-                    {/* Mock Chart Visualization */}
-                    <div className="absolute inset-0 p-8 flex items-end justify-around gap-2">
-                      {[40, 70, 45, 90, 65, 80, 55, 75, 95, 60].map((h, i) => (
-                        <motion.div 
-                          key={i}
-                          initial={{ height: 0 }}
-                          animate={{ height: `${h}%` }}
-                          transition={{ delay: i * 0.05, duration: 1, ease: "easeOut" }}
-                          className="w-full bg-gradient-to-t from-indigo-600/80 to-indigo-400 rounded-t-lg relative group/bar"
-                        >
-                          <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover/bar:opacity-100 transition-opacity bg-white text-slate-900 text-[10px] font-bold px-2 py-1 rounded">
-                            ${h}k
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                    <div className="absolute top-4 left-4 flex flex-col gap-1">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase">Y-Axis: Revenue (USD)</span>
-                      <span className="text-xl font-bold text-white">$4.2M Total</span>
-                    </div>
-                    <div className="absolute bottom-4 right-4 p-4 rounded-2xl bg-slate-900/80 border border-slate-800/80 backdrop-blur-md shadow-xl text-center">
-                      <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Wow Growth</p>
-                      <p className="text-xl font-black text-white">+12.4%</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* AI Strategic Recommendation */}
-              <Card className="bg-indigo-600 border-indigo-400 rounded-[32px] overflow-hidden shadow-[0_0_50px_rgba(99,102,241,0.2)] text-white">
-                <CardContent className="p-8 space-y-6">
-                  <div className="h-12 w-12 rounded-2xl bg-white/10 flex items-center justify-center">
-                    <BrainCircuit className="h-7 w-7 text-white" />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-2xl font-bold">Strategic Pivot Recommendation</h3>
-                    <p className="text-indigo-100 text-sm leading-relaxed">
-                      Based on current multi-regional trends, we recommend re-allocating 15% of the marketing budget from Western Europe to the APAC region for Q4.
-                    </p>
-                  </div>
-                  
-                  <div className="space-y-4 pt-4 border-t border-white/10">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-indigo-200 uppercase tracking-widest">Confidence Score</span>
-                      <span className="text-sm font-bold">98.2%</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                      <div className="w-[98%] h-full bg-white shadow-[0_0_10px_white]" />
-                    </div>
-                  </div>
-
-                  <Button className="w-full bg-white text-indigo-600 hover:bg-indigo-50 rounded-2xl font-bold text-sm h-12 shadow-xl">
-                    Execute Optimization Agent
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Sub-Insights Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {results.map((insight) => (
-                <Card key={insight.id} className="bg-slate-900/40 border-slate-800/80 rounded-3xl hover:border-slate-700/80 transition-all group shadow-xl">
-                  <CardContent className="p-6 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="p-2 rounded-xl bg-slate-950 border border-slate-800">
-                        {insight.type === "Chart" ? <BarChart3 className="h-4 w-4 text-indigo-400" /> : <Table className="h-4 w-4 text-emerald-400" />}
-                      </div>
-                      <div className="flex gap-1.5">
-                        {insight.tags.map(t => (
-                          <span key={t} className="text-[9px] font-bold text-slate-500 border border-slate-800 px-2 py-0.5 rounded uppercase tracking-wider">{t}</span>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors">{insight.title}</h4>
-                      <p className="text-xs text-slate-400 mt-2 leading-relaxed">{insight.content}</p>
-                    </div>
-                    <div className="pt-4 border-t border-slate-800/60 flex items-center justify-between">
-                      <span className="text-[10px] text-slate-500 font-bold uppercase font-mono">Confidence: {(insight.confidence * 100).toFixed(0)}%</span>
-                      <Button variant="ghost" size="sm" className="h-7 text-[10px] font-bold text-indigo-400 hover:text-indigo-300 gap-1.5">
-                        Deep Dive <ChevronRight className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="py-32 flex flex-col items-center justify-center text-center space-y-6"
-          >
-            <div className="relative">
-              <div className="absolute inset-0 bg-indigo-500/20 blur-3xl rounded-full" />
-              <div className="relative p-8 rounded-full bg-slate-900 border border-slate-800 shadow-2xl">
-                <Lightbulb className="h-16 w-16 text-slate-700" />
-              </div>
-            </div>
-            <div className="space-y-2 max-w-sm">
-              <h3 className="text-xl font-bold text-white">Ready for your query</h3>
-              <p className="text-slate-500 text-sm leading-relaxed">
-                Start typing to trigger the Vivexa Natural Language Intelligence engine.
+            <Card className="bg-slate-900/40 border-slate-800/80 rounded-[32px] overflow-hidden backdrop-blur-xl shadow-2xl p-12 text-center">
+              <Database className="h-12 w-12 text-slate-600 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-white mb-2">No active data sources found</h3>
+              <p className="text-slate-400 max-w-md mx-auto">
+                Connect your enterprise data warehouse (Snowflake, Databricks, BigQuery) in the datasets tab to enable live natural language querying.
               </p>
-            </div>
+            </Card>
           </motion.div>
-        )}
+        ) : null}
       </AnimatePresence>
 
       {/* Suggested Questions Section */}

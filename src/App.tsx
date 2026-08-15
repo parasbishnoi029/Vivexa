@@ -112,47 +112,6 @@ const DeveloperSDK = lazyWithRetry(() => import("./pages/workspace/DeveloperSDK"
 const DecisionIntelligence = lazyWithRetry(() => import("./pages/workspace/DecisionIntelligence"));
 
 // Reusable high-fidelity skeleton screen loaders
-const PublicPageLoader = () => (
-  <div className="w-full min-h-[85vh] flex flex-col justify-center items-center py-20 px-4 space-y-12 animate-pulse">
-    {/* Eyebrow */}
-    <Skeleton className="h-4 w-32 bg-slate-800/25 dark:bg-slate-800/50 rounded-full" />
-    
-    {/* Hero Header */}
-    <div className="space-y-4 text-center max-w-3xl w-full flex flex-col items-center">
-      <Skeleton className="h-10 md:h-12 w-11/12 bg-slate-800/40 dark:bg-slate-800/60" />
-      <Skeleton className="h-10 md:h-12 w-2/3 bg-slate-800/40 dark:bg-slate-800/60" />
-      <div className="pt-4 space-y-2.5 w-full flex flex-col items-center">
-        <Skeleton className="h-4.5 w-3/4 bg-slate-800/20 dark:bg-slate-800/40" />
-        <Skeleton className="h-4.5 w-1/2 bg-slate-800/20 dark:bg-slate-800/40" />
-      </div>
-    </div>
-
-    {/* CTA Actions */}
-    <div className="flex gap-4">
-      <Skeleton className="h-11 w-36 rounded-xl bg-slate-800/40 dark:bg-slate-800/65" />
-      <Skeleton className="h-11 w-36 rounded-xl bg-slate-800/15 dark:bg-slate-800/30" />
-    </div>
-
-    {/* Visual Card Feature */}
-    <div className="w-full max-w-5xl aspect-[16/9] border border-slate-800/15 dark:border-slate-800/30 rounded-2xl p-4 bg-slate-900/5 dark:bg-slate-900/15">
-      <div className="h-full w-full rounded-xl bg-slate-800/10 dark:bg-slate-800/25 flex flex-col justify-between p-6">
-        <div className="flex justify-between items-center">
-          <div className="flex gap-2">
-            <div className="h-3 w-3 rounded-full bg-slate-800/30" />
-            <div className="h-3 w-3 rounded-full bg-slate-800/30" />
-            <div className="h-3 w-3 rounded-full bg-slate-800/30" />
-          </div>
-          <Skeleton className="h-6 w-24 bg-slate-800/25 dark:bg-slate-800/45" />
-        </div>
-        <div className="space-y-4 w-2/3">
-          <Skeleton className="h-8 w-1/2 bg-slate-800/25 dark:bg-slate-800/45" />
-          <Skeleton className="h-4 w-full bg-slate-800/15 dark:bg-slate-800/35" />
-          <Skeleton className="h-4 w-5/6 bg-slate-800/15 dark:bg-slate-800/35" />
-        </div>
-      </div>
-    </div>
-  </div>
-);
 
 const WorkspacePageLoader = () => (
   <div className="w-full space-y-8 animate-pulse p-1 md:p-2">
@@ -234,14 +193,22 @@ const WorkspacePageLoader = () => (
   </div>
 );
 
+import { BrandLoader } from "./components/layout/BrandLoader";
+
 // Reusable dynamic layout loader
 const PageLoader = () => {
   const isWorkspaceOrAdmin = typeof window !== 'undefined' && 
     (window.location.pathname.startsWith('/workspace') || window.location.pathname.startsWith('/admin'));
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 md:px-8 py-6">
-      {isWorkspaceOrAdmin ? <WorkspacePageLoader /> : <PublicPageLoader />}
+    <div className="w-full">
+      {isWorkspaceOrAdmin ? (
+        <div className="max-w-7xl mx-auto px-4 md:px-8 py-6">
+          <WorkspacePageLoader />
+        </div>
+      ) : (
+        <BrandLoader />
+      )}
     </div>
   );
 };
@@ -252,10 +219,10 @@ function RootLayout() {
     <AnimatePresence mode="wait">
       <motion.div
         key={location.pathname}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -15 }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
         className="w-full h-full"
       >
         <Outlet />

@@ -16,16 +16,10 @@ type UpgradeRequest = {
   date: string;
 };
 
-const DUMMY_REQUESTS: UpgradeRequest[] = [
-  { id: '1', user_email: 'sarah.connors@example.com', user_name: 'Sarah Connors', current_plan: 'Free', requested_plan: 'Pro', status: 'pending', date: new Date().toISOString() },
-  { id: '2', user_email: 'john.doe@example.com', user_name: 'John Doe', current_plan: 'Student', requested_plan: 'Pro', status: 'pending', date: new Date(Date.now() - 86400000).toISOString() },
-  { id: '3', user_email: 'emma.watson@enterprise.com', user_name: 'Emma Watson', current_plan: 'Pro', requested_plan: 'Enterprise', status: 'pending', date: new Date(Date.now() - 172800000).toISOString() },
-];
-
 export default function AdminPlans() {
   const [plans, setPlans] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [requests, setRequests] = useState<UpgradeRequest[]>(DUMMY_REQUESTS);
+  const [requests, setRequests] = useState<UpgradeRequest[]>([]);
 
   useEffect(() => {
     async function loadPlans() {

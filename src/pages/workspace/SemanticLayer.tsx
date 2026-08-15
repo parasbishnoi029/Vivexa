@@ -24,44 +24,7 @@ interface SemanticMetric {
   lineage: string[];
 }
 
-const DEFAULT_METRICS: SemanticMetric[] = [
-  {
-    id: "m1",
-    name: "EBITDA Margin",
-    description: "Earnings before interest, taxes, depreciation, and amortization relative to total revenue.",
-    expression: "sum(ebitda) / sum(revenue)",
-    sql: "SELECT SUM(ebitda) / NULLIF(SUM(revenue), 0) FROM enterprise_finance",
-    type: "Ratio",
-    category: "Revenue",
-    status: "Verified",
-    owner: "Finance Team",
-    lineage: ["p_finance_raw", "v_ebitda_calc"]
-  },
-  {
-    id: "m2",
-    name: "Active Retention Rate (ARR)",
-    description: "Percentage of unique users who perform a core action at least 3 times in a 30-day window.",
-    expression: "count(distinct users) filter (actions >= 3) / total_active_users",
-    sql: "SELECT COUNT(DISTINCT user_id) FILTER (WHERE actions >= 3) / total_users FROM app_engagement",
-    type: "Ratio",
-    category: "User Growth",
-    status: "Verified",
-    owner: "Growth Dept",
-    lineage: ["p_events_raw", "v_user_sessions"]
-  },
-  {
-    id: "m3",
-    name: "Customer Acquisition Cost (CAC)",
-    description: "Total marketing and sales expenses divided by the number of new customers acquired.",
-    expression: "sum(marketing_spend + sales_spend) / count(new_customers)",
-    sql: "SELECT (SUM(marketing) + SUM(sales)) / COUNT(customer_id) FROM marketing_crm",
-    type: "Average",
-    category: "Revenue",
-    status: "Verified",
-    owner: "Marketing AI",
-    lineage: ["p_ads_spend", "p_crm_leads"]
-  }
-];
+const DEFAULT_METRICS: SemanticMetric[] = [];
 
 export default function SemanticLayer() {
   const [metrics, setMetrics] = useState<SemanticMetric[]>(DEFAULT_METRICS);
@@ -104,9 +67,7 @@ export default function SemanticLayer() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="bg-slate-900 border-slate-800 text-slate-300 hover:text-white rounded-xl">
-            <Shield className="h-4 w-4 mr-2" /> Governance
-          </Button>
+          
           <Button className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl px-6">
             <Plus className="h-4 w-4 mr-2" /> Create Metric
           </Button>
@@ -257,7 +218,7 @@ export default function SemanticLayer() {
                   </div>
 
                   <div className="space-y-4">
-                    <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">Governance & Health</h3>
+                    <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">Health Validation</h3>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between p-3 rounded-2xl bg-indigo-500/5 border border-indigo-500/10">
                         <div className="flex items-center gap-3">
@@ -301,7 +262,7 @@ export default function SemanticLayer() {
 
           <div className="p-6 bg-emerald-500/5 border border-emerald-500/10 rounded-3xl space-y-4">
             <h4 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-2">
-              <Shield className="h-3.5 w-3.5" /> Intelligence Governance
+              <Shield className="h-3.5 w-3.5" /> Intelligence Health Validation
             </h4>
             <p className="text-[10px] text-slate-500 leading-relaxed italic">
               All metrics marked as <span className="text-emerald-400 font-bold">Verified</span> have passed autonomous SQL integrity audits and are safe for multi-agent use.

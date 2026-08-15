@@ -109,7 +109,7 @@ export default function InteractiveVisualizationStudio({ rows, columns, datasetN
   const cleanNumber = (val: any): number => {
     if (typeof val === 'number') return val;
     if (val === null || val === undefined || val === '') return NaN;
-    const str = String(val).replace(/[^0-9.-]+/g, '');
+    const str = String(val).replace(/,/g, '').trim();
     const parsed = parseFloat(str);
     return isNaN(parsed) ? NaN : parsed;
   };
@@ -742,13 +742,16 @@ LIMIT ${topLimit};
                   <Card className="bg-slate-950/60 border-slate-800 p-6 text-center">
                     <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Total {customYLabel || yAxisCol}</span>
                     <div className="text-3xl font-extrabold text-indigo-400 mt-2">
-                      {chartData.reduce((a, b) => a + (b.value || 0), 0).toLocaleString()}
+                      {rows.map(r => cleanNumber(r[yAxisCol])).filter(n => !isNaN(n)).reduce((a, b) => a + b, 0).toLocaleString()}
                     </div>
                   </Card>
                   <Card className="bg-slate-950/60 border-slate-800 p-6 text-center">
                     <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Average per {customXLabel || xAxisCol}</span>
                     <div className="text-3xl font-extrabold text-emerald-400 mt-2">
-                      {(chartData.reduce((a, b) => a + (b.value || 0), 0) / (chartData.length || 1)).toFixed(2)}
+                      {(() => {
+                        const vals = rows.map(r => cleanNumber(r[yAxisCol])).filter(n => !isNaN(n));
+                        return vals.length > 0 ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : 'N/A';
+                      })()}
                     </div>
                   </Card>
                   <Card className="bg-slate-950/60 border-slate-800 p-6 text-center">

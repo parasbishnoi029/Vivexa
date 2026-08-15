@@ -1,3 +1,4 @@
+import { supabase } from "@/lib/supabase";
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
@@ -65,166 +66,48 @@ interface SampleQuery {
   risks: string;
 }
 
-const SAMPLE_QUERIES: Record<string, SampleQuery[]> = {
-  "fact_global_sales_v2": [
-    {
-      question: "Query gross sales metrics by region sorted descending",
-      sql: "SELECT geo_region, SUM(amount_usd) as revenue_usd, COUNT(*) as tx_count\nFROM delta.fact_global_sales_v2\nGROUP BY geo_region\nORDER BY revenue_usd DESC;",
-      headers: ["geo_region", "revenue_usd", "tx_count"],
-      rows: [
-        ["us-east-1", "$3,528,400.00", "2,410,000"],
-        ["eu-west-1", "$2,109,240.00", "1,390,000"],
-        ["ap-south-1", "$1,489,120.00", "984,000"],
-        ["sa-east-1", "$810,400.00", "510,000"]
-      ],
-      confidence: 98,
-      explanation: "Aggregates gross ledger volumes across four geo clusters using Snappy-compressed Parquet blocks. Optimizes performance via region-based partition skipping.",
-      assumptions: "Excludes active refunds and temporary void transactions from the live Delta log state.",
-      risks: "Region labels mapped through the secondary looker-region metadata sync; inconsistencies can trigger temporary grouping splits."
-    },
-    {
-      question: "Check GDPR compliance / PII mask status",
-      sql: "SELECT customer_fingerprint, COUNT(*) as session_hits\nFROM delta.fact_global_sales_v2\nWHERE is_pii_masked(customer_fingerprint) = FALSE\nGROUP BY customer_fingerprint\nLIMIT 3;",
-      headers: ["customer_fingerprint", "session_hits", "vulnerability_status"],
-      rows: [
-        ["user_94f83a8b (unmasked)", "12,480", "High Risk (Legacy EU block)"],
-        ["user_11bc90a2 (unmasked)", "9,102", "High Risk (Legacy EU block)"],
-        ["user_ef89c322 (unmasked)", "4,110", "High Risk (Legacy EU block)"]
-      ],
-      confidence: 95,
-      explanation: "Analyzes early-epoch transaction snapshots where client masking failed to run. Identifies exact row indexes that require manual GDPR purge.",
-      assumptions: "Assumes non-SHA-256 strings of length < 64 indicate unmasked or incomplete cryptographic hashing.",
-      risks: "Directly reads from the raw S3 bucket state. Requires high-level governance clearance."
-    }
-  ],
-  "user_behavior_stream": [
-    {
-      question: "Calculate rolling session hits per event type",
-      sql: "SELECT event_type, COUNT(*) as hit_count, ROUND(AVG(LENGTH(session_id)), 1) as avg_session_len\nFROM delta.user_behavior_stream\nGROUP BY event_type\nORDER BY hit_count DESC;",
-      headers: ["event_type", "hit_count", "avg_session_len"],
-      rows: [
-        ["page_view", "450,230,000", "36.0"],
-        ["click_event", "320,120,000", "36.0"],
-        ["cart_add", "48,910,000", "36.0"],
-        ["checkout_begin", "12,450,000", "36.0"]
-      ],
-      confidence: 97,
-      explanation: "Performs low-latency stream analysis on active session clicks to map standard conversion funnel rates.",
-      assumptions: "Assumes active sessions expire dynamically after 30 minutes of client inactivity.",
-      risks: "Network delays in mobile user agents may delay events, triggering temporary windowing late arrivals."
-    }
-  ],
-  "executive_summary_view": [
-    {
-      question: "Inspect aggregate operating margin trend",
-      sql: "SELECT fiscal_quarter, gross_margin_pct, total_opex, active_headcount\nFROM delta.executive_summary_view\nORDER BY fiscal_quarter DESC;",
-      headers: ["fiscal_quarter", "gross_margin_pct", "total_opex", "active_headcount"],
-      rows: [
-        ["2026-Q3", "64.2%", "$12,400,000.00", "1,240"],
-        ["2026-Q2", "62.1%", "$13,100,000.00", "1,280"],
-        ["2026-Q1", "59.8%", "$14,000,000.00", "1,310"]
-      ],
-      confidence: 99,
-      explanation: "Exposes quarterly financial metrics verified through the formal ledger consensus mechanism.",
-      assumptions: "Operating expenses are pre-adjusted for exchange rate fluctuations.",
-      risks: "Subject to post-audit adjustment before annual SEC Form 10-K filing completion."
-    }
-  ]
-};
+const SAMPLE_QUERIES: Record<string, SampleQuery[]> = {};
 
-const DEFAULT_ASSETS: LakehouseAsset[] = [
-  {
-    id: "a1",
-    name: "fact_global_sales_v2",
-    type: "Table",
-    source: "S3",
-    format: "Delta",
-    size: "1.2 TB",
-    rows: "8.4B",
-    lastUpdated: "4m ago",
-    status: "Healthy",
-    owner: "Revenue Ops",
-    tags: ["PII", "Production", "Revenue"],
-    columns: [
-      { name: 'transaction_id', type: 'UUID', null: 'No', desc: 'Primary unique identifier', completeness: 100, distinct: '8.4B', isPii: false, alert: null },
-      { name: 'amount_usd', type: 'DECIMAL(18,2)', null: 'No', desc: 'Normalized gross revenue', completeness: 100, distinct: '412M', isPii: false, alert: null },
-      { name: 'customer_fingerprint', type: 'STRING', null: 'Yes', desc: 'Hashed PII identifier', completeness: 98.4, distinct: '1.8B', isPii: true, alert: "Contains unmasked patterns in EU partitions" },
-      { name: 'geo_region', type: 'STRING', null: 'No', desc: 'Looker-mapped region ID', completeness: 100, distinct: '24', isPii: false, alert: null },
-      { name: 'event_timestamp', type: 'TIMESTAMP', null: 'No', desc: 'Delta-log partition key', completeness: 100, distinct: 'Continuous', isPii: false, alert: null }
-    ],
-    history: [
-      { version: 4, timestamp: '2026-08-14 09:38', author: 'System Admin', operation: 'OPTIMIZE', details: 'Z-Order geo_region (compacted 24 Parquet files to 1, optimized query latency by 45%)', size: '1.2 TB', rows: '8.4B' },
-      { version: 3, timestamp: '2026-08-14 04:12', author: 'Revenue Ops', operation: 'MERGE INTO', details: 'Upserted 1,200,000 sales transactions from streaming SQS pipe', size: '1.2 TB', rows: '8.4B' },
-      { version: 2, timestamp: '2026-08-13 14:02', author: 'Analytics', operation: 'UPDATE', details: 'Masked customer_fingerprint column with SHA-256 for PII / GDPR compliance', size: '1.18 TB', rows: '8.38B' },
-      { version: 1, timestamp: '2026-08-11 08:00', author: 'Revenue Ops', operation: 'CREATE TABLE', details: 'Initialized delta table manifest and defined bucket partitioning', size: '940 GB', rows: '6.1B' }
-    ],
-    aiInsights: [
-      "Geographic concentration: us-east-1 accounts for 42% of aggregate sales amount, creating single-region performance dependency.",
-      "Anomalous spike: Geo region 'eu-central-1' experienced a 340% increase in transaction velocity on 2026-08-12 14:00.",
-      "PII alert: customer_fingerprint column contains 1.6% unmasked records in early legacy EU partitions. Recommendation: Execute deep column hashing."
-    ]
-  },
-  {
-    id: "a2",
-    name: "user_behavior_stream",
-    type: "Stream",
-    source: "Snowflake",
-    format: "JSON",
-    size: "840 GB",
-    rows: "1.2B/day",
-    lastUpdated: "Just now",
-    status: "Healthy",
-    owner: "Growth Team",
-    tags: ["Raw", "Streaming"],
-    columns: [
-      { name: 'session_id', type: 'STRING', null: 'No', desc: 'Active browser session context', completeness: 100, distinct: '1.2B', isPii: false, alert: null },
-      { name: 'event_type', type: 'STRING', null: 'No', desc: 'Page view, click, checkout trigger', completeness: 100, distinct: '12', isPii: false, alert: null },
-      { name: 'user_agent', type: 'STRING', null: 'Yes', desc: 'Raw browser client user agent', completeness: 99.1, distinct: '450k', isPii: false, alert: null },
-      { name: 'ip_address', type: 'STRING', null: 'No', desc: 'IPv4/IPv6 client address for geo-IP lookup', completeness: 100, distinct: '84M', isPii: true, alert: "Masking policy active" },
-      { name: 'timestamp', type: 'TIMESTAMP', null: 'No', desc: 'Ingestion clock timestamp', completeness: 100, distinct: 'Continuous', isPii: false, alert: null }
-    ],
-    history: [
-      { version: 3, timestamp: '2026-08-14 09:42', author: 'Growth Team', operation: 'OPTIMIZE', details: 'Garbage collect expired sessions older than 24h', size: '840 GB', rows: '1.2B/day' },
-      { version: 2, timestamp: '2026-08-14 01:30', author: 'System Admin', operation: 'ALTER TABLE', details: 'Add IP masking rules to streaming ingest pipe', size: '835 GB', rows: '1.18B/day' },
-      { version: 1, timestamp: '2026-08-12 12:00', author: 'Growth Team', operation: 'CREATE STREAM', details: 'Provisioned Kafka consumer endpoint to stream Delta table', size: '400 GB', rows: '600M/day' }
-    ],
-    aiInsights: [
-      "High entropy detected in user_agent field, with 12% of traffic originating from scrapers or unclassified headless browsers.",
-      "Session lifecycle anomaly: session duration spikes to 48+ hours for 0.4% of users in Asia-Pacific region, suggesting automated keeping-alive activity."
-    ]
-  },
-  {
-    id: "a3",
-    name: "executive_summary_view",
-    type: "View",
-    source: "BigQuery",
-    format: "Delta",
-    size: "140 MB",
-    rows: "12k",
-    lastUpdated: "12h ago",
-    status: "Stale",
-    owner: "Analytics",
-    tags: ["Executive", "Certified"],
-    columns: [
-      { name: 'fiscal_quarter', type: 'STRING', null: 'No', desc: 'Active financial quarter representation', completeness: 100, distinct: '16', isPii: false, alert: null },
-      { name: 'gross_margin_pct', type: 'DECIMAL(5,4)', null: 'No', desc: 'Quarterly calculated margin ratio', completeness: 100, distinct: '16', isPii: false, alert: null },
-      { name: 'total_opex', type: 'DECIMAL(18,2)', null: 'No', desc: 'Quarterly total operating expenses', completeness: 100, distinct: '16', isPii: false, alert: null },
-      { name: 'active_headcount', type: 'INTEGER', null: 'No', desc: 'Full-time employee directory sync count', completeness: 100, distinct: '8', isPii: false, alert: null }
-    ],
-    history: [
-      { version: 2, timestamp: '2026-08-13 22:00', author: 'Analytics', operation: 'REFRESH VIEW', details: 'Full recalculation of Q3 fiscal parameters following SEC filing lock', size: '140 MB', rows: '12k' },
-      { version: 1, timestamp: '2026-08-10 10:00', author: 'Analytics', operation: 'CREATE VIEW', details: 'Aggregated view mapping HR directory stats to finance ledger', size: '135 MB', rows: '11.5k' }
-    ],
-    aiInsights: [
-      "Certified data consistency: 100% completeness verified across all fiscal quarter aggregations.",
-      "Operating margin trend: gross_margin_pct has expanded by +2.1% quarter-over-quarter due to headcount reduction optimization."
-    ]
-  }
-];
+const DEFAULT_ASSETS: LakehouseAsset[] = [];
 
 export default function Lakehouse() {
   const navigate = useNavigate();
-  const [assets, setAssets] = useState<LakehouseAsset[]>(DEFAULT_ASSETS);
+  const [assets, setAssets] = useState<any[]>([]);
+  
+  useEffect(() => {
+    const fetchAssets = async () => {
+      try {
+        const res = await fetch('/api/v1/datasets', {
+          headers: {
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          }
+        });
+        const json = await res.json();
+        if (json.success && json.data) {
+          // map backend datasets to Lakehouse UI shape
+          const mapped = json.data.map((ds: any) => ({
+            id: ds.id,
+            name: ds.name,
+            type: "Table",
+            size: `${(ds.size_bytes / 1024 / 1024).toFixed(2)} MB`,
+            rows: ds.row_count || "Unknown",
+            lastUpdated: new Date(ds.created_at).toLocaleString(),
+            status: "Healthy",
+            owner: "User",
+            tags: ["Production"],
+            columns: ds.schema?.columns || [],
+            history: [],
+            aiInsights: []
+          }));
+          setAssets(mapped);
+          if (mapped.length > 0) setSelectedAsset(mapped[0]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch assets", err);
+      }
+    };
+    fetchAssets();
+  }, []);
   const [activeTab, setActiveTab] = useState<"catalog" | "lineage" | "storage" | "governance" | "medallion" | "history">("catalog");
   const [catalogSubTab, setCatalogSubTab] = useState<"schema" | "quality" | "query" | "ai_insights">("schema");
   
@@ -373,13 +256,9 @@ export default function Lakehouse() {
       question: customQueryPrompt,
       sql: `SELECT \n  EXTRACT(HOUR FROM event_timestamp) as hour_of_day,\n  SUM(amount_usd) as aggregate_usd,\n  COUNT(*) as transaction_volume\nFROM delta.${selectedAsset?.name || "active_table"}\nWHERE event_timestamp >= CURRENT_DATE - INTERVAL '7 DAYS'\nGROUP BY 1\nORDER BY 2 DESC;`,
       headers: ["hour_of_day", "aggregate_usd", "transaction_volume"],
-      rows: [
-        ["14:00 (Peak Ingest)", "$1,894,000.00", "842,000"],
-        ["15:00", "$1,450,230.00", "643,000"],
-        ["11:00", "$920,410.00", "410,000"]
-      ],
-      confidence: 94,
-      explanation: "Synthesized dynamic hourly aggregations over the trailing week partition boundary. Implements parallelized scan-sharing.",
+      rows: [],
+      confidence: 0,
+      explanation: "No actual data returned. Connect a real data warehouse to see live metrics.",
       assumptions: "Assumes current clock context corresponds to local Eastern Standard Timezone alignments.",
       risks: "Underlying stream contains late-arriving logs up to 15m. Real-time metrics might fluctuate dynamically."
     };

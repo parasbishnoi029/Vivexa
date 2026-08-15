@@ -215,7 +215,7 @@ export default function WorkspaceBilling() {
             <CardTitle className="text-xl text-white">Free</CardTitle>
             <CardDescription>Perfect for individuals starting out.</CardDescription>
             <div className="mt-4 text-3xl font-bold text-white">₹0<span className="text-sm font-normal text-slate-400">/mo</span></div>
-            <div className="text-xs text-indigo-400 font-semibold mt-1">250 AI API Calls / mo</div>
+            <div className="text-xs text-indigo-400 font-semibold mt-1">375 AI API Calls / mo</div>
           </CardHeader>
           <CardContent className="flex-1 space-y-4">
             <ul className="space-y-2 text-sm text-slate-300">
@@ -236,7 +236,7 @@ export default function WorkspaceBilling() {
             <CardTitle className="text-xl text-white">Student</CardTitle>
             <CardDescription>For verified students and educators.</CardDescription>
             <div className="mt-4 text-3xl font-bold text-white">Free</div>
-            <div className="text-xs text-indigo-400 font-semibold mt-1">1,250 AI API Calls / mo</div>
+            <div className="text-xs text-indigo-400 font-semibold mt-1">1,875 AI API Calls / mo</div>
           </CardHeader>
           <CardContent className="flex-1 space-y-4">
             <ul className="space-y-2 text-sm text-slate-300">
@@ -257,7 +257,7 @@ export default function WorkspaceBilling() {
             <CardTitle className="text-xl text-white">Pro</CardTitle>
             <CardDescription>For professional data analysts.</CardDescription>
             <div className="mt-4 text-3xl font-bold text-white">Custom</div>
-            <div className="text-xs text-indigo-400 font-semibold mt-1">12,500 AI API Calls / mo</div>
+            <div className="text-xs text-indigo-400 font-semibold mt-1">18,750 AI API Calls / mo</div>
           </CardHeader>
           <CardContent className="flex-1 space-y-4">
             <ul className="space-y-2 text-sm text-slate-300">
@@ -284,7 +284,7 @@ export default function WorkspaceBilling() {
             <CardTitle className="text-xl text-white">Enterprise</CardTitle>
             <CardDescription>Custom solutions for large teams.</CardDescription>
             <div className="mt-4 text-3xl font-bold text-white">Custom</div>
-            <div className="text-xs text-indigo-400 font-semibold mt-1">125,000 AI API Calls / mo</div>
+            <div className="text-xs text-indigo-400 font-semibold mt-1">187,500 AI API Calls / mo</div>
           </CardHeader>
           <CardContent className="flex-1 space-y-4">
             <ul className="space-y-2 text-sm text-slate-300">

@@ -777,15 +777,6 @@ export function profileDataset(
   let mlReadinessScore = Math.max(0, Math.min(100, Math.round(100 - (overallNullRatio * 200) - (emptyColsRatio * 50) - (duplicateRatio * 150) - cardinalityPenalty - constantPenalty - domainPenalty - (numericCols.length < 2 ? 35 : 0))));
   let businessReadinessScore = Math.max(0, Math.min(100, Math.round(100 - (overallNullRatio * 150) - (emptyColsRatio * 40) - (duplicateRatio * 100) - (categoricalCols.length === 0 ? 15 : 0) - inconsistencyPenalty)));
 
-  // If dataset is ecommerce_adversarial_test_dataset.csv, enforce precise requested values
-  if (datasetName.toLowerCase().includes('ecommerce_adversarial_test_dataset')) {
-    totalRows = 14500;
-    dataQualityScore = 92;
-    healthScore = 90;
-    mlReadinessScore = 89;
-    businessReadinessScore = 95;
-  }
-
   let riskLevel: 'Low' | 'Medium' | 'High' | 'Critical' = 'Low';
   if (dataQualityScore < 50 || duplicateRatio > 0.2) riskLevel = 'Critical';
   else if (dataQualityScore < 70 || overallNullRatio > 0.15 || constantColRatio > 0.1) riskLevel = 'High';

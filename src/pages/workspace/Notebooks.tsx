@@ -1670,7 +1670,7 @@ export default function Notebooks() {
                             <div className="space-y-4 pt-1">
                               {cell.output.images.map((imgB64, i) => (
                                 <div key={i} className="rounded-xl border border-slate-800 overflow-hidden bg-white p-3 max-w-xl mx-auto flex flex-col items-center shadow-lg relative group">
-                                  <img
+                                  <img loading="lazy"
                                     src={`data:image/png;base64,${imgB64}`}
                                     referrerPolicy="no-referrer"
                                     alt={`Captured Notebook Plot ${i + 1}`}

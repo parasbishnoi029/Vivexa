@@ -38,11 +38,7 @@ const MODELS = [
   { id: "gpt4o", name: "OpenAI GPT-4o", provider: "OpenAI", icon: Zap, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" }
 ];
 
-const DEFAULT_ENTERPRISE_DATASETS = [
-  { id: "ds-sales-demo", name: "Enterprise Growth Strategy • sales_dataset.xlsx", storage_path: "demo/sales_dataset.xlsx", isDemo: true },
-  { id: "ds-churn-demo", name: "Customer Churn & LTV Pipeline • churn_q3.csv", storage_path: "demo/churn_q3.csv", isDemo: true },
-  { id: "ds-supply-demo", name: "Global Supply Chain & P&L • supply_chain_2026.parquet", storage_path: "demo/supply_chain_2026.parquet", isDemo: true }
-];
+const DEFAULT_ENTERPRISE_DATASETS: any[] = [];
 
 export default function DecisionIntelligence() {
   const { user } = useAuthStore();

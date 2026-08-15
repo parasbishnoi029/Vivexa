@@ -309,7 +309,7 @@ export function useWorkspaceRealtime(options: UseWorkspaceRealtimeOptions = {}) 
       if (document.visibilityState === 'visible') {
         fetchDashboardMetrics(true);
       }
-    }, 25000);
+    }, 60000);
 
     return () => {
       isMountedRef.current = false;
