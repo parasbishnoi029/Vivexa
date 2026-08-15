@@ -11,8 +11,13 @@ export const exportReportToPPT = (report: any) => {
   const metrics = parsedContent.c_suite_metrics || [];
   const actions = parsedContent.strategic_actions || [];
 
+  const addWatermark = (slide: any) => {
+    slide.addText("Vivexa", { x: 8.5, y: 5.3, w: 1.2, fontSize: 10, color: "475569", bold: true, align: "right" });
+  };
+
   // 1. Title Slide
   const slide1 = pptx.addSlide();
+  addWatermark(slide1);
   slide1.background = { fill: "0F172A" };
   slide1.addText("VIVEXA AI", { x: 0.5, y: 0.5, fontSize: 14, color: "8B5CF6", bold: true });
   slide1.addText(title, { x: 0.5, y: 2.5, w: "90%", fontSize: 36, color: "FFFFFF", bold: true, align: "center" });
@@ -21,6 +26,7 @@ export const exportReportToPPT = (report: any) => {
 
   // 2. Executive Summary Slide
   const slide2 = pptx.addSlide();
+  addWatermark(slide2);
   slide2.background = { fill: "0F172A" };
   slide2.addText("Executive Summary", { x: 0.5, y: 0.5, fontSize: 24, color: "8B5CF6", bold: true });
   slide2.addShape(pptx.ShapeType.rect, { x: 0.5, y: 1.0, w: 9.0, h: 0.05, fill: { color: "334155" } });
@@ -28,6 +34,7 @@ export const exportReportToPPT = (report: any) => {
 
   // 3. Key Metrics Slide
   const slide3 = pptx.addSlide();
+  addWatermark(slide3);
   slide3.background = { fill: "0F172A" };
   slide3.addText("C-Suite Key Performance Metrics", { x: 0.5, y: 0.5, fontSize: 24, color: "8B5CF6", bold: true });
   
@@ -43,6 +50,7 @@ export const exportReportToPPT = (report: any) => {
 
   // 4. Statistical Findings Slide
   const slide4 = pptx.addSlide();
+  addWatermark(slide4);
   slide4.background = { fill: "0F172A" };
   slide4.addText("Key Statistical Findings", { x: 0.5, y: 0.5, fontSize: 24, color: "8B5CF6", bold: true });
   
@@ -52,6 +60,7 @@ export const exportReportToPPT = (report: any) => {
 
   // 5. Strategic Action Roadmap
   const slide5 = pptx.addSlide();
+  addWatermark(slide5);
   slide5.background = { fill: "0F172A" };
   slide5.addText("Strategic Action Roadmap", { x: 0.5, y: 0.5, fontSize: 24, color: "8B5CF6", bold: true });
   
@@ -73,6 +82,7 @@ export const exportReportToPPT = (report: any) => {
 
   // 6. Final Slide
   const slide6 = pptx.addSlide();
+  addWatermark(slide6);
   slide6.background = { fill: "1E293B" };
   slide6.addText("Strategic Partnership Enabled by Vivexa AI", { x: 0.5, y: 2.0, w: "90%", fontSize: 28, color: "FFFFFF", bold: true, align: "center" });
   slide6.addText("Confidential Board Advisory Material", { x: 0.5, y: 3.5, w: "90%", fontSize: 14, color: "8B5CF6", align: "center" });

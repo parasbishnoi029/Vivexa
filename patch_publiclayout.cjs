@@ -1,4 +1,5 @@
-import { Outlet, useLocation } from "react-router-dom";
+const fs = require('fs');
+let code = `import { Outlet, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 
 export default function PublicLayout() {
@@ -20,3 +21,5 @@ export default function PublicLayout() {
     </div>
   );
 }
+`;
+fs.writeFileSync('src/layouts/PublicLayout.tsx', code);

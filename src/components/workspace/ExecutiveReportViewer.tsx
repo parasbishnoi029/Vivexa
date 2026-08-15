@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
   FileText, Download, X, CheckCircle2, ShieldCheck, Cpu, AlertTriangle,
@@ -14,7 +15,6 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart as RechartsPieChart, Pie, Cell, ComposedChart, Line, Area, Legend
 } from "recharts";
-import { exportReportToPDF } from "@/lib/pdfExporter";
 import { exportReportToPPT } from "@/lib/pptExporter";
 import { toast } from "sonner";
 
@@ -385,13 +385,13 @@ export default function ExecutiveReportViewer({
     }
   ];
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-hidden">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-hidden print-modal-wrapper">
       <motion.div
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.98 }}
-        className="bg-slate-900 border border-slate-800 w-full max-w-6xl h-[92vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100"
+        className="bg-slate-900 border border-slate-800 w-full max-w-6xl h-[92vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 print-modal-content"
       >
         {/* Top Command Bar */}
         <div className="px-5 py-3.5 border-b border-slate-800 bg-slate-950/80 flex items-center justify-between gap-4 shrink-0">
@@ -414,7 +414,7 @@ export default function ExecutiveReportViewer({
 
           <div className="flex items-center gap-1.5 shrink-0">
             <Button
-              onClick={() => exportReportToPDF(report)}
+              onClick={() => window.print()}
               className="bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold gap-1.5 h-8 px-3"
             >
               <Download className="h-3.5 w-3.5" /> PDF

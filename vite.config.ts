@@ -20,6 +20,10 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
+            if (id.includes('xlsx')) return 'vendor-xlsx';
+            if (id.includes('zod')) return 'vendor-zod';
+            if (id.includes('react-markdown')) return 'vendor-markdown';
+            if (id.includes('@google/genai')) return 'vendor-genai';
             if (id.includes('recharts') || id.includes('d3')) return 'vendor-charts';
             if (id.includes('framer-motion') || id.includes('motion')) return 'vendor-motion';
             if (id.includes('lucide-react')) return 'vendor-icons';

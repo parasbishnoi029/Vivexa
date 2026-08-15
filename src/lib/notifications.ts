@@ -99,7 +99,7 @@ export function generateSeedNotifications(userId: string): NotificationItem[] {
       id: `seed-2-${userId}`,
       user_id: userId,
       title: "Monthly AI API Quota Active",
-      message: "Your account is allocated 375 AI API calls per billing cycle. Monitor usage in Telemetry.",
+      message: "Your account is allocated 50 AI API calls per billing cycle. Monitor usage in Telemetry.",
       type: "billing_event",
       priority: "medium",
       is_read: false,

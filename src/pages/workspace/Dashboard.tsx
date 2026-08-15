@@ -390,8 +390,8 @@ export default function WorkspaceDashboard() {
         </div>
 
         {/* TOP KPI CARDS */}
-        <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <motion.div whileHover={{ y: -4, scale: 1.02 }} transition={{ type: "spring", stiffness: 400, damping: 25 }} className="h-full">
+        <motion.div variants={item} layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <motion.div layout whileHover={{ y: -4, scale: 1.02 }} transition={{ layout: { type: "spring", stiffness: 350, damping: 25 }, type: "spring", stiffness: 400, damping: 25 }} className="h-full">
           <Card 
             onClick={() => navigate('/workspace/projects')}
             className="bg-slate-900/50 border-slate-800/80 hover:border-indigo-500/50 transition-all cursor-pointer group rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl"
@@ -405,7 +405,7 @@ export default function WorkspaceDashboard() {
               </span>
             </div>
             <div className="mt-4">
-              <div className="text-3xl font-black text-white tracking-tight">{stats.projects}</div>
+              <div className="text-3xl font-black text-white tracking-tight"><motion.span layout>{stats.projects}</motion.span></div>
               <div className="text-xs font-bold text-slate-400 mt-0.5">Workspace Projects</div>
             </div>
             <div className="mt-3 pt-3 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-500">
@@ -415,7 +415,7 @@ export default function WorkspaceDashboard() {
           </Card>
           </motion.div>
 
-          <motion.div whileHover={{ y: -4, scale: 1.02 }} transition={{ type: "spring", stiffness: 400, damping: 25 }} className="h-full">
+          <motion.div layout whileHover={{ y: -4, scale: 1.02 }} transition={{ layout: { type: "spring", stiffness: 350, damping: 25 }, type: "spring", stiffness: 400, damping: 25 }} className="h-full">
           <Card 
             onClick={() => navigate('/workspace/datasets')}
             className="bg-slate-900/50 border-slate-800/80 hover:border-cyan-500/50 transition-all cursor-pointer group rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl"
@@ -429,7 +429,7 @@ export default function WorkspaceDashboard() {
               </span>
             </div>
             <div className="mt-4">
-              <div className="text-3xl font-black text-white tracking-tight">{stats.datasets}</div>
+              <div className="text-3xl font-black text-white tracking-tight"><motion.span layout>{stats.datasets}</motion.span></div>
               <div className="text-xs font-bold text-slate-400 mt-0.5">Connected Datasets</div>
             </div>
             <div className="mt-3 pt-3 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-500">
@@ -439,7 +439,7 @@ export default function WorkspaceDashboard() {
           </Card>
           </motion.div>
 
-          <motion.div whileHover={{ y: -4, scale: 1.02 }} transition={{ type: "spring", stiffness: 400, damping: 25 }} className="h-full">
+          <motion.div layout whileHover={{ y: -4, scale: 1.02 }} transition={{ layout: { type: "spring", stiffness: 350, damping: 25 }, type: "spring", stiffness: 400, damping: 25 }} className="h-full">
           <Card 
             onClick={() => navigate('/workspace/ai')}
             className="bg-slate-900/50 border-slate-800/80 hover:border-purple-500/50 transition-all cursor-pointer group rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl"
@@ -453,7 +453,7 @@ export default function WorkspaceDashboard() {
               </span>
             </div>
             <div className="mt-4">
-              <div className="text-3xl font-black text-white tracking-tight">{stats.ai}</div>
+              <div className="text-3xl font-black text-white tracking-tight"><motion.span layout>{stats.ai}</motion.span></div>
               <div className="text-xs font-bold text-slate-400 mt-0.5">AI Insights Generated</div>
             </div>
             <div className="mt-3 pt-3 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-500">
@@ -463,7 +463,7 @@ export default function WorkspaceDashboard() {
           </Card>
           </motion.div>
 
-          <motion.div whileHover={{ y: -4, scale: 1.02 }} transition={{ type: "spring", stiffness: 400, damping: 25 }} className="h-full">
+          <motion.div layout whileHover={{ y: -4, scale: 1.02 }} transition={{ layout: { type: "spring", stiffness: 350, damping: 25 }, type: "spring", stiffness: 400, damping: 25 }} className="h-full">
           <Card 
             onClick={() => navigate('/workspace/predictions')}
             className="bg-slate-900/50 border-slate-800/80 hover:border-amber-500/50 transition-all cursor-pointer group rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl"
@@ -477,7 +477,7 @@ export default function WorkspaceDashboard() {
               </span>
             </div>
             <div className="mt-4">
-              <div className="text-3xl font-black text-white tracking-tight">{stats.reports}</div>
+              <div className="text-3xl font-black text-white tracking-tight"><motion.span layout>{stats.reports}</motion.span></div>
               <div className="text-xs font-bold text-slate-400 mt-0.5">Predictive ML Models</div>
             </div>
             <div className="mt-3 pt-3 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-500">
@@ -487,7 +487,7 @@ export default function WorkspaceDashboard() {
           </Card>
           </motion.div>
 
-          <motion.div whileHover={{ y: -4, scale: 1.02 }} transition={{ type: "spring", stiffness: 400, damping: 25 }} className="h-full">
+          <motion.div layout whileHover={{ y: -4, scale: 1.02 }} transition={{ layout: { type: "spring", stiffness: 350, damping: 25 }, type: "spring", stiffness: 400, damping: 25 }} className="h-full">
           <Card 
             onClick={() => navigate('/workspace/organization')}
             className="bg-slate-900/50 border-slate-800/80 hover:border-indigo-500/50 transition-all cursor-pointer group rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl"
@@ -501,7 +501,7 @@ export default function WorkspaceDashboard() {
               </span>
             </div>
             <div className="mt-4">
-              <div className="text-3xl font-black text-white tracking-tight">{stats.members}</div>
+              <div className="text-3xl font-black text-white tracking-tight"><motion.span layout>{stats.members}</motion.span></div>
               <div className="text-xs font-bold text-slate-400 mt-0.5">Team & Talent Members</div>
             </div>
             <div className="mt-3 pt-3 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-500">
@@ -758,7 +758,7 @@ export default function WorkspaceDashboard() {
           {recentDatasets.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {recentDatasets.map((ds, i) => (
-                <motion.div whileHover={{ y: -4, scale: 1.02 }} transition={{ type: "spring", stiffness: 400, damping: 25 }} className="h-full">
+                <motion.div layout whileHover={{ y: -4, scale: 1.02 }} transition={{ layout: { type: "spring", stiffness: 350, damping: 25 }, type: "spring", stiffness: 400, damping: 25 }} className="h-full">
                 <Card key={ds.id || i} className="bg-slate-900/50 border-slate-800/80 hover:border-cyan-500/50 transition-all rounded-2xl p-5 space-y-4 backdrop-blur-xl group">
                   <div className="flex items-center justify-between">
                     <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">

@@ -1,3 +1,4 @@
+cat << 'INNER_EOF' > src/lib/limits.ts
 // Enterprise Limit & Quota Enforcement Engine
 import { useAuthStore } from "@/stores/authStore";
 import { createNotification } from "@/lib/notifications";
@@ -161,14 +162,14 @@ export function triggerLimitModal(payload?: Partial<TriggerLimitModalPayload>) {
 export function getAiUsageCount(userId?: string): number {
   if (typeof window === "undefined") return 0;
   const uid = userId || useAuthStore.getState().user?.id || "default";
-  const saved = localStorage.getItem(`vivexa_ai_calls_count_${uid}`) || localStorage.getItem("vivexa_ai_calls_count");
+  const saved = localStorage.getItem(\`vivexa_ai_calls_count_\${uid}\`) || localStorage.getItem("vivexa_ai_calls_count");
   return saved ? parseInt(saved, 10) : 0;
 }
 
 export function setAiUsageCount(count: number, userId?: string): number {
   if (typeof window === "undefined") return count;
   const uid = userId || useAuthStore.getState().user?.id || "default";
-  localStorage.setItem(`vivexa_ai_calls_count_${uid}`, count.toString());
+  localStorage.setItem(\`vivexa_ai_calls_count_\${uid}\`, count.toString());
   localStorage.setItem("vivexa_ai_calls_count", count.toString());
   window.dispatchEvent(new Event("vivexa_usage_updated"));
   return count;
@@ -206,7 +207,7 @@ export function checkAndConsumeQuota(count: number = 1, userId?: string, userPla
       limit,
       unit: "calls",
       title: "AI API Quota Limit Reached",
-      message: `Your account has exhausted its monthly allowance of ${limit.toLocaleString()} AI API calls. Please upgrade to continue analyzing, forecasting, and executing autonomous agents.`
+      message: \`Your account has exhausted its monthly allowance of \${limit.toLocaleString()} AI API calls. Please upgrade to continue analyzing, forecasting, and executing autonomous agents.\`
     });
     return {
       allowed: false,
@@ -251,7 +252,7 @@ export function validateDatasetUpload(
       limit: limits.maxDatasets,
       unit: "datasets",
       title: "Dataset Limit Reached",
-      message: `You have reached the maximum limit of ${limits.maxDatasets} datasets on your ${limits.name} plan. Delete existing datasets or upgrade your plan.`,
+      message: \`You have reached the maximum limit of \${limits.maxDatasets} datasets on your \${limits.name} plan. Delete existing datasets or upgrade your plan.\`,
       recommendedPlan: resolveUserPlan(userPlan) === "free" ? "pro" : "enterprise"
     };
     return { allowed: false, error: violation.message, violation };
@@ -265,7 +266,7 @@ export function validateDatasetUpload(
       limit: limits.maxFileSizeMB,
       unit: "MB",
       title: "File Size Limit Exceeded",
-      message: `The uploaded file (${fileSizeMB.toFixed(1)} MB) exceeds the maximum allowed file size of ${limits.maxFileSizeMB} MB for the ${limits.name} plan.`,
+      message: \`The uploaded file (\${fileSizeMB.toFixed(1)} MB) exceeds the maximum allowed file size of \${limits.maxFileSizeMB} MB for the \${limits.name} plan.\`,
       recommendedPlan: fileSizeMB > 500 ? "enterprise" : "pro"
     };
     return { allowed: false, error: violation.message, violation };
@@ -291,7 +292,7 @@ export function validateProjectCreation(
       limit: limits.maxProjects,
       unit: "projects",
       title: "Project Allocation Limit Reached",
-      message: `You have reached the limit of ${limits.maxProjects} projects on the ${limits.name} plan. Upgrade to unlock more projects.`,
+      message: \`You have reached the limit of \${limits.maxProjects} projects on the \${limits.name} plan. Upgrade to unlock more projects.\`,
       recommendedPlan: resolveUserPlan(userPlan) === "free" ? "pro" : "enterprise"
     };
     return { allowed: false, error: violation.message, violation };
@@ -316,7 +317,7 @@ export function validateWorkspaceCreation(
       limit: limits.maxWorkspaces,
       unit: "workspaces",
       title: "Workspace Limit Reached",
-      message: `Your ${limits.name} plan allows up to ${limits.maxWorkspaces} analytical workspace(s). Upgrade to Pro or Enterprise for additional isolated tenant workspaces.`,
+      message: \`Your \${limits.name} plan allows up to \${limits.maxWorkspaces} analytical workspace(s). Upgrade to Pro or Enterprise for additional isolated tenant workspaces.\`,
       recommendedPlan: "pro"
     };
     return { allowed: false, error: violation.message, violation };
@@ -344,7 +345,7 @@ export function validateSeatInvitation(
       limit: limits.maxSeats,
       unit: "seats",
       title: "Team Seat Allocation Reached",
-      message: `All ${limits.maxSeats} seats on your ${limits.name} plan are occupied (${activeSeats} active, ${pendingInvites} pending). Upgrade your plan to invite more team members.`,
+      message: \`All \${limits.maxSeats} seats on your \${limits.name} plan are occupied (\${activeSeats} active, \${pendingInvites} pending). Upgrade your plan to invite more team members.\`,
       recommendedPlan: "pro"
     };
     return { allowed: false, error: violation.message, violation };
@@ -352,3 +353,4 @@ export function validateSeatInvitation(
   
   return { allowed: true };
 }
+INNER_EOF

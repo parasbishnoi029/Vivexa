@@ -1,3 +1,5 @@
+import DataProcessorWorker from "@/workers/dataProcessor?worker";
+import { DatasetProfile } from "@/lib/dataEngine";
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 

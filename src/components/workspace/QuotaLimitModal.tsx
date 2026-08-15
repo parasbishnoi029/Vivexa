@@ -36,7 +36,7 @@ export default function QuotaLimitModal() {
   const [modalDetails, setModalDetails] = useState<TriggerLimitModalPayload>({
     resource: "ai_calls",
     current: 0,
-    limit: 375,
+    limit: 50,
     unit: "calls",
     title: "AI API Quota Limit Reached",
     message: "Monthly AI API call limit exhausted. Please upgrade your plan or contact your administrator."

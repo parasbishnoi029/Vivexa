@@ -114,6 +114,79 @@
 
 /* Print-Specific Media Query for High-Fidelity PDF and Paper Reports */
 @media print {
+  .print-modal-wrapper {
+    position: absolute !important;
+    inset: 0 !important;
+    display: block !important;
+    background: transparent !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  
+  .print-modal-content {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  
+  /* Make sure scrolling content areas also show all content */
+  .overflow-y-auto {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+  
+  /* Hide unnecessary UI elements during print */
+  .print-modal-wrapper .border-b,
+  .print-modal-wrapper button {
+    /* We still want the header, just not the buttons maybe? Or keep them but hide the buttons */
+  }
+
+  .print-modal-wrapper .bg-slate-900,
+  .print-modal-wrapper .bg-slate-950,
+  .print-modal-wrapper .bg-slate-900\/50 {
+    background-color: transparent !important;
+  }
+
+  .fixed.inset-0.z-50 {
+    position: relative !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+  
+  .h-\[92vh\] {
+    height: auto !important;
+    max-height: none !important;
+  }
+  
+  .overflow-hidden {
+    overflow: visible !important;
+  }
+
+  .overflow-y-auto {
+    overflow: visible !important;
+  }
+
+  /* Print Watermark */
+  body::after {
+    content: "Vivexa";
+    position: fixed;
+    bottom: 10mm;
+    right: 10mm;
+    font-size: 14pt;
+    font-weight: bold;
+    font-style: italic;
+    color: #94a3b8 !important;
+    z-index: 999999;
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
   header, 
   footer, 
   aside, 
