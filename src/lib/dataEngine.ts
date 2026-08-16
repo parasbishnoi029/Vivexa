@@ -116,6 +116,8 @@ export interface DatasetProfile {
   scoreExplanations: {
     qualityFormula: string;
     healthFormula: string;
+    completenessFormula: string;
+    consistencyFormula: string;
     mlReadinessFormula: string;
     businessReadinessFormula: string;
     riskAssessment: string;
@@ -747,35 +749,78 @@ export function profileDataset(
   const allColsCount = Object.keys(rawRows[0] || {}).length;
   const constantColRatio = allColsCount > 0 ? (constantCols / allColsCount) : 0;
 
-  // Material penalties for missingness, empty columns, duplicates, outliers, and categorical inconsistencies
-  const domainInvalidRatio = totalDomainInvalidCount / totalRows;
-  const domainPenalty = domainInvalidRatio * 1000; // Heavy penalty for domain invalidity
-  const missingPenalty = (overallNullRatio * 250) + (emptyColsRatio * 50);
-  const duplicatePenalty = duplicateRatio * 150;
-  const outlierPenalty = Math.min(30, overallOutlierRatio * 150);
-  const inconsistencyPenalty = Math.min(35, categoricalInconsistencyCount * 15);
-  const skewnessPenalty = Math.min(15, avgSkewness * 3);
-  const cardinalityPenalty = highCardRatio * 25;
-  const constantPenalty = constantColRatio * 40;
+  // Well-calibrated, statistically sound penalties (avoiding double-counting and unscaled multipliers)
+  const domainInvalidRatio = totalRows > 0 ? totalDomainInvalidCount / totalRows : 0;
 
-  // Base score calculation with stricter bounds
-  const rawQualityScore = 100 - missingPenalty - duplicatePenalty - outlierPenalty - inconsistencyPenalty - skewnessPenalty - cardinalityPenalty - constantPenalty - domainPenalty;
-  
-  // Real world datasets rarely get a perfect 100 unless they are extremely tiny or meticulously curated.
-  // We apply a soft dampening to pull extremely high scores slightly down to reflect real-world imperfections.
-  let dataQualityScore = Math.max(0, Math.min(100, Math.round(rawQualityScore)));
-  if (dataQualityScore > 95 && totalRows > 50) {
-    dataQualityScore = 95 + Math.round((dataQualityScore - 95) * 0.4);
+  // Individual penalizations scaled appropriately
+  const missingPenaltyDQ = parseFloat((overallNullRatio * 40).toFixed(1));
+  const emptyColPenaltyDQ = parseFloat((emptyColsRatio * 15).toFixed(1));
+  const duplicatePenaltyDQ = parseFloat((duplicateRatio * 20).toFixed(1));
+  const outlierPenaltyDQ = parseFloat(Math.min(15, overallOutlierRatio * 40).toFixed(1));
+  const inconsistencyPenaltyDQ = parseFloat(Math.min(15, (categoricalInconsistencyCount / Math.max(1, categoricalCols.length)) * 20).toFixed(1));
+  const skewnessPenaltyDQ = parseFloat(Math.min(10, avgSkewness * 1.5).toFixed(1));
+  const cardinalityPenaltyDQ = parseFloat((highCardRatio * 10).toFixed(1));
+  const constantPenaltyDQ = parseFloat((constantColRatio * 10).toFixed(1));
+  const domainPenaltyDQ = parseFloat(Math.min(20, domainInvalidRatio * 50).toFixed(1));
+
+  // 1. Data Quality Score: 100 minus all quality deductions
+  let dataQualityScore = Math.max(0, Math.min(100, Math.round(
+    100 - missingPenaltyDQ - emptyColPenaltyDQ - duplicatePenaltyDQ - outlierPenaltyDQ - inconsistencyPenaltyDQ - skewnessPenaltyDQ - cardinalityPenaltyDQ - constantPenaltyDQ - domainPenaltyDQ
+  )));
+
+  // Soft calibration for extremely large datasets
+  if (dataQualityScore > 98 && totalRows > 100) {
+    dataQualityScore = 98;
   }
 
-  let healthScore = Math.max(0, Math.min(100, Math.round(100 - (overallNullRatio * 150) - (emptyColsRatio * 40) - (overallOutlierRatio * 100) - (duplicateRatio * 100) - constantPenalty - domainPenalty)));
-  let completenessScore = Math.max(0, Math.min(100, Math.round((1 - overallNullRatio) * 100 - (emptyColsRatio * 30))));
-  let consistencyScore = Math.max(0, Math.min(100, Math.round(100 - (duplicateRatio * 50) - (inconsistencyPenalty * 1.8) - skewnessPenalty - domainPenalty - (numericCols.length === 0 ? 15 : 0))));
-  let integrityScore = Math.max(0, Math.min(100, Math.round(100 - (idCols.length === 0 ? 15 : 0) - (duplicateRatio * 45) - (emptyColsRatio * 20) - cardinalityPenalty)));
-  let reliabilityScore = Math.max(0, Math.min(100, Math.round(100 - (overallOutlierRatio * 45) - (overallNullRatio * 40) - (emptyColsRatio * 20) - skewnessPenalty)));
+  // 2. Completeness Score: 100 - missing cell penalty - empty col penalty
+  const missingPenaltyComp = parseFloat((overallNullRatio * 100).toFixed(1));
+  const emptyColPenaltyComp = parseFloat((emptyColsRatio * 30).toFixed(1));
+  let completenessScore = Math.max(0, Math.min(100, Math.round(
+    100 - missingPenaltyComp - emptyColPenaltyComp
+  )));
+
+  // 3. Consistency Score: 100 - duplicate penalty - casing inconsistency - skewness - domain invalidity
+  const duplicatePenaltyCons = parseFloat((duplicateRatio * 30).toFixed(1));
+  const inconsistencyPenaltyCons = parseFloat(Math.min(25, (categoricalInconsistencyCount / Math.max(1, categoricalCols.length)) * 25).toFixed(1));
+  const skewnessPenaltyCons = parseFloat(Math.min(15, avgSkewness * 2.5).toFixed(1));
+  const domainPenaltyCons = parseFloat(Math.min(20, domainInvalidRatio * 50).toFixed(1));
+  let consistencyScore = Math.max(0, Math.min(100, Math.round(
+    100 - duplicatePenaltyCons - inconsistencyPenaltyCons - skewnessPenaltyCons - domainPenaltyCons
+  )));
+
+  // 4. ML Readiness Score
+  const missingPenaltyML = parseFloat((overallNullRatio * 40).toFixed(1));
+  const emptyColPenaltyML = parseFloat((emptyColsRatio * 15).toFixed(1));
+  const duplicatePenaltyML = parseFloat((duplicateRatio * 15).toFixed(1));
+  const cardinalityPenaltyML = parseFloat((highCardRatio * 15).toFixed(1));
+  const constantPenaltyML = parseFloat((constantColRatio * 15).toFixed(1));
+  const lowFeaturesPenaltyML = numericCols.length < 2 ? 15 : 0;
+  let mlReadinessScore = Math.max(0, Math.min(100, Math.round(
+    100 - missingPenaltyML - emptyColPenaltyML - duplicatePenaltyML - cardinalityPenaltyML - constantPenaltyML - lowFeaturesPenaltyML
+  )));
+
+  // 5. Health Score
+  const missingPenaltyHealth = parseFloat((overallNullRatio * 40).toFixed(1));
+  const emptyColPenaltyHealth = parseFloat((emptyColsRatio * 20).toFixed(1));
+  const outlierPenaltyHealth = parseFloat(Math.min(20, overallOutlierRatio * 50).toFixed(1));
+  const duplicatePenaltyHealth = parseFloat((duplicateRatio * 20).toFixed(1));
+  let healthScore = Math.max(0, Math.min(100, Math.round(
+    100 - missingPenaltyHealth - emptyColPenaltyHealth - outlierPenaltyHealth - duplicatePenaltyHealth
+  )));
+
+  // 6. Business Readiness Score
+  const missingPenaltyBus = parseFloat((overallNullRatio * 30).toFixed(1));
+  const duplicatePenaltyBus = parseFloat((duplicateRatio * 20).toFixed(1));
+  const zeroCatPenaltyBus = categoricalCols.length === 0 ? 10 : 0;
+  const inconsistencyPenaltyBus = inconsistencyPenaltyDQ;
+  let businessReadinessScore = Math.max(0, Math.min(100, Math.round(
+    100 - missingPenaltyBus - duplicatePenaltyBus - zeroCatPenaltyBus - inconsistencyPenaltyBus
+  )));
+
+  let integrityScore = Math.max(0, Math.min(100, Math.round(100 - (idCols.length === 0 ? 10 : 0) - (duplicateRatio * 30) - (emptyColsRatio * 20))));
+  let reliabilityScore = Math.max(0, Math.min(100, Math.round(100 - (overallOutlierRatio * 30) - (overallNullRatio * 30) - skewnessPenaltyDQ)));
   let freshnessScore = datetimeCols.length > 0 ? 95 : 85;
-  let mlReadinessScore = Math.max(0, Math.min(100, Math.round(100 - (overallNullRatio * 200) - (emptyColsRatio * 50) - (duplicateRatio * 150) - cardinalityPenalty - constantPenalty - domainPenalty - (numericCols.length < 2 ? 35 : 0))));
-  let businessReadinessScore = Math.max(0, Math.min(100, Math.round(100 - (overallNullRatio * 150) - (emptyColsRatio * 40) - (duplicateRatio * 100) - (categoricalCols.length === 0 ? 15 : 0) - inconsistencyPenalty)));
 
   let riskLevel: 'Low' | 'Medium' | 'High' | 'Critical' = 'Low';
   if (dataQualityScore < 50 || duplicateRatio > 0.2) riskLevel = 'Critical';
@@ -1005,10 +1050,12 @@ export function profileDataset(
     },
 
     scoreExplanations: {
-      qualityFormula: `Data Quality (${dataQualityScore}/100) = 100 - (${(missingPenalty).toFixed(1)} missing) - (${(emptyColsRatio * 50).toFixed(1)} empty col) - (${duplicatePenalty.toFixed(1)} duplicate) - (${outlierPenalty.toFixed(1)} outlier) - (${inconsistencyPenalty.toFixed(1)} inconsistency) - (${skewnessPenalty.toFixed(1)} skewness) - (${cardinalityPenalty.toFixed(1)} high cardinality)`,
-      healthFormula: `Dataset Health (${healthScore}/100) = 100 - (${(overallNullRatio * 150).toFixed(1)} missing penalty) - (${(emptyColsRatio * 40).toFixed(1)} empty col penalty) - (${(overallOutlierRatio * 100).toFixed(1)} outlier penalty) - (${(duplicateRatio * 100).toFixed(1)} duplicate penalty)`,
-      mlReadinessFormula: `ML Readiness (${mlReadinessScore}/100) = 100 - (${(overallNullRatio * 200).toFixed(1)} missing penalty) - (${(emptyColsRatio * 50).toFixed(1)} empty col penalty) - (${(duplicateRatio * 150).toFixed(1)} duplicate penalty) - (${cardinalityPenalty.toFixed(1)} cardinality) - (${numericCols.length < 2 ? '35 low numeric features penalty' : '0 penalty'})`,
-      businessReadinessFormula: `Business Readiness (${businessReadinessScore}/100) = 100 - (${(overallNullRatio * 150).toFixed(1)} missing penalty) - (${(emptyColsRatio * 40).toFixed(1)} empty col penalty) - (${(duplicateRatio * 100).toFixed(1)} duplicate penalty) - (${categoricalCols.length === 0 ? '15 zero categorical features penalty' : '0 penalty'}) - (${inconsistencyPenalty.toFixed(1)} inconsistency penalty)`,
+      qualityFormula: `Data Quality (${dataQualityScore}/100) = 100 - (${missingPenaltyDQ} missing) - (${emptyColPenaltyDQ} empty col) - (${duplicatePenaltyDQ} duplicate) - (${outlierPenaltyDQ} outlier) - (${inconsistencyPenaltyDQ} inconsistency) - (${skewnessPenaltyDQ} skewness) - (${cardinalityPenaltyDQ} high card) - (${constantPenaltyDQ} constant) - (${domainPenaltyDQ} invalid types)`,
+      healthFormula: `Dataset Health (${healthScore}/100) = 100 - (${missingPenaltyHealth} missing) - (${emptyColPenaltyHealth} empty col) - (${outlierPenaltyHealth} outlier) - (${duplicatePenaltyHealth} duplicate)`,
+      completenessFormula: `Completeness (${completenessScore}/100) = 100 - (${missingPenaltyComp} missing cells) - (${emptyColPenaltyComp} empty columns)`,
+      consistencyFormula: `Consistency (${consistencyScore}/100) = 100 - (${duplicatePenaltyCons} duplicates) - (${inconsistencyPenaltyCons} casing variants) - (${skewnessPenaltyCons} skewness) - (${domainPenaltyCons} invalid types)`,
+      mlReadinessFormula: `ML Readiness (${mlReadinessScore}/100) = 100 - (${missingPenaltyML} missing) - (${emptyColPenaltyML} empty col) - (${duplicatePenaltyML} duplicate) - (${cardinalityPenaltyML} cardinality) - (${constantPenaltyML} constant) - (${lowFeaturesPenaltyML} low features)`,
+      businessReadinessFormula: `Business Readiness (${businessReadinessScore}/100) = 100 - (${missingPenaltyBus} missing) - (${duplicatePenaltyBus} duplicate) - (${zeroCatPenaltyBus} no categorical) - (${inconsistencyPenaltyBus} inconsistency)`,
       riskAssessment: `Risk classification evaluated as '${riskLevel}' based on missingness (${(overallNullRatio * 100).toFixed(1)}%), duplicate ratio (${(duplicateRatio * 100).toFixed(1)}%), and statistical outlier density (${(overallOutlierRatio * 100).toFixed(1)}%).`
     },
 

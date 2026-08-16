@@ -1,6 +1,11 @@
 import express from "express";
 import { GoogleGenAI, Type } from "@google/genai";
 import { enforceAiQuotaMiddleware } from "./limits";
+import { PythonASTStaticValidatorService } from "./services/PythonASTStaticValidatorService";
+import { SemanticMetricDictionaryService } from "./services/SemanticMetricDictionaryService";
+import { DataNormalizationPipelineService } from "./services/DataNormalizationPipelineService";
+import { AdaptiveChunkingSummarizationService } from "./services/AdaptiveChunkingSummarizationService";
+import { DeterministicASTCompilerService, QueryASTNode } from "./services/DeterministicASTCompilerService";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
@@ -1533,5 +1538,61 @@ If capabilityId is:
     return res.status(500).json(successResponse(null, { error: err.message }));
   }
 });
+
+// Upgrade 11: Zero-Shot AST Code Validation & Static Analysis
+aiAnalystRouter.post("/validate-python-ast", async (req, res) => {
+  try {
+    const { code } = req.body;
+    const result = PythonASTStaticValidatorService.validatePythonCode(code || "");
+    return res.json(successResponse(result));
+  } catch (err: any) {
+    return res.status(500).json(successResponse(null, { error: err.message }));
+  }
+});
+
+// Upgrade 12: Semantic Metric Dictionary & Pre-Calculated Entity Store
+aiAnalystRouter.get("/semantic-metrics", async (req, res) => {
+  try {
+    const metrics = SemanticMetricDictionaryService.getAllMetrics();
+    return res.json(successResponse(metrics));
+  } catch (err: any) {
+    return res.status(500).json(successResponse(null, { error: err.message }));
+  }
+});
+
+// Upgrade 13: Automatic Column Type Coercion & Data Normalization Pipeline
+aiAnalystRouter.post("/normalize-dataset", async (req, res) => {
+  try {
+    const { rawRows } = req.body;
+    const result = DataNormalizationPipelineService.normalizeDataset(rawRows || []);
+    const boilerplate = DataNormalizationPipelineService.getPythonDataCleaningBoilerplate();
+    return res.json(successResponse({ ...result, pythonSanitizeFunction: boilerplate }));
+  } catch (err: any) {
+    return res.status(500).json(successResponse(null, { error: err.message }));
+  }
+});
+
+// Upgrade 14: Incremental Result Chunking & Adaptive Summarization
+aiAnalystRouter.post("/adaptive-summarize", async (req, res) => {
+  try {
+    const { dataRows } = req.body;
+    const summary = AdaptiveChunkingSummarizationService.createAdaptiveSummary(dataRows || []);
+    return res.json(successResponse(summary));
+  } catch (err: any) {
+    return res.status(500).json(successResponse(null, { error: err.message }));
+  }
+});
+
+// Upgrade 15: Deterministic SQL / Polars AST Compilation (LLM-to-AST Engine)
+aiAnalystRouter.post("/compile-ast-query", async (req, res) => {
+  try {
+    const { ast, tableName } = req.body as { ast: QueryASTNode; tableName?: string };
+    const compiled = DeterministicASTCompilerService.compileAST(ast, tableName || "df");
+    return res.json(successResponse(compiled));
+  } catch (err: any) {
+    return res.status(500).json(successResponse(null, { error: err.message }));
+  }
+});
+
 
 

@@ -23,6 +23,7 @@ import { supabase } from "@/lib/supabase";
 import { parseDatasetFile } from "@/lib/datasetParser";
 import { profileDataset } from "@/lib/dataEngine";
 import { checkAndConsumeQuota, triggerLimitModal } from "@/lib/limits";
+import { AIOptimizationPanel } from "@/components/AIOptimizationPanel";
 
 // =========================================================================
 // INTERFACE DEFINITIONS
@@ -83,7 +84,7 @@ const DEVOPS_CAPABILITIES = capabilities.filter(c => c.category === "devops");
 
 export default function AIAgents() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<"mnc_suite" | "agents">("mnc_suite");
+  const [activeTab, setActiveTab] = useState<"mnc_suite" | "agents" | "optimization">("mnc_suite");
   const [selectedCapabilityId, setSelectedCapabilityId] = useState<string | null>(null);
 
   // 11 Core Agents State
@@ -272,6 +273,18 @@ export default function AIAgents() {
           >
             <Sliders className="h-3.5 w-3.5 mr-2 text-indigo-300" /> Consensus Agent Nodes
           </Button>
+          <Button
+            onClick={() => {
+              setSelectedCapabilityId(null);
+              setActiveTab("optimization");
+            }}
+            variant={activeTab === "optimization" ? "default" : "ghost"}
+            className={`rounded-lg h-9 px-4 font-bold text-xs ${
+              activeTab === "optimization" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <Zap className="h-3.5 w-3.5 mr-2 text-emerald-300" /> Cost & Accuracy Engine
+          </Button>
         </div>
       </div>
 
@@ -365,7 +378,7 @@ export default function AIAgents() {
               </div>
             )}
           </motion.div>
-        ) : (
+        ) : activeTab === "agents" ? (
           
           // =========================================================================
           // TAB 2: AUTONOMOUS AGENT PARAMETERS (PRE-EXISTING LAYOUT)
@@ -614,6 +627,15 @@ export default function AIAgents() {
                 );
               })}
             </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="optimization-tab"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+          >
+            <AIOptimizationPanel />
           </motion.div>
         )}
       </AnimatePresence>

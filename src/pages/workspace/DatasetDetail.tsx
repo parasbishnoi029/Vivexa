@@ -551,7 +551,7 @@ export default function DatasetDetail() {
                   gradient="from-emerald-400 to-teal-400"
                   validationReport={profile.validationReport}
                   metricKey="completeness"
-                  explanation={profile.scoreExplanations?.healthFormula}
+                  explanation={profile.scoreExplanations?.completenessFormula || profile.scoreExplanations?.healthFormula}
                 />
                 <ConfidenceScoreMetricCard
                   label="Consistency"
@@ -560,7 +560,7 @@ export default function DatasetDetail() {
                   gradient="from-sky-400 to-blue-400"
                   validationReport={profile.validationReport}
                   metricKey="consistency"
-                  explanation={profile.scoreExplanations?.riskAssessment}
+                  explanation={profile.scoreExplanations?.consistencyFormula || profile.scoreExplanations?.riskAssessment}
                 />
                 <ConfidenceScoreMetricCard
                   label="ML Readiness"
@@ -575,12 +575,14 @@ export default function DatasetDetail() {
 
               {/* Explanations Box */}
               <Card className="bg-slate-900/40 border-slate-800 p-6 space-y-3">
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Exact Calculation Formulas & Evidence</h3>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Exact Calculation Formulas & Empirical Evidence</h3>
                 <div className="space-y-2 text-xs text-slate-300 font-mono bg-slate-950/80 p-4 rounded-xl border border-slate-800">
-                  <p><strong className="text-indigo-400">Quality:</strong> {profile.scoreExplanations.qualityFormula}</p>
-                  <p><strong className="text-emerald-400">Health:</strong> {profile.scoreExplanations.healthFormula}</p>
-                  <p><strong className="text-purple-400">ML Readiness:</strong> {profile.scoreExplanations.mlReadinessFormula}</p>
-                  <p><strong className="text-amber-400">Risk Assessment:</strong> {profile.scoreExplanations.riskAssessment}</p>
+                  <p><strong className="text-indigo-400">Data Quality:</strong> {profile.scoreExplanations?.qualityFormula}</p>
+                  <p><strong className="text-emerald-400">Completeness:</strong> {profile.scoreExplanations?.completenessFormula}</p>
+                  <p><strong className="text-sky-400">Consistency:</strong> {profile.scoreExplanations?.consistencyFormula}</p>
+                  <p><strong className="text-purple-400">ML Readiness:</strong> {profile.scoreExplanations?.mlReadinessFormula}</p>
+                  <p><strong className="text-teal-400">Dataset Health:</strong> {profile.scoreExplanations?.healthFormula}</p>
+                  <p><strong className="text-amber-400">Risk Assessment:</strong> {profile.scoreExplanations?.riskAssessment}</p>
                 </div>
               </Card>
 

@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import DataProcessorWorker from '@/workers/dataProcessor?worker';
 import { AnalysisValidatorCard } from "@/components/workspace/AnalysisValidatorCard";
 import { ConfidenceScoreMetricCard } from "@/components/workspace/ConfidenceScoreMetricCard";
+import { PythonAnalyticsOptimizerModal } from "@/components/workspace/PythonAnalyticsOptimizerModal";
 import { AnalysisValidator, DataEntryErrorCheckResult } from "@/lib/analysisValidator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -49,6 +50,7 @@ export default function AIAnalyst() {
   const [selectedFeatureCol, setSelectedFeatureCol] = useState<string>("");
   const [copiedSummary, setCopiedSummary] = useState(false);
   const [dataEntryCheck, setDataEntryCheck] = useState<DataEntryErrorCheckResult | null>(null);
+  const [isOptimizerModalOpen, setIsOptimizerModalOpen] = useState(false);
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
@@ -288,7 +290,7 @@ ${(analysisResult.summary.strategic_actions || []).map((a: any) => `- [${a.prior
           </div>
 
           {/* Assessment Trigger Button */}
-          <div className="w-full sm:w-auto pt-4 sm:pt-0 self-end">
+          <div className="w-full sm:w-auto pt-4 sm:pt-0 self-end flex gap-2">
             <Button
               onClick={runSeniorDataScientistAnalysis}
               disabled={isAnalyzing}
@@ -296,6 +298,14 @@ ${(analysisResult.summary.strategic_actions || []).map((a: any) => `- [${a.prior
             >
               {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Play className="h-4 w-4 mr-2" />}
               {isAnalyzing ? "Processing..." : "Run Assessment"}
+            </Button>
+            <Button
+              onClick={() => setIsOptimizerModalOpen(true)}
+              variant="outline"
+              className="border-indigo-500/30 text-indigo-300 hover:bg-indigo-950/40 font-bold px-4 py-2.5 h-[38px] transition-all flex items-center gap-1.5"
+            >
+              <Zap className="h-4 w-4 text-indigo-400" />
+              Optimizer Engine
             </Button>
           </div>
         </div>
@@ -1244,6 +1254,12 @@ ${(analysisResult.summary.strategic_actions || []).map((a: any) => `- [${a.prior
           );
         })}
       </motion.div>
+
+      {/* Python Analytics & Cost Optimizer Modal */}
+      <PythonAnalyticsOptimizerModal
+        isOpen={isOptimizerModalOpen}
+        onClose={() => setIsOptimizerModalOpen(false)}
+      />
     </motion.div>
   );
 }
