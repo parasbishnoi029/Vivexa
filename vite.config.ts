@@ -27,27 +27,12 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
+            // Heavy standalone non-React modules (safe to isolate)
             if (id.includes('@duckdb') || id.includes('apache-arrow')) return 'vendor-duckdb';
             if (id.includes('xlsx')) return 'vendor-xlsx';
-            if (id.includes('zod')) return 'vendor-zod';
-            if (id.includes('react-markdown')) return 'vendor-markdown';
+            if (id.includes('jspdf') || id.includes('html2canvas') || id.includes('pptxgenjs')) return 'vendor-exports';
             if (id.includes('@google/genai')) return 'vendor-genai';
             if (id.includes('recharts') || id.includes('d3')) return 'vendor-charts';
-            if (id.includes('framer-motion') || id.includes('motion')) return 'vendor-motion';
-            if (id.includes('lucide-react')) return 'vendor-icons';
-            if (id.includes('@radix-ui')) return 'vendor-radix';
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) return 'vendor-react';
-            if (id.includes('@supabase')) return 'vendor-supabase';
-            if (id.includes('jspdf')) return 'vendor-jspdf';
-            if (id.includes('html2canvas')) return 'vendor-html2canvas';
-            if (id.includes('@tanstack/react-query')) return 'vendor-query';
-            if (id.includes('alasql')) return 'vendor-alasql';
-            if (id.includes('pptxgenjs')) return 'vendor-pptxgenjs';
-            if (id.includes('papaparse')) return 'vendor-papaparse';
-            if (id.includes('jszip')) return 'vendor-jszip';
-            if (id.includes('axios')) return 'vendor-axios';
-            if (id.includes('lodash')) return 'vendor-lodash';
-            return 'vendor-core';
           }
         },
       },
