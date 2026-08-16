@@ -255,6 +255,35 @@
       </div>
       <div class="loader-status">Initializing AI Intelligence Core...</div>
     </div>
+
+    <script>
+      (function() {
+        var loader = document.getElementById('initial-loader');
+        function dismiss() {
+          if (!loader || loader.getAttribute('data-dismissed')) return;
+          loader.setAttribute('data-dismissed', 'true');
+          loader.style.opacity = '0';
+          loader.style.transition = 'opacity 0.3s cubic-bezier(0.22, 1, 0.36, 1)';
+          loader.style.pointerEvents = 'none';
+          setTimeout(function() {
+            if (loader && loader.parentNode) {
+              loader.parentNode.removeChild(loader);
+            }
+          }, 350);
+        }
+        window.__dismissLoader = dismiss;
+        
+        // Auto-dismiss safety timer (1.2 seconds max) to prevent stuck loader
+        if (document.readyState === 'complete') {
+          setTimeout(dismiss, 800);
+        } else {
+          window.addEventListener('load', function() {
+            setTimeout(dismiss, 500);
+          });
+          setTimeout(dismiss, 1200);
+        }
+      })();
+    </script>
     
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

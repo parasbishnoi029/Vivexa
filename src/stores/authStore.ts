@@ -46,12 +46,26 @@ export const useAuthStore = create<AuthState>((set) => ({
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      set({ session, user: session?.user || null, isLoading: false });
-      if (session?.user) {
-        syncUserAndWorkspace(session.user);
+    // Fallback safety timeout so app never gets stuck loading if Supabase auth hangs or is blocked
+    const authTimeout = setTimeout(() => {
+      if (useAuthStore.getState().isLoading) {
+        set({ isLoading: false });
       }
-    });
+    }, 1500);
+
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        clearTimeout(authTimeout);
+        set({ session, user: session?.user || null, isLoading: false });
+        if (session?.user) {
+          syncUserAndWorkspace(session.user);
+        }
+      })
+      .catch((err) => {
+        clearTimeout(authTimeout);
+        console.warn("Supabase auth session check note:", err);
+        set({ session: null, user: null, isLoading: false });
+      });
 
     supabase.auth.onAuthStateChange((event, session) => {
       set({ session, user: session?.user || null, isLoading: false });

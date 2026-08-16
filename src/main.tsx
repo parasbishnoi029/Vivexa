@@ -42,3 +42,7 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 );
+
+if (typeof (window as any).__dismissLoader === 'function') {
+  (window as any).__dismissLoader();
+}
