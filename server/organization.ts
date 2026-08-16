@@ -1329,10 +1329,10 @@ organizationRouter.patch('/members/:id/role', async (req: express.Request, res: 
   try {
     const user = (req as any).user;
     const { id } = req.params;
-    const { role } = req.body;
+    const { role, department } = req.body;
 
     if (!user) return res.status(401).json(successResponse(null, { error: 'Unauthorized' }));
-    if (!role) return res.status(400).json(successResponse(null, { error: 'Role is required' }));
+    if (!role && !department) return res.status(400).json(successResponse(null, { error: 'Role or department is required' }));
 
     const adminClient = getAdminSupabaseClient();
     const { data: targetMember } = await adminClient
@@ -1371,13 +1371,17 @@ organizationRouter.patch('/members/:id/role', async (req: express.Request, res: 
       return res.status(403).json(successResponse(null, { error: 'Forbidden: Only Workspace Owners or Admins can modify member roles' }));
     }
 
-    if (ws?.owner_id === targetMember.user_id) {
-      return res.status(400).json(successResponse(null, { error: 'Cannot modify the role of the workspace owner' }));
+    if (ws?.owner_id === targetMember.user_id && role && role !== 'Owner') {
+      return res.status(400).json(successResponse(null, { error: 'Cannot downgrade the role of the workspace owner' }));
     }
+
+    const updates: any = { updated_at: new Date().toISOString() };
+    if (role) updates.role = role;
+    if (department) updates.department = department;
 
     const { data, error } = await adminClient
       .from('workspace_members')
-      .update({ role, updated_at: new Date().toISOString() })
+      .update(updates)
       .eq('id', id)
       .select()
       .single();
@@ -1386,12 +1390,30 @@ organizationRouter.patch('/members/:id/role', async (req: express.Request, res: 
       return res.status(400).json(successResponse(null, { error: error.message }));
     }
 
+    // Sync profiles & settings for target user
+    if (targetMember.user_id) {
+      if (department) {
+        const { data: currSetting } = await adminClient.from('settings').select('*').eq('user_id', targetMember.user_id).maybeSingle();
+        const currPrefs = currSetting?.preferences || {};
+        await adminClient.from('settings').upsert({
+          user_id: targetMember.user_id,
+          preferences: { ...currPrefs, department },
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+      }
+
+      const profileSync: any = { user_id: targetMember.user_id, updated_at: new Date().toISOString() };
+      if (role) profileSync.role = role;
+      if (department) profileSync.department = department;
+      await adminClient.from('profiles').upsert(profileSync, { onConflict: 'user_id' });
+    }
+
     await adminClient.from('audit_logs').insert({
       user_id: user.id,
       action: 'MEMBER_ROLE_UPDATED',
       resource_type: 'WORKSPACE_MEMBER',
       resource_id: id,
-      payload: { new_role: role }
+      payload: { new_role: role, new_department: department }
     });
 
     return res.json(successResponse(data));
@@ -1471,6 +1493,79 @@ organizationRouter.delete('/members/:id', async (req: express.Request, res: expr
     });
 
     return res.json(successResponse({ id, deleted: true }));
+  } catch (err: any) {
+    return res.status(500).json(successResponse(null, { error: err.message }));
+  }
+});
+
+// 5.1 POST /api/v1/organization/members/bulk - Bulk update or remove members
+organizationRouter.post('/members/bulk', async (req: express.Request, res: express.Response) => {
+  try {
+    const user = (req as any).user;
+    if (!user) return res.status(401).json(successResponse(null, { error: 'Unauthorized' }));
+
+    const { action, member_ids, role, department } = req.body;
+    if (!action || !Array.isArray(member_ids) || member_ids.length === 0) {
+      return res.status(400).json(successResponse(null, { error: 'Action and member_ids array required' }));
+    }
+
+    const adminClient = getAdminSupabaseClient();
+
+    if (action === 'update_role') {
+      if (!role) return res.status(400).json(successResponse(null, { error: 'Role is required for update_role action' }));
+      
+      const updates: any = { role, updated_at: new Date().toISOString() };
+      if (department) updates.department = department;
+
+      const { data, error } = await adminClient
+        .from('workspace_members')
+        .update(updates)
+        .in('id', member_ids)
+        .select();
+
+      if (error) return res.status(400).json(successResponse(null, { error: error.message }));
+
+      // Sync profiles for affected user_ids
+      if (data && data.length > 0) {
+        for (const m of data) {
+          if (m.user_id) {
+            await adminClient.from('profiles').upsert({
+              user_id: m.user_id,
+              role: role,
+              ...(department ? { department } : {}),
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id' });
+          }
+        }
+      }
+
+      await adminClient.from('audit_logs').insert({
+        user_id: user.id,
+        action: 'BULK_MEMBER_ROLE_UPDATED',
+        resource_type: 'WORKSPACE_MEMBER',
+        payload: { count: member_ids.length, new_role: role, member_ids }
+      });
+
+      return res.json(successResponse({ count: data?.length || 0, members: data }));
+    } else if (action === 'remove') {
+      const { error } = await adminClient
+        .from('workspace_members')
+        .delete()
+        .in('id', member_ids);
+
+      if (error) return res.status(400).json(successResponse(null, { error: error.message }));
+
+      await adminClient.from('audit_logs').insert({
+        user_id: user.id,
+        action: 'BULK_MEMBER_REMOVED',
+        resource_type: 'WORKSPACE_MEMBER',
+        payload: { count: member_ids.length, member_ids }
+      });
+
+      return res.json(successResponse({ count: member_ids.length, deleted: true }));
+    } else {
+      return res.status(400).json(successResponse(null, { error: 'Invalid action. Supported: update_role, remove' }));
+    }
   } catch (err: any) {
     return res.status(500).json(successResponse(null, { error: err.message }));
   }
