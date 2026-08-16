@@ -227,8 +227,14 @@ export default function Organization() {
         }
       });
 
+    const handleProfileUpdated = () => {
+      loadOrganizationData(undefined, true);
+    };
+    window.addEventListener('vivexa:user_profile_updated', handleProfileUpdated);
+
     return () => {
       supabase.removeChannel(channel);
+      window.removeEventListener('vivexa:user_profile_updated', handleProfileUpdated);
     };
   }, [user, selectedWorkspaceId, token]);
 

@@ -288,18 +288,25 @@ organizationRouter.get('/data', async (req: express.Request, res: express.Respon
     }
 
     // Fetch Workspace Members using admin privilege to bypass restrictive RLS policies
-    const { data: rawMembers, error: membersErr } = await adminClient
+    const { data: rawMembersList, error: membersErr } = await adminClient
       .from('workspace_members')
       .select('*')
       .eq('workspace_id', workspace.id);
 
     if (membersErr) console.warn("Members fetch note:", membersErr.message);
 
-    // Fetch Profiles for members
-    const memberUserIds = (rawMembers || []).map(m => m.user_id).concat(workspace.owner_id);
+    const rawMembers: any[] = rawMembersList ? [...rawMembersList] : [];
+
+    // Fetch Profiles & Settings for members
+    const memberUserIds = rawMembers.map(m => m.user_id).concat(workspace.owner_id);
     const { data: profiles } = await adminClient
       .from('profiles')
-      .select('user_id, full_name, avatar_url')
+      .select('*')
+      .in('user_id', memberUserIds);
+
+    const { data: settingsList } = await adminClient
+      .from('settings')
+      .select('user_id, preferences')
       .in('user_id', memberUserIds);
 
     const { data: usersList } = await adminClient
@@ -319,7 +326,48 @@ organizationRouter.get('/data', async (req: express.Request, res: express.Respon
       console.warn("[Organization Server] Auth fetch exception:", authErr?.message);
     }
 
+    // Auto-heal accepted invitations into workspace_members if missing
+    try {
+      const { data: acceptedInvites } = await adminClient
+        .from('workspace_invitations')
+        .select('*')
+        .eq('workspace_id', workspace.id)
+        .eq('status', 'Accepted');
+
+      if (acceptedInvites && acceptedInvites.length > 0) {
+        for (const inv of acceptedInvites) {
+          if (inv.email) {
+            const matchingAuthUser = authUsers.find((au: any) => au.email?.toLowerCase() === inv.email.toLowerCase());
+            if (matchingAuthUser) {
+              const existsInRaw = rawMembers.some(m => m.user_id === matchingAuthUser.id);
+              if (!existsInRaw) {
+                const { data: insertedMem } = await adminClient
+                  .from('workspace_members')
+                  .insert({
+                    workspace_id: workspace.id,
+                    user_id: matchingAuthUser.id,
+                    role: inv.role || 'Analyst',
+                    status: 'active'
+                  })
+                  .select()
+                  .single();
+                if (insertedMem) {
+                  rawMembers.push(insertedMem);
+                  if (!memberUserIds.includes(matchingAuthUser.id)) {
+                    memberUserIds.push(matchingAuthUser.id);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (autoHealErr: any) {
+      console.warn("Auto-heal accepted invitations note:", autoHealErr.message);
+    }
+
     const profileMap = new Map((profiles || []).map(p => [p.user_id, p]));
+    const settingsMap = new Map((settingsList || []).map(s => [s.user_id, s.preferences || {}]));
     const userMap = new Map((usersList || []).map(u => [u.id, u]));
     const authUserMap = new Map(authUsers.map(u => [u.id, u]));
 
@@ -338,15 +386,25 @@ organizationRouter.get('/data', async (req: express.Request, res: express.Respon
     // Format Owner as first member
     const ownerUser = userMap.get(workspace.owner_id) || authUserMap.get(workspace.owner_id);
     const ownerProfile = profileMap.get(workspace.owner_id);
+    const ownerSettings = (settingsMap.get(workspace.owner_id) || {}) as any;
+    const ownerMeta = ownerUser?.user_metadata || {};
+
+    const ownerFullName = ownerProfile?.full_name || ownerMeta?.full_name || 
+      (ownerMeta?.first_name ? `${ownerMeta.first_name} ${ownerMeta.last_name || ''}`.trim() : null) || 
+      ownerUser?.email?.split('@')[0] || user.email?.split('@')[0] || 'Workspace Owner';
+
+    const ownerDept = ownerSettings.department || ownerProfile?.department || ownerMeta?.department || 'Organisational Development & Renewal';
 
     const members = [
       {
         id: `owner-${workspace.owner_id}`,
         user_id: workspace.owner_id,
         email: ownerUser?.email || user.email,
-        full_name: ownerProfile?.full_name || ownerUser?.user_metadata?.full_name || ownerUser?.email?.split('@')[0] || user.email?.split('@')[0] || 'Workspace Owner',
-        avatar_url: ownerProfile?.avatar_url,
+        full_name: ownerFullName,
+        avatar_url: ownerProfile?.avatar_url || ownerMeta?.avatar_url,
         role: 'Owner',
+        department: ownerDept,
+        company: ownerProfile?.company || ownerMeta?.company || workspace.name,
         status: 'active',
         created_at: workspace.created_at,
         is_owner: true
@@ -354,7 +412,7 @@ organizationRouter.get('/data', async (req: express.Request, res: express.Respon
     ];
 
     // Format other members
-    for (const m of (rawMembers || [])) {
+    for (const m of rawMembers) {
       if (m.user_id !== workspace.owner_id) {
         let u = userMap.get(m.user_id) || authUserMap.get(m.user_id);
         if (!u) {
@@ -367,18 +425,26 @@ organizationRouter.get('/data', async (req: express.Request, res: express.Respon
           } catch (_) {}
         }
         const p = profileMap.get(m.user_id);
+        const s = (settingsMap.get(m.user_id) || {}) as any;
+        const uMeta = u?.user_metadata || {};
+
         const memberEmail = u?.email || m.email || 'team.member@domain.com';
-        const memberName = p?.full_name || u?.user_metadata?.full_name || u?.user_metadata?.first_name 
-          ? `${u?.user_metadata?.first_name || ''} ${u?.user_metadata?.last_name || ''}`.trim()
-          : memberEmail.split('@')[0];
+        const memberName = p?.full_name || uMeta?.full_name || 
+          (uMeta?.first_name ? `${uMeta.first_name} ${uMeta.last_name || ''}`.trim() : null) || 
+          memberEmail.split('@')[0];
+
+        const memberDept = m.department || s.department || p?.department || uMeta?.department || 'Engineering & Architecture';
+        const memberRole = m.role || p?.role || uMeta?.role || 'Analyst';
 
         members.push({
           id: m.id,
           user_id: m.user_id,
           email: memberEmail,
           full_name: memberName || 'Team Member',
-          avatar_url: p?.avatar_url || u?.user_metadata?.avatar_url,
-          role: m.role || 'Analyst',
+          avatar_url: p?.avatar_url || uMeta?.avatar_url,
+          role: memberRole,
+          department: memberDept,
+          company: p?.company || uMeta?.company || workspace.name,
           status: m.status || 'active',
           created_at: m.created_at,
           is_owner: false
@@ -1192,6 +1258,68 @@ organizationRouter.delete('/invitations/:id', async (req: express.Request, res: 
 
     return res.json(successResponse({ id, status: 'Cancelled' }));
   } catch (err: any) {
+    return res.status(500).json(successResponse(null, { error: err.message }));
+  }
+});
+
+// 3.9 PATCH /api/v1/organization/members/me/profile - Update current user's profile across workspace & profiles
+organizationRouter.patch('/members/me/profile', async (req: express.Request, res: express.Response) => {
+  try {
+    const user = (req as any).user;
+    if (!user) return res.status(401).json(successResponse(null, { error: 'Unauthorized' }));
+
+    const { full_name, role, department, company, avatar_url } = req.body;
+    const adminClient = getAdminSupabaseClient();
+    const now = new Date().toISOString();
+
+    // 1. Update public.profiles
+    const profileUpdates: any = { user_id: user.id, updated_at: now };
+    if (full_name !== undefined) profileUpdates.full_name = full_name;
+    if (company !== undefined) profileUpdates.company = company;
+    if (role !== undefined) profileUpdates.role = role;
+    if (avatar_url !== undefined) profileUpdates.avatar_url = avatar_url;
+
+    await adminClient.from('profiles').upsert(profileUpdates, { onConflict: 'user_id' });
+
+    // 2. Update public.settings preferences (department)
+    if (department !== undefined) {
+      const { data: currSetting } = await adminClient.from('settings').select('*').eq('user_id', user.id).maybeSingle();
+      const currPrefs = currSetting?.preferences || {};
+      await adminClient.from('settings').upsert({
+        user_id: user.id,
+        preferences: { ...currPrefs, department },
+        updated_at: now
+      }, { onConflict: 'user_id' });
+    }
+
+    // 3. Update Supabase Auth user metadata
+    try {
+      const { data: authUser } = await adminClient.auth.admin.getUserById(user.id);
+      const currMeta = authUser?.user?.user_metadata || {};
+      const updatedMeta = {
+        ...currMeta,
+        ...(full_name ? { full_name, first_name: full_name.split(' ')[0], last_name: full_name.split(' ').slice(1).join(' ') } : {}),
+        ...(role ? { role } : {}),
+        ...(department ? { department } : {}),
+        ...(company ? { company } : {}),
+        ...(avatar_url ? { avatar_url } : {})
+      };
+      await adminClient.auth.admin.updateUserById(user.id, { user_metadata: updatedMeta });
+    } catch (authErr: any) {
+      console.warn("Auth metadata update note:", authErr.message);
+    }
+
+    // 4. Update workspace_members if department or role provided
+    if (department || role) {
+      const memberUpdates: any = { updated_at: now };
+      if (department) memberUpdates.department = department;
+      if (role) memberUpdates.role = role;
+      await adminClient.from('workspace_members').update(memberUpdates).eq('user_id', user.id);
+    }
+
+    return res.json(successResponse({ status: 'ok', updated_at: now }));
+  } catch (err: any) {
+    console.error("Error updating member profile:", err);
     return res.status(500).json(successResponse(null, { error: err.message }));
   }
 });

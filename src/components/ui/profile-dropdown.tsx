@@ -59,6 +59,14 @@ export function ProfileDropdown() {
         }
       }
       loadProfile();
+
+      const handleProfileUpdated = () => {
+        loadProfile();
+      };
+      window.addEventListener('vivexa:user_profile_updated', handleProfileUpdated);
+      return () => {
+        window.removeEventListener('vivexa:user_profile_updated', handleProfileUpdated);
+      };
     }
   }, [user]);
 

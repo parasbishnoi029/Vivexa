@@ -1,60 +1,71 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import {
-  User, Shield, Bell, Palette, Globe, HardDrive, Trash2, LogOut, Link as LinkIcon,
-  Smartphone, Laptop, Camera, Loader2, Key, CreditCard, Layers, Building, Users,
-  BarChart2, Zap, Sparkles, Download, Lock, CheckCircle2, RefreshCw, AlertTriangle,
-  FileText, ShieldAlert, Cpu, Eye, Copy, Check, Plus, Settings2, ShieldCheck, Database,
-  LayoutDashboard, Activity, ArrowUpRight, Clock, HelpCircle, ChevronRight, X, Search,
-  Server, Sliders, ToggleLeft, ToggleRight, Trash, MessageSquare, ExternalLink, Fingerprint
+  User, Shield, Bell, Globe, HardDrive, Link as LinkIcon,
+  Smartphone, Camera, Loader2, Key, CreditCard, Building, Users,
+  BarChart2, Zap, Sparkles, Download, Lock, CheckCircle2, AlertTriangle,
+  FileText, Database, LayoutDashboard, Activity, Clock, HelpCircle,
+  Search, Server, MessageSquare, ExternalLink, Fingerprint, RefreshCw, Trash2
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { motion, AnimatePresence } from "motion/react";
 import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/lib/supabase";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { createNotification } from "@/lib/notifications";
 import { getAiUsageCount, getQuotaLimit } from "@/lib/telemetry";
 import { useTheme } from "@/providers/ThemeProvider";
 import { safeFetchJson } from "@/lib/utils";
 
+// Streamlined & Upgraded Settings Categories
 const TABS = [
-  { id: "overview", label: "Settings Overview", icon: LayoutDashboard },
-  { id: "profile", label: "Profile Settings", icon: User },
-  { id: "workspace", label: "Workspace & Region", icon: Building },
-  { id: "organization", label: "Organization & Teams", icon: Users },
-  { id: "security", label: "Security & 2FA", icon: Shield },
-  { id: "enterprise", label: "Enterprise Architecture & SSO", icon: Server },
-  { id: "sessions", label: "Active Sessions", icon: Smartphone },
-  { id: "notifications", label: "Notifications & Alerts", icon: Bell },
-  { id: "language", label: "Language & Region", icon: Globe },
-  { id: "storage", label: "Storage Analytics", icon: HardDrive },
-  { id: "usage", label: "Usage & Limits", icon: BarChart2 },
-  { id: "subscription", label: "Subscription & Plan", icon: Zap },
-  { id: "billing", label: "Billing & Invoices", icon: CreditCard },
-  { id: "apikeys", label: "API Keys & Secrets", icon: Key },
-  { id: "accounts", label: "Connected Accounts", icon: LinkIcon },
-  { id: "devices", label: "Connected Devices", icon: Laptop },
-  { id: "ai_prefs", label: "AI Engine Preferences", icon: Sparkles },
-  { id: "privacy", label: "Privacy & Data Policy", icon: Lock },
-  { id: "backup", label: "Export & Backup", icon: Download },
-  { id: "support", label: "Support & Help", icon: MessageSquare }
+  { id: "overview", label: "Overview", icon: LayoutDashboard, badge: "Hub" },
+  { id: "profile", label: "Profile & Localization", icon: User },
+  { id: "workspace", label: "Workspace & Teams", icon: Building },
+  { id: "security", label: "Security, SSO & Sessions", icon: Shield, badge: "2FA" },
+  { id: "ai_prefs", label: "AI Copilot Parameters", icon: Sparkles, badge: "Gemini" },
+  { id: "apikeys", label: "API Keys & OAuth", icon: Key },
+  { id: "usage", label: "Usage & Storage Analytics", icon: BarChart2 },
+  { id: "billing", label: "Billing & Plans", icon: Zap },
+  { id: "privacy_support", label: "Privacy, Backup & Support", icon: HelpCircle },
 ];
+
+// Map legacy URL tab parameters to streamlined tabs
+const TAB_ALIASES: Record<string, string> = {
+  overview: "overview",
+  profile: "profile",
+  language: "profile",
+  workspace: "workspace",
+  organization: "workspace",
+  security: "security",
+  enterprise: "security",
+  sessions: "security",
+  devices: "security", // redirects gracefully (devices tab removed)
+  ai_prefs: "ai_prefs",
+  apikeys: "apikeys",
+  accounts: "apikeys",
+  usage: "usage",
+  storage: "usage",
+  subscription: "billing",
+  billing: "billing",
+  notifications: "privacy_support",
+  privacy: "privacy_support",
+  backup: "privacy_support",
+  support: "privacy_support",
+};
 
 export default function WorkspaceSettings() {
   const { user, session } = useAuthStore();
-  const { theme, setTheme } = useTheme();
+  const { setTheme } = useTheme();
   const token = session?.access_token;
   const initials = user?.email?.substring(0, 2).toUpperCase() || 'U';
 
   const [activeTab, setActiveTab] = useState("overview");
-  const [profile, setProfile] = useState<any>(null);
+  const [tabSearchQuery, setTabSearchQuery] = useState("");
+  const [, setProfile] = useState<any>(null);
   const [aiUsageCount, setAiUsageCount] = useState<number>(() => getAiUsageCount());
   const [ssoProvider, setSsoProvider] = useState<"none" | "okta" | "entra">("okta");
-  const [vpcEnabled, setVpcEnabled] = useState(true);
-  const [privateLinkEnabled, setPrivateLinkEnabled] = useState(true);
 
   useEffect(() => {
     const syncUsage = () => setAiUsageCount(getAiUsageCount());
@@ -92,11 +103,6 @@ export default function WorkspaceSettings() {
   const [workspaceName, setWorkspaceName] = useState("Vivexa Enterprise Workspace");
   const [workspaceRegion, setWorkspaceRegion] = useState("us-central1 (Iowa)");
 
-  const [accentColor, setAccentColor] = useState("indigo");
-  const [themeMode, setThemeMode] = useState<"dark" | "light" | "system">("dark");
-  const [compactMode, setCompactMode] = useState(false);
-  const [animationsEnabled, setAnimationsEnabled] = useState(true);
-
   // Security & Password
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [currPassword, setCurrPassword] = useState("");
@@ -106,39 +112,19 @@ export default function WorkspaceSettings() {
   const [aiModel, setAiModel] = useState("gemini-3.1-pro-preview");
   const [creativity, setCreativity] = useState("0.2");
   const [autoSql, setAutoSql] = useState(true);
-  const [autoPython, setAutoPython] = useState(true);
-  const [autoReports, setAutoReports] = useState(true);
 
   // API Keys (fetched from Supabase database)
   const [apiKeys, setApiKeys] = useState<any[]>([]);
-  const [isApiKeysLoading, setIsApiKeysLoading] = useState(false);
+  const [, setIsApiKeysLoading] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
 
   // Audit Logs (fetched from Supabase database)
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
-  const [isAuditLogsLoading, setIsAuditLogsLoading] = useState(false);
 
   // Storage and Datasets stats
   const [storageBytes, setStorageBytes] = useState(0);
   const [datasetCount, setDatasetCount] = useState(0);
   const [isRecalculatingStorage, setIsRecalculatingStorage] = useState(false);
-
-  // Dynamic Client Attributes
-  const [deviceIp, setDeviceIp] = useState("34.34.244.19");
-  const [browserInfo, setBrowserInfo] = useState("Chrome macOS");
-
-  // Notifications Toggles
-  const [notifCritical, setNotifCritical] = useState(true);
-  const [notifWeekly, setNotifWeekly] = useState(true);
-  const [notifSystem, setNotifSystem] = useState(false);
-  const [notifInvites, setNotifInvites] = useState(true);
-
-  // Language & Timezone
-  const [displayLanguage, setDisplayLanguage] = useState("en");
-  const [displayTimezone, setDisplayTimezone] = useState("Asia/Kolkata");
-
-  // Active Plan Level
-  const [userPlan, setUserPlan] = useState("Enterprise Pro");
 
   // Dynamic Session Listings
   const [sessions, setSessions] = useState<any[]>([
@@ -147,8 +133,20 @@ export default function WorkspaceSettings() {
     { id: "sess-2", device: "Firefox Linux (Ubuntu 24.04)", ip: "84.120.45.12", location: "Frankfurt, DE", current: false, time: "1 day ago" }
   ]);
 
-  // Billing Statement history
-  const [invoices, setInvoices] = useState<any[]>([
+  // Notifications Toggles
+  const [notifCritical, setNotifCritical] = useState(true);
+  const [notifWeekly, setNotifWeekly] = useState(true);
+  const [notifSystem, setNotifSystem] = useState(false);
+
+  // Language & Timezone
+  const [displayLanguage, setDisplayLanguage] = useState("en");
+  const [displayTimezone, setDisplayTimezone] = useState("Asia/Kolkata");
+
+  // Active Plan Level
+  const [userPlan, setUserPlan] = useState("Enterprise Pro");
+
+  // Invoices history
+  const [invoices] = useState<any[]>([
     { id: "VVX-2026-7829", date: "2026-08-01", description: "Enterprise Pro Monthly Charge", amount: "₹1,499.00 INR", status: "Paid" },
     { id: "VVX-2026-6910", date: "2026-07-01", description: "Enterprise Pro Monthly Charge", amount: "₹1,499.00 INR", status: "Paid" },
     { id: "VVX-2026-5811", date: "2026-06-01", description: "Pro Sandbox Trial Period", amount: "₹0.00 INR", status: "Free" }
@@ -158,54 +156,15 @@ export default function WorkspaceSettings() {
   const [connectedAccounts, setConnectedAccounts] = useState<any[]>([
     { id: "google", name: "Google Accounts Verification", email: "", connected: true },
     { id: "github", name: "GitHub OAuth Access", email: "", connected: false },
-    { id: "slack", name: "Slack Real-Time Chat Workspaces Sync", email: "vivexa-copilot-workspace.slack.com", connected: true }
+    { id: "slack", name: "Slack Real-Time Chat Workspace Sync", email: "workspace.slack.com", connected: true }
   ]);
 
-  // Verified Devices
-  const [connectedDevices, setConnectedDevices] = useState<any[]>([
-    { id: "dev-mac", name: 'MacBook Pro 16" (M3 Max)', detail: "Last Sync: Just now • Bengaluru, India" },
-    { id: "dev-iphone", name: "iPhone 15 Pro Max", detail: "Last Sync: 12 mins ago • Bengaluru, India" }
-  ]);
-
-  // Parse details on render
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const ua = navigator.userAgent;
-      let detectedOS = "Mac OS X";
-      if (ua.indexOf("Win") !== -1) detectedOS = "Windows";
-      else if (ua.indexOf("Linux") !== -1) detectedOS = "Linux";
-      else if (ua.indexOf("Android") !== -1) detectedOS = "Android";
-      else if (ua.indexOf("like Mac") !== -1) detectedOS = "iOS";
-
-      let detectedBrowser = "Chrome";
-      if (ua.indexOf("Safari") !== -1 && ua.indexOf("Chrome") === -1) detectedBrowser = "Safari";
-      else if (ua.indexOf("Firefox") !== -1) detectedBrowser = "Firefox";
-      else if (ua.indexOf("Edge") !== -1) detectedBrowser = "Edge";
-
-      setBrowserInfo(`${detectedBrowser} ${detectedOS}`);
-      
-      // Set current session attributes
-      setSessions(prev => prev.map(s => s.current ? { ...s, device: `${detectedBrowser} ${detectedOS} (Primary Cluster)` } : s));
-
-      fetch("https://api.ipify.org?format=json")
-        .then(res => res.json())
-        .then(data => {
-          if (data.ip) {
-            setDeviceIp(data.ip);
-            setSessions(prev => prev.map(s => s.current ? { ...s, ip: data.ip } : s));
-          }
-        })
-        .catch(() => {});
-    }
-  }, []);
-
-  // Sync google email
+  // Sync google email and user plan
   useEffect(() => {
     if (user?.email) {
       setConnectedAccounts(prev => prev.map(a => a.id === "google" ? { ...a, email: user.email! } : a));
     }
     
-    // Sync plan level from users table
     if (user) {
       supabase.from('users').select('plan').eq('id', user.id).maybeSingle()
         .then(({ data }) => {
@@ -216,115 +175,19 @@ export default function WorkspaceSettings() {
     }
   }, [user]);
 
-  // Handlers
-  const handleRevokeSession = async (sessId: string) => {
-    setSessions(prev => prev.filter(s => s.id !== sessId));
-    toast.success("Active authentication session terminated and token cleared!");
-    if (user) {
-      await supabase.from('audit_logs').insert({
-        user_id: user.id,
-        action: "Session Terminated",
-        metadata: { session_id: sessId }
-      });
-      loadAuditLogs();
-    }
-  };
-
-  const handleRevokeDevice = async (devId: string) => {
-    setConnectedDevices(prev => prev.filter(d => d.id !== devId));
-    toast.success("Device key registration successfully revoked!");
-    if (user) {
-      await supabase.from('audit_logs').insert({
-        user_id: user.id,
-        action: "Device Revoked",
-        metadata: { device_id: devId }
-      });
-      loadAuditLogs();
-    }
-  };
-
-  const handleToggleAccount = (id: string) => {
-    setConnectedAccounts(prev => prev.map(a => {
-      if (a.id === id) {
-        const nextState = !a.connected;
-        toast.success(`${a.name} ${nextState ? 'Connected Successfully' : 'Disconnected Successfully'}`);
-        return { ...a, connected: nextState };
-      }
-      return a;
-    }));
-  };
-
-  const handleRecalculateStorage = () => {
-    setIsRecalculatingStorage(true);
-    toast.loading("Querying live file sizes inside Supabase storage bucket...");
-    setTimeout(() => {
-      setIsRecalculatingStorage(false);
-      loadStorageStats();
-      toast.dismiss();
-      toast.success("Database storage cache synchronized successfully!");
-    }, 1200);
-  };
-
-  const handleDownloadInvoice = (inv: any) => {
-    toast.info(`Generating Invoice statement for #${inv.id}...`);
-    setTimeout(() => {
-      const doc = `
-=========================================
-VIVEXA PLATFORMS - TAX INVOICE & RECEIPT
-=========================================
-Invoice Ref:  \${inv.id}
-Date:         \${inv.date}
-Client Name:  \${fullName || user?.email || "Enterprise Partner"}
-Organization: \${company || "Vivexa Enterprise"}
-Plan Level:   \${userPlan}
-
-Description:  \${inv.description}
-Total Charged: \${inv.amount}
-Payment Mode: Credit Card (Autopay)
-Status:       \${inv.status} (SUCCESS)
-=========================================
-Thank you for scaling with Vivexa!
-      `;
-      const blob = new Blob([doc.trim()], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Vivexa_Invoice_\${inv.id}.txt`;
-      a.click();
-      toast.success(`Invoice \${inv.id} downloaded successfully!`);
-    }, 800);
-  };
-
-  const handleUpgradePlan = async (planName: string) => {
-    if (!user) return;
-    try {
-      const lowercasePlan = planName.toLowerCase();
-      const { error } = await supabase.from('users').update({ plan: lowercasePlan }).eq('id', user.id);
-      if (error) throw error;
-      
-      setUserPlan(planName);
-      toast.success(`Plan successfully altered to \${planName}!`);
-      
-      await supabase.from('audit_logs').insert({
-        user_id: user.id,
-        action: `Subscription Altered`,
-        metadata: { new_plan: planName }
-      });
-      loadAuditLogs();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update subscription");
-    }
-  };
-
+  // Parse tab search parameter
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
-    const tab = searchParams.get("tab");
-    if (tab && TABS.find(t => t.id === tab)) {
-      setActiveTab(tab);
+    const rawTab = searchParams.get("tab");
+    if (rawTab) {
+      const mapped = TAB_ALIASES[rawTab];
+      if (mapped) {
+        setActiveTab(mapped);
+      }
       setSearchParams({}, { replace: true });
     }
-  }, [searchParams]);
+  }, [searchParams, setSearchParams]);
 
   // Load profile, database values, and logs
   useEffect(() => {
@@ -336,6 +199,92 @@ Thank you for scaling with Vivexa!
       loadStorageStats();
     }
   }, [user]);
+
+  const handleRevokeSession = async (sessId: string) => {
+    setSessions(prev => prev.filter(s => s.id !== sessId));
+    toast.success("Authentication session terminated!");
+    if (user) {
+      await supabase.from('audit_logs').insert({
+        user_id: user.id,
+        action: "Session Terminated",
+        metadata: { session_id: sessId }
+      });
+      loadAuditLogs();
+    }
+  };
+
+  const handleToggleAccount = (id: string) => {
+    setConnectedAccounts(prev => prev.map(a => {
+      if (a.id === id) {
+        const nextState = !a.connected;
+        toast.success(`${a.name} ${nextState ? 'Connected Successfully' : 'Disconnected'}`);
+        return { ...a, connected: nextState };
+      }
+      return a;
+    }));
+  };
+
+  const handleRecalculateStorage = () => {
+    setIsRecalculatingStorage(true);
+    toast.loading("Querying live file sizes inside database storage...");
+    setTimeout(() => {
+      setIsRecalculatingStorage(false);
+      loadStorageStats();
+      toast.dismiss();
+      toast.success("Storage cache synchronized successfully!");
+    }, 1000);
+  };
+
+  const handleDownloadInvoice = (inv: any) => {
+    toast.info(`Generating Tax Invoice statement for #${inv.id}...`);
+    setTimeout(() => {
+      const doc = `
+=========================================
+VIVEXA PLATFORMS - TAX INVOICE & RECEIPT
+=========================================
+Invoice Ref:   ${inv.id}
+Date:          ${inv.date}
+Client Name:   ${fullName || user?.email || "Valued Customer"}
+Company:       ${company || "Enterprise Customer"}
+Plan Tier:     ${userPlan}
+
+Description:   ${inv.description}
+Total Charged: ${inv.amount}
+Payment Mode:  Credit Card (Autopay)
+Status:        ${inv.status}
+=========================================
+Thank you for scaling with Vivexa!
+      `;
+      const blob = new Blob([doc.trim()], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Vivexa_Invoice_${inv.id}.txt`;
+      a.click();
+      toast.success(`Invoice ${inv.id} downloaded successfully!`);
+    }, 800);
+  };
+
+  const handleUpgradePlan = async (planName: string) => {
+    if (!user) return;
+    try {
+      const lowercasePlan = planName.toLowerCase();
+      const { error } = await supabase.from('users').update({ plan: lowercasePlan }).eq('id', user.id);
+      if (error) throw error;
+      
+      setUserPlan(planName);
+      toast.success(`Plan upgraded to ${planName}!`);
+      
+      await supabase.from('audit_logs').insert({
+        user_id: user.id,
+        action: `Subscription Upgraded`,
+        metadata: { new_plan: planName }
+      });
+      loadAuditLogs();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update subscription");
+    }
+  };
 
   const handleUpdatePassword = async () => {
     if (!newPassword) {
@@ -372,25 +321,19 @@ Thank you for scaling with Vivexa!
       const { data, error } = await supabase.from('settings').select('*').eq('user_id', user?.id).maybeSingle();
       if (!error && data) {
         if (data.theme) {
-          setThemeMode(data.theme);
           setTheme(data.theme as any);
         }
         
-        // Use JSONB metadata for extra fields if needed, or fallback to state
         if (data.preferences) {
-          if (data.preferences.accentColor) setAccentColor(data.preferences.accentColor);
-          if (data.preferences.compactMode !== undefined) setCompactMode(data.preferences.compactMode);
           if (data.preferences.aiModel) setAiModel(data.preferences.aiModel);
           if (data.preferences.creativity) setCreativity(data.preferences.creativity);
           if (data.preferences.autoSql !== undefined) setAutoSql(data.preferences.autoSql);
           if (data.preferences.workspaceName) setWorkspaceName(data.preferences.workspaceName);
           if (data.preferences.workspaceRegion) setWorkspaceRegion(data.preferences.workspaceRegion);
           if (data.preferences.twoFactorEnabled !== undefined) setTwoFactorEnabled(data.preferences.twoFactorEnabled);
-          
           if (data.preferences.notifCritical !== undefined) setNotifCritical(data.preferences.notifCritical);
           if (data.preferences.notifWeekly !== undefined) setNotifWeekly(data.preferences.notifWeekly);
           if (data.preferences.notifSystem !== undefined) setNotifSystem(data.preferences.notifSystem);
-          if (data.preferences.notifInvites !== undefined) setNotifInvites(data.preferences.notifInvites);
           if (data.preferences.displayLanguage) setDisplayLanguage(data.preferences.displayLanguage);
           if (data.preferences.displayTimezone) setDisplayTimezone(data.preferences.displayTimezone);
         }
@@ -400,11 +343,9 @@ Thank you for scaling with Vivexa!
     }
   }
 
-  // Generic function to save settings changes to Supabase
   const saveSetting = async (key: string, value: any) => {
     if (!user) return;
     try {
-      // Fetch current preferences first
       const { data: curr } = await supabase.from('settings').select('*').eq('user_id', user.id).maybeSingle();
       const prefs = curr?.preferences || {};
       
@@ -469,35 +410,24 @@ Thank you for scaling with Vivexa!
     setIsApiKeysLoading(true);
     try {
       const { data, error } = await supabase.from('api_keys').select('*').eq('user_id', user?.id).order('created_at', { ascending: false });
-      if (error) {
-         console.error("API Keys fetch error:", error);
-         toast.error("Could not load API keys.");
-      } else if (data) {
+      if (!error && data) {
         setApiKeys(data);
       }
     } catch (err) {
       console.error(err);
-      toast.error("Could not load API keys.");
     } finally {
       setIsApiKeysLoading(false);
     }
   }
 
   async function loadAuditLogs() {
-    setIsAuditLogsLoading(true);
     try {
       const { data, error } = await supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(20);
-      if (error) {
-         console.error("Audit Logs fetch error:", error);
-         toast.error("Could not load Audit logs.");
-      } else if (data) {
+      if (!error && data) {
         setAuditLogs(data);
       }
     } catch (err) {
       console.error(err);
-      toast.error("Could not load Audit logs.");
-    } finally {
-      setIsAuditLogsLoading(false);
     }
   }
 
@@ -516,7 +446,7 @@ Thank you for scaling with Vivexa!
 
   const handleSubmitTicket = async () => {
     if (!ticketMessage.trim()) {
-      toast.error("Please enter a detailed message describing your issue.");
+      toast.error("Please enter a detailed message describing your request.");
       return;
     }
     setSubmittingTicket(true);
@@ -535,21 +465,21 @@ Thank you for scaling with Vivexa!
 
       const json = await safeFetchJson(res);
       if (json.success) {
-        toast.success("Priority support ticket dispatched to Vivexa Engineering team!");
+        toast.success("Support request submitted to engineering team!");
         setTicketMessage("");
         await createNotification({
           userId: user?.id || "",
           title: "Support Ticket Dispatched",
-          message: `Your priority support ticket (${ticketCategory}) was successfully logged and sent to engineering founders.`,
+          message: `Your support request (${ticketCategory}) was logged successfully.`,
           type: "system"
         });
         loadAuditLogs();
       } else {
-        toast.error(json.error || "Failed to dispatch ticket.");
+        toast.error(json.error || "Failed to submit support request.");
       }
     } catch (err: any) {
       console.error(err);
-      toast.error("An unexpected error occurred while sending ticket.");
+      toast.error("An unexpected error occurred while sending support ticket.");
     } finally {
       setSubmittingTicket(false);
     }
@@ -559,7 +489,6 @@ Thank you for scaling with Vivexa!
     if (!user) return;
     setIsSaving(true);
     try {
-      // Valid columns for public.profiles
       const profileUpdates = {
         user_id: user.id,
         full_name: fullName,
@@ -577,7 +506,6 @@ Thank you for scaling with Vivexa!
         console.warn("Could not save to Supabase, continuing locally", e);
       }
       
-      // Save other fields to settings preferences
       await saveSetting('username', username);
       await saveSetting('department', department);
       await saveSetting('designation', designation);
@@ -586,13 +514,76 @@ Thank you for scaling with Vivexa!
       await saveSetting('website', website);
       await saveSetting('portfolio', portfolio);
 
+      // Sync Supabase Auth User Metadata
+      try {
+        const nameParts = fullName.trim().split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        await supabase.auth.updateUser({
+          data: {
+            full_name: fullName,
+            first_name: firstName,
+            last_name: lastName,
+            company,
+            role,
+            department,
+            designation,
+            avatar_url: avatarUrl
+          }
+        });
+      } catch (authErr) {
+        console.warn("Auth user metadata sync note:", authErr);
+      }
+
+      // Sync backend organization member endpoint
+      if (session?.access_token) {
+        try {
+          await fetch('/api/v1/organization/members/me/profile', {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({
+              full_name: fullName,
+              role,
+              department,
+              company,
+              avatar_url: avatarUrl
+            })
+          });
+        } catch (serverErr) {
+          console.warn("Server organization profile sync note:", serverErr);
+        }
+      }
+
+      // Update Zustand local user state
+      const updatedUser = {
+        ...user,
+        user_metadata: {
+          ...(user.user_metadata || {}),
+          full_name: fullName,
+          first_name: fullName.split(' ')[0] || '',
+          last_name: fullName.split(' ').slice(1).join(' ') || '',
+          company,
+          role,
+          department,
+          avatar_url: avatarUrl
+        }
+      };
+      useAuthStore.getState().setUser(updatedUser as any);
+
+      // Trigger global event for real-time component updates across views
+      window.dispatchEvent(new CustomEvent('vivexa:user_profile_updated', {
+        detail: { full_name: fullName, role, department, company, avatar_url: avatarUrl }
+      }));
+
       toast.success("Profile saved successfully!");
 
-      // Log action
       await supabase.from('audit_logs').insert({
         user_id: user.id,
         action: "Profile Details Saved",
-        metadata: { full_name: fullName, username, company, role }
+        metadata: { full_name: fullName, username, company, role, department }
       });
       loadAuditLogs();
     } catch (err: any) {
@@ -612,7 +603,6 @@ Thank you for scaling with Vivexa!
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
       const filePath = `avatars/${fileName}`;
 
-      // Check bucket
       const { data: buckets } = await supabase.storage.listBuckets();
       if (!buckets?.find(b => b.name === 'avatars')) {
         await supabase.storage.createBucket('avatars', { public: true });
@@ -641,9 +631,6 @@ Thank you for scaling with Vivexa!
     }
 
     try {
-      const entropy = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-      const rawKey = `vx_live_${entropy}`;
-      
       const response = await fetch("/api/v1/keys", {
         method: "POST",
         headers: {
@@ -659,33 +646,34 @@ Thank you for scaling with Vivexa!
         setNewKeyName("");
         loadApiKeys();
         
-        // Show plain key to user so they can copy it!
         if (json.data.plaintext_key) {
            alert(`Your new API key is:\n\n${json.data.plaintext_key}\n\nPlease copy it now. It will not be shown again.`);
         }
       } else {
-        throw new Error(json.error || "Failed to generate key");
+        toast.error(json.error || "Failed to create key.");
       }
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err) {
+      console.error(err);
+      toast.error("Error connecting to API keys endpoint.");
     }
   }
 
-  async function handleRevokeApiKey(keyId: string) {
+  async function handleDeleteApiKey(id: string) {
     try {
-      const res = await fetch(`/api/v1/keys/${keyId}/revoke`, {
-        method: "POST",
+      const response = await fetch(`/api/v1/keys/${id}`, {
+        method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
-      const json = await res.json();
+      const json = await response.json();
       if (json.success) {
-        toast.success("API key revoked successfully.");
+        toast.success("API key revoked.");
         loadApiKeys();
       } else {
-        throw new Error(json.error || "Failed to revoke key");
+        toast.error(json.error || "Failed to revoke key.");
       }
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to revoke key.");
     }
   }
 
@@ -709,67 +697,100 @@ Thank you for scaling with Vivexa!
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `Vivexa_Workspace_Backup_${Date.now()}.json`;
+    a.download = `Vivexa_Settings_Backup_${Date.now()}.json`;
     a.click();
-    toast.success("Workspace backup file downloaded successfully!");
+    toast.success("Settings archive exported successfully!");
   };
 
+  const filteredTabs = useMemo(() => {
+    if (!tabSearchQuery.trim()) return TABS;
+    const q = tabSearchQuery.toLowerCase();
+    return TABS.filter(t => t.label.toLowerCase().includes(q) || t.id.toLowerCase().includes(q));
+  }, [tabSearchQuery]);
+
   return (
-    <div className="space-y-6 relative z-10 w-full max-w-7xl mx-auto pb-16 text-slate-100 font-sans">
+    <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8">
       
-      {/* Title Header */}
-      <div className="bg-slate-900/40 p-6 rounded-2xl border border-slate-800/60 backdrop-blur-xl shadow-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      {/* Header Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800/80">
         <div>
-          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[10px] font-bold uppercase tracking-wider mb-2">
-            <Settings2 className="h-3.5 w-3.5" /> Workspace Settings Console
-          </div>
           <h1 className="text-2xl font-extrabold tracking-tight text-white flex items-center gap-3">
-            Enterprise Settings & Synchronization
+            <Building className="h-6 w-6 text-indigo-400 shrink-0" />
+            Enterprise Settings
           </h1>
-          <p className="text-xs text-slate-400 mt-1">Configure profile data, access credentials, limits, subscriptions, and security parameters directly inside Supabase.</p>
+          <p className="text-xs text-slate-400 mt-1">
+            Manage your account identity, security preferences, AI models, API keys, and workspace parameters.
+          </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2.5 shrink-0">
           <Button onClick={handleBackupWorkspace} variant="outline" className="border-slate-800 bg-slate-950/40 text-xs text-slate-200 hover:bg-slate-900 rounded-xl">
             <Download className="h-3.5 w-3.5 mr-1.5 text-indigo-400" /> Export Backup
           </Button>
-          <Button onClick={handleSaveProfile} disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl px-4">
+          <Button onClick={handleSaveProfile} disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl px-5">
             {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null} Save Changes
           </Button>
         </div>
       </div>
 
-      {/* Settings layout */}
+      {/* Settings Panel Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         
-        {/* Navigation Sidebar */}
-        <div className="lg:col-span-1 space-y-1 bg-slate-900/40 p-3 rounded-2xl border border-slate-800/60 backdrop-blur-xl max-h-[800px] overflow-y-auto">
-          <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-850 mb-2">
-            Settings Panels
+        {/* Streamlined Navigation Sidebar */}
+        <div className="lg:col-span-1 space-y-3 bg-slate-900/40 p-3 rounded-2xl border border-slate-800/60 backdrop-blur-xl max-h-[780px] overflow-y-auto">
+          
+          {/* Quick Tab Search */}
+          <div className="relative mb-2">
+            <Search className="h-3.5 w-3.5 text-slate-500 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              placeholder="Search settings..."
+              value={tabSearchQuery}
+              onChange={(e) => setTabSearchQuery(e.target.value)}
+              className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500"
+            />
           </div>
-          {TABS.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${
-                  isActive
-                    ? "bg-indigo-600 text-white shadow-lg font-bold"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/30"
-                }`}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span className="truncate">{tab.label}</span>
-              </button>
-            );
-          })}
+
+          <div className="space-y-1">
+            {filteredTabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
+                    isActive
+                      ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 font-semibold"
+                      : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 truncate">
+                    <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-white" : "text-slate-400"}`} />
+                    <span className="truncate">{tab.label}</span>
+                  </div>
+                  {tab.badge && (
+                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                      isActive ? "bg-white/20 text-white" : "bg-slate-800 text-indigo-400 border border-slate-700/60"
+                    }`}>
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {filteredTabs.length === 0 && (
+            <div className="p-4 text-center text-xs text-slate-500">
+              No matching settings found.
+            </div>
+          )}
         </div>
 
-        {/* Dynamic Panel */}
+        {/* Settings Panel Canvas */}
         <div className="lg:col-span-3">
-          <Card className="bg-slate-900/40 border-slate-800/60 backdrop-blur-xl shadow-2xl p-6 min-h-[600px] flex flex-col justify-between">
+          <Card className="bg-slate-900/40 border-slate-800/60 backdrop-blur-xl shadow-2xl p-6 min-h-[620px] flex flex-col justify-between">
             <div className="space-y-6">
 
               {/* OVERVIEW TAB */}
@@ -780,23 +801,23 @@ Thank you for scaling with Vivexa!
                       <h2 className="text-lg font-bold text-white flex items-center gap-2">
                         <LayoutDashboard className="h-5 w-5 text-indigo-400" /> Settings Overview
                       </h2>
-                      <p className="text-xs text-slate-400 mt-0.5">Summary of enterprise metrics, subscription status, and platform health.</p>
+                      <p className="text-xs text-slate-400 mt-0.5">Summary of platform parameters, user identity, and active usage statistics.</p>
                     </div>
                     <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> All systems operational
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Systems Operational
                     </span>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                     <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-850 space-y-1">
-                      <span className="text-[9px] uppercase font-bold text-slate-500 block">Current User</span>
+                      <span className="text-[9px] uppercase font-bold text-slate-500 block">User Account</span>
                       <span className="font-bold text-white truncate block">{fullName || user?.email}</span>
-                      <span className="text-[10px] text-indigo-400 font-semibold">{role || 'Enterprise Leader'}</span>
+                      <span className="text-[10px] text-indigo-400 font-semibold">{role || 'Member'}</span>
                     </div>
                     <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-850 space-y-1">
-                      <span className="text-[9px] uppercase font-bold text-slate-500 block">Subscription Tier</span>
-                      <span className="font-bold text-amber-400 block">Enterprise Pro</span>
-                      <span className="text-[10px] text-slate-500">Auto-renews dynamically</span>
+                      <span className="text-[9px] uppercase font-bold text-slate-500 block">Active Plan</span>
+                      <span className="font-bold text-amber-400 block">{userPlan}</span>
+                      <span className="text-[10px] text-slate-500">Enterprise Access</span>
                     </div>
                     <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-850 space-y-1">
                       <span className="text-[9px] uppercase font-bold text-slate-500 block">Storage Used</span>
@@ -804,22 +825,25 @@ Thank you for scaling with Vivexa!
                       <div className="h-1.5 bg-slate-900 rounded-full mt-1.5"><div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(100, (storageBytes / (1024 * 1024 * 1024)) * 10)}%` }} /></div>
                     </div>
                     <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-850 space-y-1">
-                      <span className="text-[9px] uppercase font-bold text-slate-500 block">Active API Keys</span>
-                      <span className="font-bold text-emerald-400 block">{apiKeys.length} Keys</span>
+                      <span className="text-[9px] uppercase font-bold text-slate-500 block">API Secret Keys</span>
+                      <span className="font-bold text-emerald-400 block">{apiKeys.length} Active</span>
                       <span className="text-[10px] text-slate-500">Authorized endpoints</span>
                     </div>
                   </div>
 
-                  <div className="p-4 rounded-xl bg-indigo-950/10 border border-indigo-500/20 space-y-3">
+                  <div className="p-4 rounded-xl bg-indigo-950/20 border border-indigo-500/20 space-y-3">
                     <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
-                      <Zap className="h-3.5 w-3.5 text-indigo-400 animate-pulse" /> Administrative Quick Commands
+                      <Zap className="h-3.5 w-3.5 text-indigo-400" /> Administrative Quick Shortcuts
                     </h3>
                     <div className="flex flex-wrap gap-2">
                       <Button onClick={() => setActiveTab("profile")} size="sm" variant="outline" className="border-indigo-500/20 text-indigo-300 hover:bg-indigo-600/10 text-xs rounded-xl">
                         <User className="h-3.5 w-3.5 mr-1" /> Edit Profile
                       </Button>
+                      <Button onClick={() => setActiveTab("security")} size="sm" variant="outline" className="border-indigo-500/20 text-indigo-300 hover:bg-indigo-600/10 text-xs rounded-xl">
+                        <Shield className="h-3.5 w-3.5 mr-1" /> Security & SSO
+                      </Button>
                       <Button onClick={() => setActiveTab("apikeys")} size="sm" variant="outline" className="border-indigo-500/20 text-indigo-300 hover:bg-indigo-600/10 text-xs rounded-xl">
-                        <Key className="h-3.5 w-3.5 mr-1" /> Create API Key
+                        <Key className="h-3.5 w-3.5 mr-1" /> API Keys & OAuth
                       </Button>
                       <Button onClick={handleBackupWorkspace} size="sm" variant="outline" className="border-indigo-500/20 text-indigo-300 hover:bg-indigo-600/10 text-xs rounded-xl">
                         <Download className="h-3.5 w-3.5 mr-1" /> Export Backup
@@ -827,33 +851,37 @@ Thank you for scaling with Vivexa!
                     </div>
                   </div>
 
-                  {/* Recent Logs Preview */}
+                  {/* Audit Logs Feed */}
                   <div className="space-y-3">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <Clock className="h-4 w-4" /> Recent Security Logs
+                      <Clock className="h-4 w-4" /> Recent Security Activity
                     </h3>
                     <div className="space-y-2 text-xs">
-                      {auditLogs.slice(0, 3).map((log) => (
+                      {auditLogs.slice(0, 4).map((log) => (
                         <div key={log.id} className="p-3 rounded-xl bg-slate-950/30 border border-slate-850 flex items-center justify-between text-slate-300">
                           <div className="flex items-center gap-2">
                             <span className="h-2 w-2 rounded-full bg-indigo-500" />
                             <span className="font-semibold text-slate-200">{log.action}</span>
-                            <span className="text-[10px] text-slate-500">by Admin</span>
                           </div>
                           <span className="text-[10px] text-slate-500 font-mono">
                             {new Date(log.created_at).toLocaleString()}
                           </span>
                         </div>
                       ))}
+                      {auditLogs.length === 0 && (
+                        <div className="p-4 text-center text-slate-500 text-xs bg-slate-950/20 rounded-xl border border-slate-850">
+                          No recent audit logs logged.
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* PROFILE TAB */}
+              {/* PROFILE & LOCALIZATION TAB */}
               {activeTab === "profile" && (
                 <div className="space-y-6">
-                  {/* Callout Notice to update original details */}
+                  {/* Notice banner to put original profile details */}
                   <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 flex items-start gap-3">
                     <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
                     <div className="space-y-1">
@@ -938,6 +966,52 @@ Thank you for scaling with Vivexa!
                     <textarea placeholder="Write a brief summary of your role, responsibilities, or expertise..." value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className="w-full px-3 py-2 bg-slate-950/40 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-indigo-500 placeholder:text-slate-600" />
                   </div>
 
+                  {/* Language & Regional Preferences */}
+                  <div className="pt-4 border-t border-slate-800 space-y-4">
+                    <h4 className="font-bold text-white text-xs flex items-center gap-2">
+                      <Globe className="h-4 w-4 text-indigo-400" /> Regional & Language Preferences
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                      <div className="space-y-1.5">
+                        <label className="text-slate-400 font-semibold">Display Language</label>
+                        <select
+                          value={displayLanguage}
+                          onChange={(e) => {
+                            setDisplayLanguage(e.target.value);
+                            saveSetting('displayLanguage', e.target.value);
+                            toast.success("Display language preference saved");
+                          }}
+                          className="w-full h-10 px-3 py-1.5 text-xs rounded-xl border border-slate-800 bg-slate-950/60 text-slate-200 focus:outline-none focus:border-indigo-500"
+                        >
+                          <option value="en">English (US - International)</option>
+                          <option value="es">Español (Spanish)</option>
+                          <option value="de">Deutsch (German)</option>
+                          <option value="fr">Français (French)</option>
+                          <option value="ja">日本語 (Japanese)</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-slate-400 font-semibold">Primary Timezone</label>
+                        <select
+                          value={displayTimezone}
+                          onChange={(e) => {
+                            setDisplayTimezone(e.target.value);
+                            saveSetting('displayTimezone', e.target.value);
+                            toast.success("Timezone preference saved");
+                          }}
+                          className="w-full h-10 px-3 py-1.5 text-xs rounded-xl border border-slate-800 bg-slate-950/60 text-slate-200 focus:outline-none focus:border-indigo-500"
+                        >
+                          <option value="UTC">UTC (Universal Coordinated Time)</option>
+                          <option value="Asia/Kolkata">Asia/Kolkata (IST - GMT +5:30)</option>
+                          <option value="America/New_York">America/New_York (EST - GMT -5:00)</option>
+                          <option value="America/Los_Angeles">America/Los_Angeles (PST - GMT -8:00)</option>
+                          <option value="Europe/London">Europe/London (GMT +0:00)</option>
+                          <option value="Europe/Frankfurt">Europe/Frankfurt (CET - GMT +1:00)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-slate-800">
                     <p className="text-[11px] text-slate-400">
                       <span className="text-amber-400 font-semibold">*</span> Completing your profile details improves workspace collaboration and identity verification.
@@ -950,14 +1024,14 @@ Thank you for scaling with Vivexa!
                 </div>
               )}
 
-              {/* WORKSPACE & REGION TAB */}
+              {/* WORKSPACE & TEAMS TAB */}
               {activeTab === "workspace" && (
                 <div className="space-y-6 text-xs">
                   <div>
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Building className="h-5 w-5 text-indigo-400" /> Workspace Settings
+                      <Building className="h-5 w-5 text-indigo-400" /> Workspace & Team Parameters
                     </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Manage workspace names, deployment clusters, and region specifications.</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Manage workspace details, deployment clusters, corporate entity name, and team member permissions.</p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -969,36 +1043,57 @@ Thank you for scaling with Vivexa!
                       }} className="bg-slate-950/60 border-slate-800 rounded-xl text-white font-semibold" />
                     </div>
                     <div className="space-y-1.5 font-mono">
-                      <label className="text-slate-400">Workspace UUID</label>
-                      <div className="h-10 px-3 bg-slate-950/60 border border-slate-800 rounded-xl flex items-center text-indigo-300 text-xs">
-                        ws_uuid_89201982a10
+                      <label className="text-slate-400">Active Deployment Region</label>
+                      <select
+                        className="w-full h-10 px-3 py-1.5 text-xs rounded-xl border border-slate-800 bg-slate-950/60 text-slate-200 focus:outline-none focus:border-indigo-500 font-sans"
+                        value={workspaceRegion}
+                        onChange={(e) => {
+                          setWorkspaceRegion(e.target.value);
+                          saveSetting('workspaceRegion', e.target.value);
+                          toast.success("Workspace region updated");
+                        }}
+                      >
+                        <option value="us-central1 (Iowa)">us-central1 (Iowa, USA)</option>
+                        <option value="asia-south1 (Mumbai)">asia-south1 (Mumbai, India)</option>
+                        <option value="europe-west3 (Frankfurt)">europe-west3 (Frankfurt, Germany)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl space-y-1.5">
+                    <label className="text-slate-400 font-semibold">Corporate Entity Name</label>
+                    <Input value={company} onChange={e => setCompany(e.target.value)} placeholder="e.g. Acme Corp" className="bg-slate-950/60 border-slate-800 rounded-xl" />
+                  </div>
+
+                  {/* Registered Directory Members */}
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <Users className="h-4 w-4 text-indigo-400" /> Team Member Access
+                      </h4>
+                      <Button onClick={() => toast.success("Invitation link copied to clipboard")} size="sm" className="h-7 text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg px-3">
+                        + Invite Member
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="p-3 bg-slate-950/30 border border-slate-850 rounded-xl flex items-center justify-between">
+                        <div>
+                          <span className="font-bold text-white block">{fullName || user?.email}</span>
+                          <span className="text-slate-500 text-[10px]">{user?.email}</span>
+                        </div>
+                        <span className="px-2.5 py-0.5 bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 rounded font-bold text-[10px]">Owner / Admin</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-slate-400">Active Deployment Region</label>
-                    <select
-                      className="w-full h-10 px-3 py-1.5 text-sm rounded-xl border border-slate-800 bg-slate-950/60 text-slate-200 focus:outline-none focus:border-indigo-500"
-                      value={workspaceRegion}
-                      onChange={(e) => {
-                        setWorkspaceRegion(e.target.value);
-                        saveSetting('workspaceRegion', e.target.value);
-                      }}
-                    >
-                      <option value="us-central1 (Iowa)">us-central1 (Iowa, USA) - Cluster A</option>
-                      <option value="asia-south1 (Mumbai)">asia-south1 (Mumbai, India) - Cluster B</option>
-                      <option value="europe-west3 (Frankfurt)">europe-west3 (Frankfurt, Germany) - Cluster C</option>
-                    </select>
-                  </div>
-                  
-                  <div className="pt-6 mt-6 border-t border-slate-800/60">
+                  <div className="pt-4 border-t border-slate-800/60">
                     <div className="p-4 rounded-xl border border-red-500/20 bg-red-500/5 flex items-center justify-between">
                       <div>
-                        <h4 className="font-bold text-red-400 text-sm">Danger Zone</h4>
-                        <p className="text-slate-400 mt-0.5 text-xs">Irreversibly transfer complete ownership of this workspace to another admin.</p>
+                        <h4 className="font-bold text-red-400 text-sm">Workspace Danger Zone</h4>
+                        <p className="text-slate-400 mt-0.5 text-xs">Transfer workspace ownership or archive workspace resources.</p>
                       </div>
-                      <Button onClick={() => toast.success("Ownership transfer workflow initiated")} variant="destructive" className="bg-red-600 hover:bg-red-500 text-white rounded-xl">
+                      <Button onClick={() => toast.info("Ownership transfer workflow initiated")} variant="destructive" className="bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs">
                         Transfer Ownership
                       </Button>
                     </div>
@@ -1006,62 +1101,21 @@ Thank you for scaling with Vivexa!
                 </div>
               )}
 
-              {/* ORGANIZATION & TEAMS TAB */}
-              {activeTab === "organization" && (
-                <div className="space-y-6 text-xs">
-                  <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Users className="h-5 w-5 text-indigo-400" /> Organization & Directory
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Configure organization entities and view member mappings.</p>
-                  </div>
-
-                  <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl space-y-1.5">
-                    <span className="text-slate-400">Current Corporate Organization</span>
-                    <Input value={company} onChange={e => setCompany(e.target.value)} className="bg-slate-950/60 border-slate-800 rounded-xl" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400 font-semibold uppercase tracking-wider text-[10px]">Registered Directory Team Members</span>
-                      <Button onClick={() => toast.success("Invitation dispatched to new team member!")} size="sm" className="h-7 text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg px-3">
-                        + Add Team Member
-                      </Button>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="p-3 bg-slate-950/30 border border-slate-850 rounded-xl flex items-center justify-between">
-                        <div>
-                          <span className="font-bold text-white block">Paras Bishnoi</span>
-                          <span className="text-slate-500 text-[10px]">info.vivexa@gmail.com</span>
-                        </div>
-                        <span className="text-indigo-400 font-bold uppercase text-[10px] bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">Super Admin</span>
-                      </div>
-                      <div className="p-3 bg-slate-950/30 border border-slate-850 rounded-xl flex items-center justify-between">
-                        <div>
-                          <span className="font-bold text-white block">Karunya Sharma</span>
-                          <span className="text-slate-500 text-[10px]">karunya.sharma@vivexa.ai</span>
-                        </div>
-                        <span className="text-emerald-400 font-bold uppercase text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Admin</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* SECURITY & 2FA TAB */}
+              {/* SECURITY, SSO & SESSIONS TAB */}
               {activeTab === "security" && (
                 <div className="space-y-6 text-xs">
                   <div>
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Shield className="h-5 w-5 text-indigo-400" /> Security Policies & Authentication
+                      <Shield className="h-5 w-5 text-indigo-400" /> Security, SSO & Authentication
                     </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Control multifactor identity flows and credentials validation.</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Manage authentication security, single sign-on (SSO), and active sessions.</p>
                   </div>
 
+                  {/* 2FA Toggle */}
                   <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-850 flex items-center justify-between">
                     <div>
                       <h4 className="font-bold text-white text-sm">Two-Factor Authentication (2FA)</h4>
-                      <p className="text-slate-400 mt-0.5">Secure your login with TOTP authenticator keys.</p>
+                      <p className="text-slate-400 mt-0.5">Secure your account with TOTP authenticator keys.</p>
                     </div>
                     <Button
                       onClick={() => { 
@@ -1070,851 +1124,143 @@ Thank you for scaling with Vivexa!
                         saveSetting('twoFactorEnabled', newVal);
                         toast.success(`2FA successfully ${newVal ? 'Activated' : 'Revoked'}`); 
                       }}
-                      className={twoFactorEnabled ? "bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl" : "bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl"}
+                      className={twoFactorEnabled ? "bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs" : "bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs"}
                     >
                       {twoFactorEnabled ? "2FA Verified Active" : "Setup 2FA Key"}
                     </Button>
                   </div>
 
+                  {/* Password Update */}
                   <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-850 space-y-3">
-                    <h4 className="font-bold text-white text-xs">Alter Account Password</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      <input type="password" placeholder="Current Secret Phrase" value={currPassword} onChange={e => setCurrPassword(e.target.value)} className="h-10 px-3 bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-none" />
-                      <input type="password" placeholder="New Strong Phrase" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="h-10 px-3 bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-none" />
+                    <h4 className="font-bold text-white text-xs">Update Security Credentials</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <input type="password" placeholder="Current Password" value={currPassword} onChange={e => setCurrPassword(e.target.value)} className="h-10 px-3 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500" />
+                      <input type="password" placeholder="New Strong Password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="h-10 px-3 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500" />
                     </div>
                     <Button 
                       onClick={handleUpdatePassword} 
                       disabled={isSaving}
-                      className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl"
+                      className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs"
                     >
                       {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
                       Update Credentials
                     </Button>
                   </div>
 
-                  <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-850 flex items-center justify-between">
-                    <div>
-                      <h4 className="font-bold text-white text-sm">Security Audit Logs</h4>
-                      <p className="text-slate-400 mt-0.5">Download a detailed cryptographic report of your security events.</p>
-                    </div>
-                    <Button
-                      onClick={() => toast.success("Security logs download initiated...")}
-                      variant="outline"
-                      className="border-indigo-500/20 text-indigo-300 hover:bg-indigo-600/10 rounded-xl"
-                    >
-                      <Download className="h-4 w-4 mr-2" /> Security Log Download
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* ACTIVE SESSIONS TAB */}
-              
-              {activeTab === "enterprise" && (
-                <div className="space-y-8 text-xs">
-                  <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Server className="h-5 w-5 text-indigo-400" /> Enterprise Architecture & SSO
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Manage zero-trust federated identity, RBAC/RLS policies, and VPC deployments.</p>
-                  </div>
-
-                  {/* Bring-Your-Own-Identity (BYOI) Component */}
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-bold text-slate-300 flex items-center gap-2">
-                      <Fingerprint className="h-4 w-4 text-emerald-400" /> Bring-Your-Own-Identity (SSO)
+                  {/* SSO Provider Configurations */}
+                  <div className="space-y-4 pt-2 border-t border-slate-800">
+                    <h4 className="text-xs font-bold text-slate-300 flex items-center gap-2 uppercase tracking-wider">
+                      <Fingerprint className="h-4 w-4 text-emerald-400" /> Enterprise Single Sign-On (SSO)
                     </h4>
                     
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       {/* Okta Config */}
-                      <div className={`p-5 rounded-2xl border ${ssoProvider === "okta" ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-slate-900/50 border-slate-800'}`}>
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-slate-950 rounded-lg border border-slate-800">
-                              <img src="https://www.vectorlogo.zone/logos/okta/okta-icon.svg" className="w-6 h-6 grayscale hover:grayscale-0 transition-all opacity-80" alt="Okta" />
-                            </div>
-                            <div>
-                              <h5 className="font-bold text-white text-sm">Okta Enterprise (SAML)</h5>
-                              <p className="text-[10px] text-slate-400 font-mono mt-0.5">Federated Identity Provider</p>
-                            </div>
+                      <div className={`p-4 rounded-2xl border ${ssoProvider === "okta" ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-slate-950/40 border-slate-850'}`}>
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <h5 className="font-bold text-white text-sm">Okta Enterprise (SAML 2.0)</h5>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Federated Identity Provider</p>
                           </div>
                           {ssoProvider === "okta" ? (
-                            <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
                               ACTIVE
                             </span>
                           ) : (
-                            <span className="text-[10px] font-bold text-slate-500 px-2.5 py-1 rounded-full border border-slate-700 bg-slate-800/50">INACTIVE</span>
+                            <span className="text-[10px] font-bold text-slate-500 px-2.5 py-0.5 rounded-full border border-slate-800 bg-slate-900">INACTIVE</span>
                           )}
                         </div>
-                        
-                        {ssoProvider === "okta" ? (
-                          <div className="space-y-2 mt-4 pt-4 border-t border-emerald-500/10 text-[10px] font-mono text-slate-300">
-                            <div className="flex justify-between"><span className="text-slate-500">Assertion URL:</span><span className="truncate max-w-[150px]">https://vivexa.ai/sso/okta/saml</span></div>
-                            <div className="flex justify-between"><span className="text-slate-500">Entity ID:</span><span>vivexa-urn:okta:enterprise</span></div>
-                            <Button variant="outline" size="sm" className="w-full mt-2 h-7 text-[10px] border-rose-500/30 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300" onClick={() => { setSsoProvider("none"); toast.success("Okta SSO Disabled"); }}>Disconnect</Button>
-                          </div>
-                        ) : (
-                          <Button variant="default" size="sm" className="w-full mt-4 h-8 text-[11px] bg-slate-800 hover:bg-slate-700 text-white" onClick={() => { setSsoProvider("okta"); toast.success("Okta SSO Authorized"); }}>Configure Integration</Button>
-                        )}
-                      </div>
-
-                      {/* Entra ID Config */}
-                      <div className={`p-5 rounded-2xl border ${ssoProvider === "entra" ? 'bg-blue-500/10 border-blue-500/30' : 'bg-slate-900/50 border-slate-800'}`}>
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-slate-950 rounded-lg border border-slate-800">
-                              <Globe className="w-6 h-6 text-blue-500" />
-                            </div>
-                            <div>
-                              <h5 className="font-bold text-white text-sm">Microsoft Entra ID (OIDC)</h5>
-                              <p className="text-[10px] text-slate-400 font-mono mt-0.5">Corporate Active Directory</p>
-                            </div>
-                          </div>
-                          {ssoProvider === "entra" ? (
-                            <span className="flex items-center gap-1 text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-full border border-blue-500/20">
-                              <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-                              ACTIVE
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-bold text-slate-500 px-2.5 py-1 rounded-full border border-slate-700 bg-slate-800/50">INACTIVE</span>
-                          )}
-                        </div>
-
-                        {ssoProvider === "entra" ? (
-                          <div className="space-y-2 mt-4 pt-4 border-t border-blue-500/10 text-[10px] font-mono text-slate-300">
-                            <div className="flex justify-between"><span className="text-slate-500">Tenant ID:</span><span>0e42d...49a1f</span></div>
-                            <div className="flex justify-between"><span className="text-slate-500">Client ID:</span><span>a912e...b198c</span></div>
-                            <Button variant="outline" size="sm" className="w-full mt-2 h-7 text-[10px] border-rose-500/30 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300" onClick={() => { setSsoProvider("none"); toast.success("Entra ID SSO Disabled"); }}>Disconnect</Button>
-                          </div>
-                        ) : (
-                          <Button variant="default" size="sm" className="w-full mt-4 h-8 text-[11px] bg-slate-800 hover:bg-slate-700 text-white" onClick={() => { setSsoProvider("entra"); toast.success("Entra ID SSO Authorized"); }}>Configure Integration</Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="h-px bg-slate-800/50 w-full" />
-
-                  {/* Architecture & RBAC Visualization */}
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-bold text-slate-300 flex items-center gap-2">
-                        <Cpu className="h-4 w-4 text-cyan-400" /> Deployment & Network Security
-                      </h4>
-                      <div className="flex gap-4">
-                        <div className="flex items-center gap-2">
-                          <label className="text-[11px] text-slate-400 font-bold">VPC Deployment</label>
-                          <button onClick={() => { setVpcEnabled(!vpcEnabled); toast.success(vpcEnabled ? "VPC Integration Disabled" : "VPC Integration Enabled"); }} className="text-slate-400 hover:text-cyan-400">
-                            {vpcEnabled ? <ToggleRight className="h-5 w-5 text-cyan-400" /> : <ToggleLeft className="h-5 w-5" />}
-                          </button>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <label className="text-[11px] text-slate-400 font-bold">AWS PrivateLink</label>
-                          <button onClick={() => { setPrivateLinkEnabled(!privateLinkEnabled); toast.success(privateLinkEnabled ? "PrivateLink Disabled" : "PrivateLink Enabled"); }} className="text-slate-400 hover:text-indigo-400">
-                            {privateLinkEnabled ? <ToggleRight className="h-5 w-5 text-indigo-400" /> : <ToggleLeft className="h-5 w-5" />}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 relative overflow-hidden">
-                      {vpcEnabled && <div className="absolute inset-0 border-2 border-dashed border-cyan-500/20 m-2 rounded-xl pointer-events-none" />}
-                      {vpcEnabled && <span className="absolute top-4 left-6 text-[9px] font-bold font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">Customer VPC Boundary</span>}
-
-                      <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 pt-6">
-                        
-                        {/* User Identity */}
-                        <div className="flex flex-col items-center gap-2">
-                          <div className="w-12 h-12 bg-slate-900 border border-slate-700 rounded-full flex items-center justify-center shadow-lg relative">
-                            <User className="h-5 w-5 text-slate-300" />
-                            {ssoProvider !== "none" && (
-                              <div className="absolute -bottom-1 -right-1 bg-emerald-500 p-0.5 rounded-full border-2 border-slate-950">
-                                <Check className="h-2.5 w-2.5 text-white" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="text-center">
-                            <div className="text-[10px] font-bold text-white">Analyst Request</div>
-                            <div className="text-[9px] font-mono text-slate-500">{ssoProvider !== "none" ? 'SAML Token Validated' : 'Standard Auth'}</div>
-                          </div>
-                        </div>
-
-                        {/* Middle Middleware / RBAC */}
-                        <div className="flex-1 flex items-center justify-center relative">
-                          <div className={`h-0.5 w-full ${privateLinkEnabled ? 'bg-indigo-500' : 'bg-slate-800'}`} />
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                            <div className="bg-slate-900 border border-rose-500/30 shadow-[0_0_15px_rgba(244,63,94,0.1)] px-4 py-2 rounded-lg flex flex-col items-center">
-                              <ShieldCheck className="h-5 w-5 text-rose-400 mb-1" />
-                              <div className="text-[10px] font-bold text-white whitespace-nowrap">RBAC / RLS Engine</div>
-                              <div className="text-[9px] font-mono text-rose-300/70 whitespace-nowrap">Query Filter Injection</div>
-                            </div>
-                          </div>
-                          {privateLinkEnabled && (
-                            <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] font-mono text-indigo-400 bg-indigo-500/10 px-2 rounded-full border border-indigo-500/20">PrivateLink Tunnel</span>
-                          )}
-                        </div>
-
-                        {/* Target Database */}
-                        <div className="flex flex-col items-center gap-2">
-                          <div className="w-12 h-12 bg-slate-900 border border-slate-700 rounded-xl flex items-center justify-center shadow-lg">
-                            <Database className="h-5 w-5 text-blue-400" />
-                          </div>
-                          <div className="text-center">
-                            <div className="text-[10px] font-bold text-white">Data Warehouse</div>
-                            <div className="text-[9px] font-mono text-slate-500">Filtered Rows Only</div>
-                          </div>
-                        </div>
-
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="h-px bg-slate-800/50 w-full" />
-
-                  {/* SCIM 2.0 User Provisioning & Directory Sync */}
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-300 flex items-center gap-2">
-                          <Users className="h-4 w-4 text-purple-400" /> Automated SCIM 2.0 Directory Sync (Okta / Azure AD)
-                        </h4>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          RFC 7644 compliant identity provisioning endpoint. Syncs users, lifecycle de-provisioning, and maps IdP groups to Vivexa RBAC roles.
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={async () => {
-                            try {
-                              const res = await fetch("/api/v1/scim/Users");
-                              const json = await res.json();
-                              toast.success(`Okta / Azure AD SCIM Synced: ${json.totalResults || 2} active identities verified.`);
-                            } catch (e) {
-                              toast.error("Failed to run SCIM sync");
-                            }
+                          className="w-full mt-3 h-8 text-xs border-slate-800 hover:bg-slate-800 text-slate-200"
+                          onClick={() => {
+                            const next = ssoProvider === "okta" ? "none" : "okta";
+                            setSsoProvider(next);
+                            toast.success(`Okta SSO ${next === "okta" ? "Enabled" : "Disabled"}`);
                           }}
-                          className="border-purple-500/30 text-purple-300 hover:bg-purple-500/10 text-xs h-8"
                         >
-                          <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Run Directory Sync
+                          {ssoProvider === "okta" ? "Disconnect Provider" : "Enable Okta SSO"}
                         </Button>
                       </div>
-                    </div>
 
-                    <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/40 grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-[11px]">
-                      <div>
-                        <span className="text-slate-500 block">SCIM 2.0 Base URL:</span>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-slate-200 font-semibold truncate">https://api.vivexa.ai/scim/v2</span>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText("https://api.vivexa.ai/scim/v2");
-                              toast.success("SCIM Base URL copied to clipboard");
-                            }}
-                            className="text-slate-400 hover:text-white"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </button>
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block">Bearer Secret Token:</span>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-slate-200 font-semibold truncate">vx_scim_live_••••••••••••9f21</span>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText("vx_scim_live_9f21ac0874e5421b");
-                              toast.success("SCIM Bearer Token copied to clipboard");
-                            }}
-                            className="text-slate-400 hover:text-white"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </button>
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block">Provisioning Status:</span>
-                        <span className="text-emerald-400 font-semibold mt-0.5 block flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                          Listening (Okta & Azure AD Webhooks)
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Group to Role Mapping Table */}
-                    <div className="p-3.5 rounded-xl border border-slate-800/80 bg-slate-900/30 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-300">SCIM IdP Group to Role Synchronization Rules</span>
-                        <span className="text-[10px] text-slate-500 font-mono">Auto-mapped upon user join</span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 text-[11px] font-mono">
-                        <div className="p-2 rounded bg-slate-950/60 border border-slate-800 flex items-center justify-between">
-                          <span className="text-slate-300">Okta: Vivexa-Admins</span>
-                          <span className="text-indigo-400 font-bold">Admin</span>
-                        </div>
-                        <div className="p-2 rounded bg-slate-950/60 border border-slate-800 flex items-center justify-between">
-                          <span className="text-slate-300">Azure: Data-Engineers</span>
-                          <span className="text-cyan-400 font-bold">Data Scientist</span>
-                        </div>
-                        <div className="p-2 rounded bg-slate-950/60 border border-slate-800 flex items-center justify-between">
-                          <span className="text-slate-300">Azure: Financial-Analysts</span>
-                          <span className="text-emerald-400 font-bold">Analyst</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="h-px bg-slate-800/50 w-full" />
-
-                  {/* Active Row-Level Security (RLS) & Column Masking Policies */}
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-bold text-slate-300 flex items-center gap-2">
-                      <ShieldCheck className="h-4 w-4 text-emerald-400" /> Active RLS & Column Masking (CLS) Guardrails
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-200 text-xs">Tenant Multi-Tenancy RLS</span>
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">ENFORCED</span>
-                        </div>
-                        <p className="text-[11px] text-slate-400 font-mono">Predicate: tenant_id = CURRENT_USER.org_id</p>
-                        <p className="text-[10px] text-slate-500">Injects WHERE clause automatically across all warehouse queries.</p>
-                      </div>
-
-                      <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-200 text-xs">PII & Salary Masking (CLS)</span>
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-bold">DYNAMIC</span>
-                        </div>
-                        <p className="text-[11px] text-slate-400 font-mono">Masks: ssn, salary, credit_card, secret</p>
-                        <p className="text-[10px] text-slate-500">Applies SHA-256 hash or redact mask for non-Admin roles.</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "sessions" && (
-                <div className="space-y-6 text-xs">
-                  <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Smartphone className="h-5 w-5 text-indigo-400" /> Active Session Mappings
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Current logged in cookies mapping to your identity hash.</p>
-                  </div>
-
-                  <div className="space-y-3">
-                    {sessions.map((sess) => (
-                      <div key={sess.id} className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          {sess.device.includes("iPhone") || sess.device.includes("iOS") || sess.device.includes("Android") ? (
-                            <Smartphone className="h-6 w-6 text-indigo-400 shrink-0" />
-                          ) : (
-                            <Laptop className={sess.current ? "h-6 w-6 text-emerald-400 shrink-0" : "h-6 w-6 text-slate-400 shrink-0"} />
-                          )}
+                      {/* Entra ID Config */}
+                      <div className={`p-4 rounded-2xl border ${ssoProvider === "entra" ? 'bg-blue-500/10 border-blue-500/30' : 'bg-slate-950/40 border-slate-850'}`}>
+                        <div className="flex items-start justify-between mb-2">
                           <div>
-                            <span className="font-bold text-slate-200 block flex items-center gap-2">
-                              {sess.device}
-                              {sess.current && (
-                                <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded font-bold">Current</span>
-                              )}
+                            <h5 className="font-bold text-white text-sm">Microsoft Entra ID (OIDC)</h5>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Azure Active Directory</p>
+                          </div>
+                          {ssoProvider === "entra" ? (
+                            <span className="flex items-center gap-1 text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2.5 py-0.5 rounded-full border border-blue-500/20">
+                              ACTIVE
                             </span>
-                            <span className="text-slate-500 text-[10px]">IP: {sess.ip} • {sess.location} ({sess.time})</span>
-                          </div>
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-500 px-2.5 py-0.5 rounded-full border border-slate-800 bg-slate-900">INACTIVE</span>
+                          )}
                         </div>
-                        {sess.current ? (
-                          <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded font-bold">Active</span>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRevokeSession(sess.id)}
-                            className="bg-slate-950/50 border-slate-800 text-rose-400 hover:text-rose-300 h-8 rounded-lg"
-                          >
-                            Revoke Session
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* NOTIFICATIONS & ALERTS TAB */}
-              {activeTab === "notifications" && (
-                <div className="space-y-6 text-xs">
-                  <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Bell className="h-5 w-5 text-indigo-400" /> Notifications & Alerts Preferences
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Toggle channel delivery preferences for platform notifications.</p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl flex items-center justify-between gap-4">
-                      <div>
-                        <span className="font-bold text-slate-200 block">Critical Security Alerts</span>
-                        <span className="text-slate-500 text-[10px]">Immediate dispatch on root alterations or password resets.</span>
-                      </div>
-                      <button
-                        onClick={() => {
-                          const nextVal = !notifCritical;
-                          setNotifCritical(nextVal);
-                          saveSetting('notifCritical', nextVal);
-                          toast.success("Critical alerts preference updated.");
-                        }}
-                        className={`h-6 w-11 rounded-full p-0.5 transition-colors focus:outline-none ${notifCritical ? "bg-indigo-600" : "bg-slate-800"}`}
-                      >
-                        <div className={`h-5 w-5 rounded-full bg-white transition-transform ${notifCritical ? "translate-x-5" : ""}`} />
-                      </button>
-                    </div>
-
-                    <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl flex items-center justify-between gap-4">
-                      <div>
-                        <span className="font-bold text-slate-200 block">Weekly Digests</span>
-                        <span className="text-slate-500 text-[10px]">Analytical updates of team datasets and workspace storage limits.</span>
-                      </div>
-                      <button
-                        onClick={() => {
-                          const nextVal = !notifWeekly;
-                          setNotifWeekly(nextVal);
-                          saveSetting('notifWeekly', nextVal);
-                          toast.success("Weekly digest preference updated.");
-                        }}
-                        className={`h-6 w-11 rounded-full p-0.5 transition-colors focus:outline-none ${notifWeekly ? "bg-indigo-600" : "bg-slate-800"}`}
-                      >
-                        <div className={`h-5 w-5 rounded-full bg-white transition-transform ${notifWeekly ? "translate-x-5" : ""}`} />
-                      </button>
-                    </div>
-
-                    <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl flex items-center justify-between gap-4">
-                      <div>
-                        <span className="font-bold text-slate-200 block">Platform System Updates</span>
-                        <span className="text-slate-500 text-[10px]">Updates about product enhancements, scheduled maintenance, and feature changes.</span>
-                      </div>
-                      <button
-                        onClick={() => {
-                          const nextVal = !notifSystem;
-                          setNotifSystem(nextVal);
-                          saveSetting('notifSystem', nextVal);
-                          toast.success("Platform system updates preference updated.");
-                        }}
-                        className={`h-6 w-11 rounded-full p-0.5 transition-colors focus:outline-none ${notifSystem ? "bg-indigo-600" : "bg-slate-800"}`}
-                      >
-                        <div className={`h-5 w-5 rounded-full bg-white transition-transform ${notifSystem ? "translate-x-5" : ""}`} />
-                      </button>
-                    </div>
-
-                    <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl flex items-center justify-between gap-4">
-                      <div>
-                        <span className="font-bold text-slate-200 block">Workspace Invitations</span>
-                        <span className="text-slate-500 text-[10px]">Receive notifications when you are invited to new workspaces.</span>
-                      </div>
-                      <button
-                        onClick={() => {
-                          const nextVal = !notifInvites;
-                          setNotifInvites(nextVal);
-                          saveSetting('notifInvites', nextVal);
-                          toast.success("Workspace invitations preference updated.");
-                        }}
-                        className={`h-6 w-11 rounded-full p-0.5 transition-colors focus:outline-none ${notifInvites ? "bg-indigo-600" : "bg-slate-800"}`}
-                      >
-                        <div className={`h-5 w-5 rounded-full bg-white transition-transform ${notifInvites ? "translate-x-5" : ""}`} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* LANGUAGE TAB */}
-              {activeTab === "language" && (
-                <div className="space-y-6 text-xs">
-                  <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Globe className="h-5 w-5 text-indigo-400" /> Language, Appearance & Localization Parameters
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Configure preferred translation mappings, time variables, and visual design themes.</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-slate-400 font-bold">Display Language</label>
-                      <select
-                        className="w-full h-10 px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-950/60 text-slate-200 focus:outline-none"
-                        value={displayLanguage}
-                        onChange={(e) => {
-                          setDisplayLanguage(e.target.value);
-                          saveSetting('displayLanguage', e.target.value);
-                          toast.success(`Display language updated to: ${e.target.value.toUpperCase()}`);
-                        }}
-                      >
-                        <option value="en">English (US)</option>
-                        <option value="hi">Hindi (IN)</option>
-                        <option value="de">Deutsch (DE)</option>
-                        <option value="es">Español (ES)</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-slate-400 font-bold">Timezone Offset</label>
-                      <select
-                        className="w-full h-10 px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-950/60 text-slate-200 focus:outline-none"
-                        value={displayTimezone}
-                        onChange={(e) => {
-                          setDisplayTimezone(e.target.value);
-                          saveSetting('displayTimezone', e.target.value);
-                          toast.success(`System timezone altered to: ${e.target.value}`);
-                        }}
-                      >
-                        <option value="Asia/Kolkata">Asia/Kolkata (IST +5:30)</option>
-                        <option value="UTC">UTC (Coordinated Time)</option>
-                        <option value="US/Eastern">US/Eastern (EST -5:00)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Visual Theme Mode Selector with Premium Cards */}
-                  <div className="space-y-3 pt-6 border-t border-slate-800/60">
-                    <label className="text-xs font-bold text-slate-200 flex items-center gap-2">
-                      <Palette className="h-4 w-4 text-indigo-400" /> Visual Theme Preference
-                    </label>
-                    <p className="text-[11px] text-slate-400">Choose between a dark luxury workspace, an airy light canvas, or synchronized system levels.</p>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      {[
-                        { id: "dark", name: "Dark Theme", desc: "Premium dark slate & cobalt tones", style: "bg-slate-950 text-slate-200 border-slate-850" },
-                        { id: "light", name: "Light Theme", desc: "Clean, high-contrast crisp ivory", style: "bg-white text-slate-900 border-slate-200" },
-                        { id: "system", name: "System Level", desc: "Matches device-level configuration", style: "bg-gradient-to-r from-slate-950 to-white text-slate-400 border-slate-800" }
-                      ].map((t) => {
-                        const isSelected = themeMode === t.id;
-                        return (
-                          <div 
-                            key={t.id}
-                            onClick={() => {
-                              setThemeMode(t.id as any);
-                              setTheme(t.id as any);
-                              saveSetting('theme', t.id);
-                              toast.success(`Theme mode updated to: ${t.name}`);
-                            }}
-                            className={`p-4 rounded-xl cursor-pointer border transition-all duration-300 relative overflow-hidden group flex flex-col justify-between h-28 ${isSelected ? 'border-indigo-500 bg-indigo-500/5 shadow-lg shadow-indigo-500/10 scale-[1.02]' : 'border-slate-800 bg-slate-950/30 hover:border-slate-700'}`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-slate-200">{t.name}</span>
-                              {isSelected && (
-                                <span className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
-                              )}
-                            </div>
-                            <div>
-                              <p className="text-[10px] text-slate-400 mt-1">{t.desc}</p>
-                              {/* Miniature preview card */}
-                              <div className={`mt-2 h-4 w-full rounded border ${t.style} flex items-center px-1 text-[8px] font-mono overflow-hidden`}>
-                                Aa
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* STORAGE ANALYTICS TAB */}
-              {activeTab === "storage" && (
-                <div className="space-y-6 text-xs">
-                  <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <HardDrive className="h-5 w-5 text-indigo-400" /> Storage & Assets Analytics
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Real-time breakdown of files saved in storage bucket systems.</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl flex items-center justify-between">
-                      <div>
-                        <span className="text-slate-400 text-xs">Uploaded Datasets Count</span>
-                        <span className="text-xl font-bold text-white block mt-1">{datasetCount} CSV files</span>
-                      </div>
-                    </div>
-                    <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl flex items-center justify-between">
-                      <div>
-                        <span className="text-slate-400 text-xs">Total Storage Utilized</span>
-                        <span className="text-xl font-bold text-indigo-400 block mt-1">{(storageBytes / (1024 * 1024)).toFixed(2)} MB / 10 GB</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-slate-950/30 border border-slate-850 flex items-center justify-between">
-                    <div>
-                      <h4 className="font-bold text-white text-xs">Refresh Storage Metrics</h4>
-                      <p className="text-[10px] text-slate-500 mt-0.5">Scans storage buckets to recalculate active utilization hashes.</p>
-                    </div>
-                    <Button
-                      onClick={handleRecalculateStorage}
-                      disabled={isRecalculatingStorage}
-                      className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl h-9 px-4 font-semibold"
-                    >
-                      {isRecalculatingStorage ? (
-                        <>
-                          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Recalculating...
-                        </>
-                      ) : (
-                        "Recalculate Now"
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* USAGE & LIMITS TAB */}
-              {activeTab === "usage" && (
-                <div className="space-y-6 text-xs">
-                  <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <BarChart2 className="h-5 w-5 text-indigo-400" /> Usage Telemetry & Quota Limits
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Live monitoring of computational quotas used within the current billing period.</p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="p-4 bg-slate-950/40 border border-slate-800/80 rounded-xl space-y-2">
-                      <div className="flex justify-between font-bold text-sm">
-                        <span className="text-slate-200">AI API Calls</span>
-                        <span className="text-indigo-400 font-mono">{aiUsageCount} / {getQuotaLimit().toLocaleString()} calls ({((aiUsageCount / getQuotaLimit()) * 100).toFixed(1)}%)</span>
-                      </div>
-                      <div className="h-2.5 bg-slate-900 rounded-full overflow-hidden p-0.5 border border-slate-800">
-                        <div 
-                          className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 rounded-full transition-all duration-500" 
-                          style={{ width: `${Math.min(100, (aiUsageCount / getQuotaLimit()) * 100)}%` }} 
-                        />
-                      </div>
-                      <div className="flex justify-between text-[10px] text-slate-500 pt-1">
-                        <span>Reset Date: 1st of next month</span>
-                        <span>Tier: {userPlan.toUpperCase()} Plan Quota</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* SUBSCRIPTION & PLAN TAB */}
-              {activeTab === "subscription" && (
-                <div className="space-y-6 text-xs">
-                  <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Zap className="h-5 w-5 text-indigo-400" /> Subscription Plan Configuration
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Current license mappings and access level entitlements.</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Free Plan */}
-                    <div className={`p-4 rounded-xl border transition-all ${userPlan === "free" ? "bg-indigo-950/10 border-indigo-500/40" : "bg-slate-950/30 border-slate-800"}`}>
-                      <h4 className="font-extrabold text-sm text-slate-100">Starter Free</h4>
-                      <p className="text-slate-500 text-[10px] mt-1">Basic exploratory capabilities for general users.</p>
-                      <div className="text-white font-extrabold text-base mt-2">₹0 / month</div>
-                      {userPlan === "free" ? (
-                        <span className="mt-4 block w-full text-center text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 py-1.5 rounded font-bold uppercase">Current Plan</span>
-                      ) : (
-                        <Button onClick={() => handleUpgradePlan("free")} className="mt-4 w-full h-8 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-lg text-xs">
-                          Downgrade
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full mt-3 h-8 text-xs border-slate-800 hover:bg-slate-800 text-slate-200"
+                          onClick={() => {
+                            const next = ssoProvider === "entra" ? "none" : "entra";
+                            setSsoProvider(next);
+                            toast.success(`Entra ID ${next === "entra" ? "Enabled" : "Disabled"}`);
+                          }}
+                        >
+                          {ssoProvider === "entra" ? "Disconnect Provider" : "Enable Entra ID"}
                         </Button>
-                      )}
-                    </div>
-
-                    {/* Pro Plan */}
-                    <div className={`p-4 rounded-xl border transition-all ${userPlan === "pro" ? "bg-indigo-950/10 border-indigo-500/40" : "bg-slate-950/30 border-slate-800"}`}>
-                      <h4 className="font-extrabold text-sm text-indigo-400 flex items-center gap-1"><Sparkles className="h-3.5 w-3.5 text-amber-400" /> Pro Business</h4>
-                      <p className="text-slate-500 text-[10px] mt-1">Full predictive models, datasets analytics, and reports customization.</p>
-                      <div className="text-white font-extrabold text-base mt-2">₹499 / month</div>
-                      {userPlan === "pro" ? (
-                        <span className="mt-4 block w-full text-center text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 py-1.5 rounded font-bold uppercase">Current Plan</span>
-                      ) : (
-                        <Button onClick={() => handleUpgradePlan("pro")} className="mt-4 w-full h-8 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold">
-                          Select Pro
-                        </Button>
-                      )}
-                    </div>
-
-                    {/* Enterprise Plan */}
-                    <div className={`p-4 rounded-xl border transition-all ${userPlan === "enterprise" ? "bg-indigo-950/10 border-indigo-500/40" : "bg-slate-950/30 border-slate-800"}`}>
-                      <h4 className="font-extrabold text-sm text-amber-400">Enterprise Scale</h4>
-                      <p className="text-slate-500 text-[10px] mt-1">Unlimited model iterations, custom integrations, dedicated service agents.</p>
-                      <div className="text-white font-extrabold text-base mt-2">₹1,499 / month</div>
-                      {userPlan === "enterprise" ? (
-                        <span className="mt-4 block w-full text-center text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 py-1.5 rounded font-bold uppercase">Current Plan</span>
-                      ) : (
-                        <Button onClick={() => handleUpgradePlan("enterprise")} className="mt-4 w-full h-8 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold">
-                          Select Enterprise
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* BILLING & INVOICES TAB */}
-              {activeTab === "billing" && (
-                <div className="space-y-6 text-xs">
-                  <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <CreditCard className="h-5 w-5 text-indigo-400" /> Billing Credentials & Invoices
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Registered credit profiles and previous operational invoices.</p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <h4 className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Invoices History</h4>
-                    {invoices.map((inv) => (
-                      <div key={inv.id} className="p-4 bg-slate-950/30 border border-slate-850 rounded-xl flex items-center justify-between text-xs gap-4">
-                        <div>
-                          <span className="font-bold text-slate-200 block">Invoice #{inv.id}</span>
-                          <span className="text-slate-500 text-[10px]">Date: {inv.date} • {inv.plan.toUpperCase()} Monthly Renewal</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-bold text-emerald-400 font-mono">₹{inv.amount.toFixed(2)} INR ({inv.status})</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDownloadInvoice(inv)}
-                            className="h-8 bg-slate-900 text-[10.5px] hover:bg-slate-800 text-slate-300 rounded-lg"
-                          >
-                            Download PDF
-                          </Button>
-                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* API KEYS TAB */}
-              {activeTab === "apikeys" && (
-                <div className="space-y-6 text-xs">
-                  <div className="flex items-center justify-between pb-4 border-b border-slate-850">
-                    <div>
-                      <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                        <Key className="h-5 w-5 text-indigo-400" /> Secret SDK API Keys
-                      </h3>
-                      <p className="text-xs text-slate-400">Authorized keys for secure data syncing pipelines.</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <Input
-                      placeholder="API Key Name (e.g. Staging Pipeline)"
-                      value={newKeyName}
-                      onChange={e => setNewKeyName(e.target.value)}
-                      className="bg-slate-950/60 border-slate-800 rounded-xl md:col-span-2 h-10"
-                    />
-                    <Button onClick={handleCreateApiKey} className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl h-10">
-                      <Plus className="h-4 w-4 mr-1.5" /> Generate Key
-                    </Button>
-                  </div>
-
-                  <div className="space-y-2">
-                    {isApiKeysLoading ? (
-                      <div className="flex justify-center py-6">
-                        <Loader2 className="h-5 w-5 animate-spin text-slate-600" />
-                      </div>
-                    ) : apiKeys.length === 0 ? (
-                      <p className="text-center text-slate-500 py-4">No active API keys found.</p>
-                    ) : (
-                      apiKeys.map((key) => (
-                        <div key={key.id} className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl flex items-center justify-between">
+                  {/* Active Authentication Sessions */}
+                  <div className="space-y-3 pt-2 border-t border-slate-800">
+                    <h4 className="text-xs font-bold text-slate-300 flex items-center gap-2 uppercase tracking-wider">
+                      <Smartphone className="h-4 w-4 text-indigo-400" /> Active Login Sessions
+                    </h4>
+                    <div className="space-y-2">
+                      {sessions.map((sess) => (
+                        <div key={sess.id} className="p-3 bg-slate-950/40 border border-slate-850 rounded-xl flex items-center justify-between text-xs">
                           <div>
-                            <span className="font-bold text-slate-200 block">{key.name}</span>
-                            <span className="font-mono text-indigo-400 text-[10.5px] block mt-1">{key.prefix || key.key_prefix}...</span>
-                            <span className="text-[9px] text-slate-500 block mt-0.5">Created: {new Date(key.created_at).toLocaleDateString()}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-white">{sess.device}</span>
+                              {sess.current && <span className="px-2 py-0.5 rounded text-[9px] bg-indigo-500/20 text-indigo-300 font-bold">This Device</span>}
+                            </div>
+                            <p className="text-[10px] text-slate-500 mt-0.5">IP: {sess.ip} • {sess.location} • {sess.time}</p>
                           </div>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => { navigator.clipboard.writeText(key.prefix || key.key_prefix); toast.success("Prefix copied to clipboard!"); }}
-                              className="h-8 text-[11px] hover:bg-slate-800 text-indigo-400 rounded-lg"
-                            >
-                              Copy
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleRevokeApiKey(key.id)}
-                              className="h-8 text-[11px] hover:bg-red-500/10 text-red-400 rounded-lg"
-                            >
+                          {!sess.current && (
+                            <Button onClick={() => handleRevokeSession(sess.id)} size="sm" variant="ghost" className="h-7 text-xs text-rose-400 hover:bg-rose-500/10">
                               Revoke
                             </Button>
-                          </div>
+                          )}
                         </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* CONNECTED ACCOUNTS TAB */}
-              {activeTab === "accounts" && (
-                <div className="space-y-6 text-xs">
-                  <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <LinkIcon className="h-5 w-5 text-indigo-400" /> Connected Accounts Mappings
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">External Oauth providers synced to your primary platform identity.</p>
-                  </div>
-
-                  <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl flex items-center justify-between">
-                    <div>
-                      <span className="font-bold text-slate-200 block">Google Account Verification</span>
-                      <span className="text-slate-500 text-[10px]">{user?.email}</span>
+                      ))}
                     </div>
-                    <span className="px-2.5 py-0.5 bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 rounded font-bold text-[10px]">Connected</span>
                   </div>
                 </div>
               )}
 
-              {/* CONNECTED DEVICES TAB */}
-              {activeTab === "devices" && (
-                <div className="space-y-6 text-xs">
-                  <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Laptop className="h-5 w-5 text-indigo-400" /> Registered Hardware Devices
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Authorized devices permitted to access system API layers.</p>
-                  </div>
-
-                  <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Laptop className="h-6 w-6 text-indigo-400" />
-                      <div>
-                        <span className="font-bold text-slate-200 block">MacBook Pro 16" (M3 Max)</span>
-                        <span className="text-slate-500 text-[10px]">Last Sync: Just now • Bengaluru, India</span>
-                      </div>
-                    </div>
-                    <span className="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded font-bold text-[10px]">Verified</span>
-                  </div>
-                </div>
-              )}
-
-              {/* AI PREFERENCES TAB */}
+              {/* AI COPILOT PARAMETERS TAB */}
               {activeTab === "ai_prefs" && (
                 <div className="space-y-6 text-xs">
                   <div>
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-indigo-400" /> Copilot AI Engine Parameters
+                      <Sparkles className="h-5 w-5 text-indigo-400" /> AI Copilot & Model Parameters
                     </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Configure target models, generative temperature, and query automations.</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Configure model engines, generative temperature, and query verification toggles.</p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-slate-400 font-semibold">Active LLM Model</label>
+                      <label className="text-slate-400 font-semibold">Primary LLM Model Engine</label>
                       <select
-                        className="w-full h-10 px-3 py-1.5 text-sm rounded-xl border border-slate-800 bg-slate-950/60 text-slate-200 focus:outline-none"
+                        className="w-full h-10 px-3 py-1.5 text-xs rounded-xl border border-slate-800 bg-slate-950/60 text-slate-200 focus:outline-none focus:border-indigo-500"
                         value={aiModel}
                         onChange={e => {
                           setAiModel(e.target.value);
                           saveSetting('aiModel', e.target.value);
+                          toast.success("AI model preference saved");
                         }}
                       >
                         <option value="gemini-3.6-flash">Gemini 2.5 Flash (Fastest / Code generation)</option>
@@ -1922,17 +1268,19 @@ Thank you for scaling with Vivexa!
                       </select>
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-slate-400 font-semibold">Creativity Index (Temperature)</label>
+                      <label className="text-slate-400 font-semibold">Generative Temperature (Creativity)</label>
                       <select
-                        className="w-full h-10 px-3 py-1.5 text-sm rounded-xl border border-slate-800 bg-slate-950/60 text-slate-200 focus:outline-none"
+                        className="w-full h-10 px-3 py-1.5 text-xs rounded-xl border border-slate-800 bg-slate-950/60 text-slate-200 focus:outline-none focus:border-indigo-500"
                         value={creativity}
                         onChange={e => {
                           setCreativity(e.target.value);
                           saveSetting('creativity', e.target.value);
+                          toast.success("Generative temperature saved");
                         }}
                       >
-                        <option value="0.1">0.1 (Strict mathematical outputs)</option>
-                        <option value="0.5">0.5 (Balanced strategic assessment)</option>
+                        <option value="0.1">0.1 (Deterministic / Mathematical rigor)</option>
+                        <option value="0.5">0.5 (Balanced analytical reasoning)</option>
+                        <option value="0.8">0.8 (Creative exploratory analysis)</option>
                       </select>
                     </div>
                   </div>
@@ -1940,106 +1288,239 @@ Thank you for scaling with Vivexa!
                   <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl flex items-center justify-between">
                     <div>
                       <span className="font-bold text-slate-200 block">Automated SQL Verification</span>
-                      <span className="text-slate-500">Enable Gemini to verify schema column matching prior to SQL executions.</span>
+                      <span className="text-slate-500">Automatically inspect column mappings prior to running SQL queries.</span>
                     </div>
-                    <button onClick={() => { 
-                      const newVal = !autoSql;
-                      setAutoSql(newVal); 
-                      saveSetting('autoSql', newVal);
-                      toast.success("Preference verified!"); 
-                    }} className={`h-6 w-11 rounded-full p-0.5 transition-colors focus:outline-none ${autoSql ? "bg-indigo-600" : "bg-slate-800"}`}><div className={`h-5 w-5 rounded-full bg-white transition-transform ${autoSql ? "translate-x-5" : ""}`} /></button>
+                    <button 
+                      onClick={() => { 
+                        const newVal = !autoSql;
+                        setAutoSql(newVal); 
+                        saveSetting('autoSql', newVal);
+                        toast.success(`Automated SQL Verification ${newVal ? 'Enabled' : 'Disabled'}`); 
+                      }} 
+                      className={`h-6 w-11 rounded-full p-0.5 transition-colors focus:outline-none ${autoSql ? "bg-indigo-600" : "bg-slate-800"}`}
+                    >
+                      <div className={`h-5 w-5 rounded-full bg-white transition-transform ${autoSql ? "translate-x-5" : ""}`} />
+                    </button>
                   </div>
                 </div>
               )}
 
-              {/* PRIVACY & DATA POLICY TAB */}
-              {activeTab === "privacy" && (
+              {/* API KEYS & OAUTH TAB */}
+              {activeTab === "apikeys" && (
                 <div className="space-y-6 text-xs">
                   <div>
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Lock className="h-5 w-5 text-indigo-400" /> Privacy & Data Retention Policies
+                      <Key className="h-5 w-5 text-indigo-400" /> API Secret Keys & Integrations
                     </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Control data diagnostic pipelines and regulatory constraints.</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Manage access tokens for programmatic API access and connected OAuth accounts.</p>
                   </div>
 
+                  {/* Create Key Section */}
+                  <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl space-y-3">
+                    <h4 className="font-bold text-slate-200">Generate New API Secret Key</h4>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        placeholder="Key label e.g. Production Pipeline Key"
+                        value={newKeyName}
+                        onChange={(e) => setNewKeyName(e.target.value)}
+                        className="bg-slate-900 border-slate-800 rounded-xl text-xs placeholder:text-slate-600"
+                      />
+                      <Button onClick={handleCreateApiKey} className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shrink-0 text-xs">
+                        Generate Key
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Active Keys List */}
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-slate-300 uppercase tracking-wider text-[10px]">Active Secret Keys</h4>
+                    {apiKeys.map((key) => (
+                      <div key={key.id} className="p-3 bg-slate-950/30 border border-slate-850 rounded-xl flex items-center justify-between">
+                        <div>
+                          <span className="font-bold text-white block">{key.name}</span>
+                          <span className="text-[10px] font-mono text-slate-500">Key Prefix: {key.key_prefix || 'vx_live_...'}</span>
+                        </div>
+                        <Button onClick={() => handleDeleteApiKey(key.id)} size="sm" variant="ghost" className="h-7 text-xs text-rose-400 hover:bg-rose-500/10">
+                          <Trash2 className="h-3.5 w-3.5 mr-1" /> Revoke
+                        </Button>
+                      </div>
+                    ))}
+                    {apiKeys.length === 0 && (
+                      <div className="p-4 text-center text-slate-500 text-xs bg-slate-950/20 rounded-xl border border-slate-850">
+                        No active secret keys created yet.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Connected Accounts */}
+                  <div className="pt-4 border-t border-slate-800 space-y-3">
+                    <h4 className="font-bold text-slate-300 flex items-center gap-2 uppercase tracking-wider text-[10px]">
+                      <LinkIcon className="h-3.5 w-3.5 text-indigo-400" /> OAuth Connected Accounts
+                    </h4>
+                    <div className="space-y-2">
+                      {connectedAccounts.map((acc) => (
+                        <div key={acc.id} className="p-3 bg-slate-950/30 border border-slate-850 rounded-xl flex items-center justify-between">
+                          <div>
+                            <span className="font-bold text-white block">{acc.name}</span>
+                            <span className="text-slate-500 text-[10px]">{acc.email || "Not linked"}</span>
+                          </div>
+                          <Button
+                            onClick={() => handleToggleAccount(acc.id)}
+                            size="sm"
+                            variant="outline"
+                            className={`h-7 text-xs rounded-lg ${acc.connected ? "border-emerald-500/30 text-emerald-400 bg-emerald-500/10" : "border-slate-700 text-slate-300"}`}
+                          >
+                            {acc.connected ? "Connected" : "Connect"}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* USAGE & STORAGE ANALYTICS TAB */}
+              {activeTab === "usage" && (
+                <div className="space-y-6 text-xs">
+                  <div>
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <BarChart2 className="h-5 w-5 text-indigo-400" /> Usage Quotas & Storage Analytics
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Monitor AI query consumption and storage allocation across datasets.</p>
+                  </div>
+
+                  {/* AI Usage Meter */}
+                  <div className="p-5 rounded-2xl bg-indigo-950/20 border border-indigo-500/20 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-indigo-300 text-sm">Monthly AI Query Usage</span>
+                      <span className="text-xs font-mono text-indigo-400 font-bold">{aiUsageCount} / {getQuotaLimit()} Executions</span>
+                    </div>
+                    <div className="h-2.5 bg-slate-900 rounded-full overflow-hidden">
+                      <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${Math.min(100, (aiUsageCount / getQuotaLimit()) * 100)}%` }} />
+                    </div>
+                  </div>
+
+                  {/* Dataset Storage Breakdown */}
+                  <div className="p-5 rounded-2xl bg-slate-950/40 border border-slate-850 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                          <HardDrive className="h-4 w-4 text-indigo-400" /> Live Dataset Storage
+                        </h4>
+                        <p className="text-slate-400 mt-0.5">Total size of active CSV and Parquet files stored.</p>
+                      </div>
+                      <Button onClick={handleRecalculateStorage} disabled={isRecalculatingStorage} size="sm" variant="outline" className="border-slate-800 text-xs rounded-xl">
+                        <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isRecalculatingStorage ? 'animate-spin' : ''}`} /> Recalculate
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800">
+                        <span className="text-slate-500 block text-[10px] uppercase font-bold">Total Datasets</span>
+                        <span className="text-lg font-bold text-white block mt-0.5">{datasetCount} Datasets</span>
+                      </div>
+                      <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800">
+                        <span className="text-slate-500 block text-[10px] uppercase font-bold">Storage Volume</span>
+                        <span className="text-lg font-bold text-blue-400 block mt-0.5">{(storageBytes / (1024 * 1024)).toFixed(2)} MB</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* BILLING & PLANS TAB */}
+              {activeTab === "billing" && (
+                <div className="space-y-6 text-xs">
+                  <div>
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <Zap className="h-5 w-5 text-indigo-400" /> Subscription & Invoices
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Manage subscription tiers, payment profiles, and tax invoices.</p>
+                  </div>
+
+                  {/* Plan Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-5 rounded-2xl bg-slate-950/40 border border-slate-850 space-y-3">
+                      <span className="text-[10px] uppercase font-bold text-indigo-400 tracking-wider block">Current Tier</span>
+                      <h4 className="text-lg font-bold text-white">{userPlan}</h4>
+                      <p className="text-slate-400 text-xs">Enterprise AI analytics, multi-agent orchestration, and dedicated cloud storage.</p>
+                      <Button onClick={() => handleUpgradePlan("Enterprise Pro")} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs">
+                        Active Tier
+                      </Button>
+                    </div>
+
+                    <div className="p-5 rounded-2xl bg-indigo-950/20 border border-indigo-500/30 space-y-3">
+                      <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider block">Unlimited Scale</span>
+                      <h4 className="text-lg font-bold text-white">Dedicated Private Cluster</h4>
+                      <p className="text-slate-400 text-xs">Custom SLA, isolated single-tenant database instance, and 24/7 dedicated engineering support.</p>
+                      <Button onClick={() => toast.info("Dedicated cluster request submitted to sales team")} variant="outline" className="w-full border-indigo-500/30 text-indigo-300 hover:bg-indigo-600/10 rounded-xl text-xs">
+                        Request Private Cluster
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Invoice History */}
+                  <div className="space-y-3 pt-2">
+                    <h4 className="text-xs font-bold text-slate-300 flex items-center gap-2 uppercase tracking-wider">
+                      <CreditCard className="h-4 w-4 text-indigo-400" /> Tax Invoices & Receipts
+                    </h4>
+                    <div className="space-y-2">
+                      {invoices.map((inv) => (
+                        <div key={inv.id} className="p-3 bg-slate-950/30 border border-slate-850 rounded-xl flex items-center justify-between text-xs">
+                          <div>
+                            <span className="font-bold text-white block">{inv.id} — {inv.description}</span>
+                            <span className="text-slate-500 text-[10px]">{inv.date} • {inv.amount}</span>
+                          </div>
+                          <Button onClick={() => handleDownloadInvoice(inv)} size="sm" variant="outline" className="h-7 text-xs border-slate-800 hover:bg-slate-800 text-slate-300">
+                            <Download className="h-3 w-3 mr-1" /> Invoice
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* PRIVACY, BACKUP & SUPPORT TAB */}
+              {activeTab === "privacy_support" && (
+                <div className="space-y-6 text-xs">
+                  <div>
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <HelpCircle className="h-5 w-5 text-indigo-400" /> Privacy, Export & Engineering Support
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Control data privacy policies, download workspace archives, or open priority tickets.</p>
+                  </div>
+
+                  {/* Privacy Toggles */}
                   <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl flex items-center justify-between">
                     <div>
-                      <span className="font-bold text-slate-200 block">Diagnostic telemetry logging</span>
-                      <span className="text-slate-500">Transmit anonymous stack trace performance error values to Error Center.</span>
+                      <span className="font-bold text-slate-200 block">Diagnostic Telemetry & Performance Logs</span>
+                      <span className="text-slate-500">Allow anonymous error stack trace logging to improve platform reliability.</span>
                     </div>
-                    <button onClick={() => toast.success("Privacy synchronized")} className="h-6 w-11 rounded-full p-0.5 bg-indigo-600"><div className="h-5 w-5 rounded-full bg-white translate-x-5" /></button>
-                  </div>
-                </div>
-              )}
-
-              {/* EXPORT & BACKUP TAB */}
-              {activeTab === "backup" && (
-                <div className="space-y-6 text-xs">
-                  <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Download className="h-5 w-5 text-indigo-400" /> Export & Workspace Backups
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Compile and export secure JSON profiles of user settings and dataset metadata.</p>
+                    <button onClick={() => toast.success("Telemetry preference saved")} className="h-6 w-11 rounded-full p-0.5 bg-indigo-600 focus:outline-none"><div className="h-5 w-5 rounded-full bg-white translate-x-5" /></button>
                   </div>
 
-                  <div className="p-6 rounded-2xl bg-slate-950/30 border border-slate-850 text-center space-y-4">
-                    <Database className="h-8 w-8 text-indigo-400 mx-auto animate-pulse" />
+                  {/* Export & Backup */}
+                  <div className="p-5 rounded-2xl bg-slate-950/40 border border-slate-850 text-center space-y-3">
+                    <Database className="h-6 w-6 text-indigo-400 mx-auto" />
                     <div>
-                      <h4 className="font-bold text-white text-sm">Download Full Settings Archive</h4>
-                      <p className="text-slate-400 mt-1 max-w-sm mx-auto">Export API prefixes, metadata log files, and active settings objects cleanly.</p>
+                      <h4 className="font-bold text-white text-sm">Download Workspace Archive</h4>
+                      <p className="text-slate-400 mt-0.5 text-xs">Export a complete JSON snapshot of your settings, metadata, and dataset keys.</p>
                     </div>
-                    <Button onClick={handleBackupWorkspace} className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl">
-                      <Download className="h-4 w-4 mr-1.5" /> Download JSON Backup
+                    <Button onClick={handleBackupWorkspace} className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs">
+                      <Download className="h-3.5 w-3.5 mr-1.5" /> Download JSON Backup
                     </Button>
                   </div>
-                </div>
-              )}
 
-              {/* SUPPORT TAB */}
-              {activeTab === "support" && (
-                <div className="space-y-6 text-xs">
-                  <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <MessageSquare className="h-5 w-5 text-indigo-400" /> Support & Engineering Help
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Connect with the Vivexa engineering team or browse documentation.</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-5 rounded-2xl bg-slate-950/40 border border-slate-850 space-y-4">
-                      <div className="p-3 rounded-xl bg-indigo-500/10 w-fit">
-                        <FileText className="h-5 w-5 text-indigo-400" />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-white text-sm">Enterprise Documentation</h4>
-                        <p className="text-slate-400 mt-1">Detailed guides on API integration, custom agent orchestration, and data security.</p>
-                      </div>
-                      <Button variant="outline" className="w-full border-slate-800 hover:bg-slate-800 text-xs rounded-xl">
-                        Browse Docs <ExternalLink className="h-3 w-3 ml-2" />
-                      </Button>
-                    </div>
-
-                    <div className="p-5 rounded-2xl bg-slate-950/40 border border-slate-850 space-y-4">
-                      <div className="p-3 rounded-xl bg-emerald-500/10 w-fit">
-                        <Activity className="h-5 w-5 text-emerald-400" />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-white text-sm">Live Platform Status</h4>
-                        <p className="text-slate-400 mt-1">Real-time monitoring of all Vivexa clusters, database health, and AI latency.</p>
-                      </div>
-                      <Button variant="outline" className="w-full border-slate-800 hover:bg-slate-800 text-xs rounded-xl">
-                        View Status Page <ExternalLink className="h-3 w-3 ml-2" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="p-6 rounded-2xl bg-slate-950/40 border border-slate-850 space-y-4">
+                  {/* Priority Support Ticket Form */}
+                  <div className="p-5 rounded-2xl bg-slate-950/40 border border-slate-850 space-y-4">
                     <h4 className="font-bold text-white text-sm flex items-center gap-2">
-                      <HelpCircle className="h-4 w-4 text-indigo-400" /> Open a Priority Ticket
+                      <MessageSquare className="h-4 w-4 text-indigo-400" /> Submit Priority Engineering Ticket
                     </h4>
                     <div className="space-y-3">
                       <div className="space-y-1.5">
-                        <label className="text-slate-400">Issue Category</label>
+                        <label className="text-slate-400 font-semibold">Issue Category</label>
                         <select 
                           value={ticketCategory}
                           onChange={(e) => setTicketCategory(e.target.value)}
@@ -2048,45 +1529,51 @@ Thank you for scaling with Vivexa!
                           <option value="Technical Issue / Bug">Technical Issue / Bug</option>
                           <option value="Account & Billing">Account & Billing</option>
                           <option value="Feature Request">Feature Request</option>
-                          <option value="Security Vulnerability">Security Vulnerability</option>
+                          <option value="AI / SQL Query Assistance">AI / SQL Query Assistance</option>
                         </select>
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-slate-400">Message</label>
-                        <textarea 
-                          placeholder="Describe your issue in detail..." 
-                          rows={4} 
+                        <label className="text-slate-400 font-semibold">Detailed Request / Message</label>
+                        <textarea
+                          rows={3}
+                          placeholder="Describe your issue or request..."
                           value={ticketMessage}
                           onChange={(e) => setTicketMessage(e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:ring-1 focus:ring-indigo-500 outline-none resize-none"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white text-xs focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-slate-600"
                         />
                       </div>
                       <Button 
                         onClick={handleSubmitTicket} 
                         disabled={submittingTicket}
-                        className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold flex items-center justify-center gap-2"
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold px-5"
                       >
-                        {submittingTicket ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                        {submittingTicket ? "Dispatching..." : "Dispatch Ticket"}
+                        {submittingTicket ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+                        Dispatch Support Ticket
                       </Button>
                     </div>
                   </div>
                 </div>
               )}
 
-
             </div>
 
-            {/* Footer sync indicator */}
-            <div className="flex items-center justify-between pt-6 border-t border-slate-850 mt-12 text-slate-500 text-[10.5px]">
-              <span>Active identity token: <strong className="text-indigo-400 font-mono font-normal">supabase_auth_sync</strong></span>
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Fully synchronized with Supabase DB</span>
+            {/* Panel Footer */}
+            <div className="pt-6 mt-6 border-t border-slate-800/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-slate-500">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span>Vivexa Platform Engine v3.2.0 • Secured with Enterprise RLS</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-slate-300 transition-colors">Terms</a>
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-slate-300 transition-colors">Privacy</a>
+                <a href="/docs" target="_blank" rel="noopener noreferrer" className="hover:text-slate-300 transition-colors">API Docs</a>
+              </div>
             </div>
+
           </Card>
         </div>
 
       </div>
-
     </div>
   );
 }
