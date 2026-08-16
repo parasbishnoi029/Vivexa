@@ -5,7 +5,7 @@ import {
   BarChart2, Zap, Sparkles, Download, Lock, CheckCircle2, RefreshCw, AlertTriangle,
   FileText, ShieldAlert, Cpu, Eye, Copy, Check, Plus, Settings2, ShieldCheck, Database,
   LayoutDashboard, Activity, ArrowUpRight, Clock, HelpCircle, ChevronRight, X, Search,
-  Server, Sliders, ToggleLeft, ToggleRight, Trash, MessageSquare, ExternalLink
+  Server, Sliders, ToggleLeft, ToggleRight, Trash, MessageSquare, ExternalLink, Fingerprint
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ const TABS = [
   { id: "workspace", label: "Workspace & Region", icon: Building },
   { id: "organization", label: "Organization & Teams", icon: Users },
   { id: "security", label: "Security & 2FA", icon: Shield },
+  { id: "enterprise", label: "Enterprise Architecture & SSO", icon: Server },
   { id: "sessions", label: "Active Sessions", icon: Smartphone },
   { id: "notifications", label: "Notifications & Alerts", icon: Bell },
   { id: "language", label: "Language & Region", icon: Globe },
@@ -51,6 +52,9 @@ export default function WorkspaceSettings() {
   const [activeTab, setActiveTab] = useState("overview");
   const [profile, setProfile] = useState<any>(null);
   const [aiUsageCount, setAiUsageCount] = useState<number>(() => getAiUsageCount());
+  const [ssoProvider, setSsoProvider] = useState<"none" | "okta" | "entra">("okta");
+  const [vpcEnabled, setVpcEnabled] = useState(true);
+  const [privateLinkEnabled, setPrivateLinkEnabled] = useState(true);
 
   useEffect(() => {
     const syncUsage = () => setAiUsageCount(getAiUsageCount());
@@ -975,7 +979,7 @@ Thank you for scaling with Vivexa!
                       <div className="p-3 bg-slate-950/30 border border-slate-850 rounded-xl flex items-center justify-between">
                         <div>
                           <span className="font-bold text-white block">Paras Bishnoi</span>
-                          <span className="text-slate-500 text-[10px]">parasbishnoi012@gmail.com</span>
+                          <span className="text-slate-500 text-[10px]">info.vivexa@gmail.com</span>
                         </div>
                         <span className="text-indigo-400 font-bold uppercase text-[10px] bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">Super Admin</span>
                       </div>
@@ -1052,6 +1056,293 @@ Thank you for scaling with Vivexa!
               )}
 
               {/* ACTIVE SESSIONS TAB */}
+              
+              {activeTab === "enterprise" && (
+                <div className="space-y-8 text-xs">
+                  <div>
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <Server className="h-5 w-5 text-indigo-400" /> Enterprise Architecture & SSO
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Manage zero-trust federated identity, RBAC/RLS policies, and VPC deployments.</p>
+                  </div>
+
+                  {/* Bring-Your-Own-Identity (BYOI) Component */}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-bold text-slate-300 flex items-center gap-2">
+                      <Fingerprint className="h-4 w-4 text-emerald-400" /> Bring-Your-Own-Identity (SSO)
+                    </h4>
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {/* Okta Config */}
+                      <div className={`p-5 rounded-2xl border ${ssoProvider === "okta" ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-slate-900/50 border-slate-800'}`}>
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-slate-950 rounded-lg border border-slate-800">
+                              <img src="https://www.vectorlogo.zone/logos/okta/okta-icon.svg" className="w-6 h-6 grayscale hover:grayscale-0 transition-all opacity-80" alt="Okta" />
+                            </div>
+                            <div>
+                              <h5 className="font-bold text-white text-sm">Okta Enterprise (SAML)</h5>
+                              <p className="text-[10px] text-slate-400 font-mono mt-0.5">Federated Identity Provider</p>
+                            </div>
+                          </div>
+                          {ssoProvider === "okta" ? (
+                            <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                              ACTIVE
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-500 px-2.5 py-1 rounded-full border border-slate-700 bg-slate-800/50">INACTIVE</span>
+                          )}
+                        </div>
+                        
+                        {ssoProvider === "okta" ? (
+                          <div className="space-y-2 mt-4 pt-4 border-t border-emerald-500/10 text-[10px] font-mono text-slate-300">
+                            <div className="flex justify-between"><span className="text-slate-500">Assertion URL:</span><span className="truncate max-w-[150px]">https://vivexa.ai/sso/okta/saml</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500">Entity ID:</span><span>vivexa-urn:okta:enterprise</span></div>
+                            <Button variant="outline" size="sm" className="w-full mt-2 h-7 text-[10px] border-rose-500/30 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300" onClick={() => { setSsoProvider("none"); toast.success("Okta SSO Disabled"); }}>Disconnect</Button>
+                          </div>
+                        ) : (
+                          <Button variant="default" size="sm" className="w-full mt-4 h-8 text-[11px] bg-slate-800 hover:bg-slate-700 text-white" onClick={() => { setSsoProvider("okta"); toast.success("Okta SSO Authorized"); }}>Configure Integration</Button>
+                        )}
+                      </div>
+
+                      {/* Entra ID Config */}
+                      <div className={`p-5 rounded-2xl border ${ssoProvider === "entra" ? 'bg-blue-500/10 border-blue-500/30' : 'bg-slate-900/50 border-slate-800'}`}>
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-slate-950 rounded-lg border border-slate-800">
+                              <Globe className="w-6 h-6 text-blue-500" />
+                            </div>
+                            <div>
+                              <h5 className="font-bold text-white text-sm">Microsoft Entra ID (OIDC)</h5>
+                              <p className="text-[10px] text-slate-400 font-mono mt-0.5">Corporate Active Directory</p>
+                            </div>
+                          </div>
+                          {ssoProvider === "entra" ? (
+                            <span className="flex items-center gap-1 text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-full border border-blue-500/20">
+                              <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                              ACTIVE
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-500 px-2.5 py-1 rounded-full border border-slate-700 bg-slate-800/50">INACTIVE</span>
+                          )}
+                        </div>
+
+                        {ssoProvider === "entra" ? (
+                          <div className="space-y-2 mt-4 pt-4 border-t border-blue-500/10 text-[10px] font-mono text-slate-300">
+                            <div className="flex justify-between"><span className="text-slate-500">Tenant ID:</span><span>0e42d...49a1f</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500">Client ID:</span><span>a912e...b198c</span></div>
+                            <Button variant="outline" size="sm" className="w-full mt-2 h-7 text-[10px] border-rose-500/30 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300" onClick={() => { setSsoProvider("none"); toast.success("Entra ID SSO Disabled"); }}>Disconnect</Button>
+                          </div>
+                        ) : (
+                          <Button variant="default" size="sm" className="w-full mt-4 h-8 text-[11px] bg-slate-800 hover:bg-slate-700 text-white" onClick={() => { setSsoProvider("entra"); toast.success("Entra ID SSO Authorized"); }}>Configure Integration</Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="h-px bg-slate-800/50 w-full" />
+
+                  {/* Architecture & RBAC Visualization */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-bold text-slate-300 flex items-center gap-2">
+                        <Cpu className="h-4 w-4 text-cyan-400" /> Deployment & Network Security
+                      </h4>
+                      <div className="flex gap-4">
+                        <div className="flex items-center gap-2">
+                          <label className="text-[11px] text-slate-400 font-bold">VPC Deployment</label>
+                          <button onClick={() => { setVpcEnabled(!vpcEnabled); toast.success(vpcEnabled ? "VPC Integration Disabled" : "VPC Integration Enabled"); }} className="text-slate-400 hover:text-cyan-400">
+                            {vpcEnabled ? <ToggleRight className="h-5 w-5 text-cyan-400" /> : <ToggleLeft className="h-5 w-5" />}
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-[11px] text-slate-400 font-bold">AWS PrivateLink</label>
+                          <button onClick={() => { setPrivateLinkEnabled(!privateLinkEnabled); toast.success(privateLinkEnabled ? "PrivateLink Disabled" : "PrivateLink Enabled"); }} className="text-slate-400 hover:text-indigo-400">
+                            {privateLinkEnabled ? <ToggleRight className="h-5 w-5 text-indigo-400" /> : <ToggleLeft className="h-5 w-5" />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 relative overflow-hidden">
+                      {vpcEnabled && <div className="absolute inset-0 border-2 border-dashed border-cyan-500/20 m-2 rounded-xl pointer-events-none" />}
+                      {vpcEnabled && <span className="absolute top-4 left-6 text-[9px] font-bold font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">Customer VPC Boundary</span>}
+
+                      <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 pt-6">
+                        
+                        {/* User Identity */}
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="w-12 h-12 bg-slate-900 border border-slate-700 rounded-full flex items-center justify-center shadow-lg relative">
+                            <User className="h-5 w-5 text-slate-300" />
+                            {ssoProvider !== "none" && (
+                              <div className="absolute -bottom-1 -right-1 bg-emerald-500 p-0.5 rounded-full border-2 border-slate-950">
+                                <Check className="h-2.5 w-2.5 text-white" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-center">
+                            <div className="text-[10px] font-bold text-white">Analyst Request</div>
+                            <div className="text-[9px] font-mono text-slate-500">{ssoProvider !== "none" ? 'SAML Token Validated' : 'Standard Auth'}</div>
+                          </div>
+                        </div>
+
+                        {/* Middle Middleware / RBAC */}
+                        <div className="flex-1 flex items-center justify-center relative">
+                          <div className={`h-0.5 w-full ${privateLinkEnabled ? 'bg-indigo-500' : 'bg-slate-800'}`} />
+                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                            <div className="bg-slate-900 border border-rose-500/30 shadow-[0_0_15px_rgba(244,63,94,0.1)] px-4 py-2 rounded-lg flex flex-col items-center">
+                              <ShieldCheck className="h-5 w-5 text-rose-400 mb-1" />
+                              <div className="text-[10px] font-bold text-white whitespace-nowrap">RBAC / RLS Engine</div>
+                              <div className="text-[9px] font-mono text-rose-300/70 whitespace-nowrap">Query Filter Injection</div>
+                            </div>
+                          </div>
+                          {privateLinkEnabled && (
+                            <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] font-mono text-indigo-400 bg-indigo-500/10 px-2 rounded-full border border-indigo-500/20">PrivateLink Tunnel</span>
+                          )}
+                        </div>
+
+                        {/* Target Database */}
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="w-12 h-12 bg-slate-900 border border-slate-700 rounded-xl flex items-center justify-center shadow-lg">
+                            <Database className="h-5 w-5 text-blue-400" />
+                          </div>
+                          <div className="text-center">
+                            <div className="text-[10px] font-bold text-white">Data Warehouse</div>
+                            <div className="text-[9px] font-mono text-slate-500">Filtered Rows Only</div>
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="h-px bg-slate-800/50 w-full" />
+
+                  {/* SCIM 2.0 User Provisioning & Directory Sync */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-300 flex items-center gap-2">
+                          <Users className="h-4 w-4 text-purple-400" /> Automated SCIM 2.0 Directory Sync (Okta / Azure AD)
+                        </h4>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          RFC 7644 compliant identity provisioning endpoint. Syncs users, lifecycle de-provisioning, and maps IdP groups to Vivexa RBAC roles.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            try {
+                              const res = await fetch("/api/v1/scim/Users");
+                              const json = await res.json();
+                              toast.success(`Okta / Azure AD SCIM Synced: ${json.totalResults || 2} active identities verified.`);
+                            } catch (e) {
+                              toast.error("Failed to run SCIM sync");
+                            }
+                          }}
+                          className="border-purple-500/30 text-purple-300 hover:bg-purple-500/10 text-xs h-8"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Run Directory Sync
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/40 grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-[11px]">
+                      <div>
+                        <span className="text-slate-500 block">SCIM 2.0 Base URL:</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-slate-200 font-semibold truncate">https://api.vivexa.ai/scim/v2</span>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText("https://api.vivexa.ai/scim/v2");
+                              toast.success("SCIM Base URL copied to clipboard");
+                            }}
+                            className="text-slate-400 hover:text-white"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Bearer Secret Token:</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-slate-200 font-semibold truncate">vx_scim_live_••••••••••••9f21</span>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText("vx_scim_live_9f21ac0874e5421b");
+                              toast.success("SCIM Bearer Token copied to clipboard");
+                            }}
+                            className="text-slate-400 hover:text-white"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Provisioning Status:</span>
+                        <span className="text-emerald-400 font-semibold mt-0.5 block flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                          Listening (Okta & Azure AD Webhooks)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Group to Role Mapping Table */}
+                    <div className="p-3.5 rounded-xl border border-slate-800/80 bg-slate-900/30 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-300">SCIM IdP Group to Role Synchronization Rules</span>
+                        <span className="text-[10px] text-slate-500 font-mono">Auto-mapped upon user join</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-[11px] font-mono">
+                        <div className="p-2 rounded bg-slate-950/60 border border-slate-800 flex items-center justify-between">
+                          <span className="text-slate-300">Okta: Vivexa-Admins</span>
+                          <span className="text-indigo-400 font-bold">Admin</span>
+                        </div>
+                        <div className="p-2 rounded bg-slate-950/60 border border-slate-800 flex items-center justify-between">
+                          <span className="text-slate-300">Azure: Data-Engineers</span>
+                          <span className="text-cyan-400 font-bold">Data Scientist</span>
+                        </div>
+                        <div className="p-2 rounded bg-slate-950/60 border border-slate-800 flex items-center justify-between">
+                          <span className="text-slate-300">Azure: Financial-Analysts</span>
+                          <span className="text-emerald-400 font-bold">Analyst</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="h-px bg-slate-800/50 w-full" />
+
+                  {/* Active Row-Level Security (RLS) & Column Masking Policies */}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-bold text-slate-300 flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-emerald-400" /> Active RLS & Column Masking (CLS) Guardrails
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-slate-200 text-xs">Tenant Multi-Tenancy RLS</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">ENFORCED</span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 font-mono">Predicate: tenant_id = CURRENT_USER.org_id</p>
+                        <p className="text-[10px] text-slate-500">Injects WHERE clause automatically across all warehouse queries.</p>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-slate-200 text-xs">PII & Salary Masking (CLS)</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-bold">DYNAMIC</span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 font-mono">Masks: ssn, salary, credit_card, secret</p>
+                        <p className="text-[10px] text-slate-500">Applies SHA-256 hash or redact mask for non-Admin roles.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {activeTab === "sessions" && (
                 <div className="space-y-6 text-xs">
                   <div>

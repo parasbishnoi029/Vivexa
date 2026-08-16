@@ -45,7 +45,7 @@ const INITIAL_EXCEPTIONS: SystemException[] = [
     ipAddress: "103.42.112.5",
     userId: "u-9842",
     status: "active",
-    assignedTo: "parasbishnoi012@gmail.com"
+    assignedTo: "info.vivexa@gmail.com"
   },
   {
     id: "ERR-8302",
@@ -117,7 +117,7 @@ const INITIAL_EXCEPTIONS: SystemException[] = [
     ipAddress: "127.0.0.1",
     userId: "u-9842",
     status: "resolved",
-    assignedTo: "parasbishnoi012@gmail.com"
+    assignedTo: "info.vivexa@gmail.com"
   },
   {
     id: "ERR-0419",
@@ -210,7 +210,7 @@ export default function AdminDiagnosticsConsole() {
   };
 
   const handleAssignToMe = (id: string) => {
-    const developer = "parasbishnoi012@gmail.com";
+    const developer = "info.vivexa@gmail.com";
     setExceptions(prev => prev.map(e => e.id === id ? { ...e, assignedTo: developer } : e));
     if (selectedException?.id === id) {
       setSelectedException(curr => curr ? { ...curr, assignedTo: developer } : null);

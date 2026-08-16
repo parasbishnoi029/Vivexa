@@ -4,7 +4,7 @@ import {
   BarChart3, Bot, FileText, LayoutTemplate, Bookmark, Activity, ScrollText,
   Shield, HelpCircle, MessageSquare, ChevronDown, Moon, Sun, Command, Users, CreditCard, Key,
   Network, Cable, TerminalSquare, Workflow, Blocks, ActivitySquare, BookOpen, Menu, X,
-  Boxes, Layers, Globe, Brain, Building2, User, Plus, Wifi, WifiOff
+  Boxes, Layers, Globe, Brain, Building2, User, Plus, Wifi, WifiOff, ShieldCheck
 } from "lucide-react";
 import { AppBackground } from "@/components/layout/AppBackground";
 import { motion, AnimatePresence } from "motion/react";
@@ -374,9 +374,11 @@ export default function WorkspaceLayout() {
                 <nav className="space-y-1 px-3">
                   <NavItem to="/workspace/connectors" icon={Cable}>Data Connectors</NavItem>
                   <NavItem to="/workspace/notebooks" icon={TerminalSquare}>Notebooks</NavItem>
+                  <NavItem to="/workspace/dashboards" icon={LayoutDashboard}>Dashboards (BI)</NavItem>
                   <NavItem to="/workspace/automations" icon={Workflow}>Automations</NavItem>
                   <NavItem to="/workspace/plugins" icon={Blocks}>Plugins</NavItem>
                   <NavItem to="/workspace/observability" icon={ActivitySquare}>Observability</NavItem>
+                  <NavItem to="/workspace/quality" icon={ShieldCheck}>Data Quality Sentinel</NavItem>
                   <NavItem to="/workspace/marketplace" icon={Globe}>Marketplace</NavItem>
                   <NavItem to="/workspace/sdk" icon={TerminalSquare}>Intelligence SDK</NavItem>
                 </nav>
@@ -542,6 +544,7 @@ export default function WorkspaceLayout() {
                     <nav className="space-y-1 px-1">
                       <NavItem to="/workspace/connectors" icon={Cable} onClick={() => setIsMobileSidebarOpen(false)}>Data Connectors</NavItem>
                       <NavItem to="/workspace/notebooks" icon={TerminalSquare} onClick={() => setIsMobileSidebarOpen(false)}>Notebooks</NavItem>
+                      <NavItem to="/workspace/dashboards" icon={LayoutDashboard} onClick={() => setIsMobileSidebarOpen(false)}>Dashboards (BI)</NavItem>
                       <NavItem to="/workspace/automations" icon={Workflow} onClick={() => setIsMobileSidebarOpen(false)}>Automations</NavItem>
                       <NavItem to="/workspace/plugins" icon={Blocks} onClick={() => setIsMobileSidebarOpen(false)}>Plugins</NavItem>
                       <NavItem to="/workspace/observability" icon={ActivitySquare} onClick={() => setIsMobileSidebarOpen(false)}>Observability</NavItem>

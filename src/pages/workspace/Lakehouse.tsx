@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -10,12 +10,13 @@ import {
   Trash2, RefreshCw, BarChart3, PieChart, LineChart, Cpu, 
   Network, Key, Globe, FileJson, Filter, Sparkles, ChevronRight,
   GitMerge, BookOpen, Fingerprint, X, Terminal, AlertTriangle, ArrowRight,
-  ShieldCheck, HelpCircle, FileCheck
+  ShieldCheck, HelpCircle, FileCheck, Download, Code2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { ShareDialog } from "@/components/ShareDialog";
+import { duckdbEngine, DuckDBQueryResult, DuckDBTableInfo } from "@/lib/duckdbEngine";
 
 interface AssetColumn {
   name: string;
@@ -108,7 +109,7 @@ export default function Lakehouse() {
     };
     fetchAssets();
   }, []);
-  const [activeTab, setActiveTab] = useState<"catalog" | "lineage" | "storage" | "governance" | "medallion" | "history">("catalog");
+  const [activeTab, setActiveTab] = useState<"catalog" | "duckdb_wasm" | "lineage" | "storage" | "governance" | "medallion" | "history">("catalog");
   const [catalogSubTab, setCatalogSubTab] = useState<"schema" | "quality" | "query" | "ai_insights">("schema");
   
   const [searchQuery, setSearchQuery] = useState("");
@@ -131,6 +132,17 @@ export default function Lakehouse() {
   const [activeQueryResult, setActiveQueryResult] = useState<SampleQuery | null>(null);
   const [activeQueryExplanation, setActiveQueryExplanation] = useState<boolean>(false);
   
+  // DuckDB WASM In-Browser SQL Engine State
+  const [duckdbSql, setDuckdbSql] = useState<string>("");
+  const [duckdbResult, setDuckdbResult] = useState<DuckDBQueryResult | null>(null);
+  const [duckdbExplainPlan, setDuckdbExplainPlan] = useState<string | null>(null);
+  const [isDuckdbExecuting, setIsDuckdbExecuting] = useState(false);
+  const [isDuckdbReady, setIsDuckdbReady] = useState(false);
+  const [duckdbTables, setDuckdbTables] = useState<DuckDBTableInfo[]>([]);
+  const [duckdbPreset, setDuckdbPreset] = useState<string>("revenue_by_region");
+  const [duckdbPage, setDuckdbPage] = useState<number>(0);
+  const DUCKDB_PAGE_SIZE = 15;
+
   // Optimize Delta logs
   const [isOptimizing, setIsOptimizing] = useState(false);
 
@@ -140,14 +152,142 @@ export default function Lakehouse() {
     { principal: 'Executive Dashboard App', role: 'READ_ONLY', status: 'Authorized' }
   ]);
 
-  // Reset states when changing asset
+  // Sync selected asset into DuckDB WASM memory
+  const syncAssetToDuckDB = useCallback(async (asset: LakehouseAsset) => {
+    try {
+      const tableName = (asset.name || "lakehouse_table").replace(/[^a-zA-Z0-9_]/g, "_").toLowerCase();
+      const mockRows = Array.from({ length: 400 }, (_, i) => ({
+        id: `trx_${1000 + i}`,
+        transaction_id: `TX-${2026000 + i}`,
+        customer_id: `CUST-${(i % 60) + 1}`,
+        region: ["North America", "EMEA", "APAC", "LATAM"][i % 4],
+        segment: ["Enterprise", "Mid-Market", "SMB", "Public Sector"][i % 4],
+        plan_tier: ["Enterprise Plus", "Scale Tier", "Starter", "Standard Pro"][i % 4],
+        amount_usd: Math.round((1200 + (i * 47) % 8500) * 100) / 100,
+        quantity: (i % 12) + 1,
+        discount_pct: (i % 5) * 0.05,
+        status: ["Completed", "Settled", "Pending", "Verified"][i % 4],
+        latency_ms: Math.round(15 + (i * 13) % 180),
+        event_timestamp: new Date(Date.now() - (i * 3600000 * 4)).toISOString().slice(0, 19).replace('T', ' '),
+        created_at: new Date(Date.now() - (i * 3600000 * 8)).toISOString().slice(0, 19).replace('T', ' ')
+      }));
+
+      await duckdbEngine.registerTableFromJson(tableName, mockRows);
+      const tables = await duckdbEngine.getRegisteredTables();
+      setDuckdbTables(tables);
+      setIsDuckdbReady(true);
+      
+      const defaultSql = `SELECT \n  region,\n  segment,\n  COUNT(*) AS transaction_count,\n  ROUND(SUM(amount_usd), 2) AS gross_revenue_usd,\n  ROUND(AVG(amount_usd), 2) AS avg_deal_size,\n  ROUND(AVG(latency_ms), 1) AS avg_latency_ms\nFROM ${tableName}\nGROUP BY region, segment\nORDER BY gross_revenue_usd DESC;`;
+      setDuckdbSql(defaultSql);
+    } catch (err: any) {
+      console.error("DuckDB table registration error:", err);
+    }
+  }, []);
+
+  // Reset states and sync DuckDB when changing asset
   useEffect(() => {
     setCatalogSubTab("schema");
     setSelectedQueryIndex(null);
     setActiveQueryResult(null);
     setCustomQueryPrompt("");
     setActiveQueryExplanation(false);
-  }, [selectedAsset]);
+    setDuckdbResult(null);
+    setDuckdbExplainPlan(null);
+    if (selectedAsset) {
+      syncAssetToDuckDB(selectedAsset);
+    }
+  }, [selectedAsset, syncAssetToDuckDB]);
+
+  // Execute in DuckDB WASM
+  const handleExecuteDuckDB = async (sqlToRun?: string) => {
+    const query = (sqlToRun || duckdbSql).trim();
+    if (!query) {
+      toast.error("Please enter a SQL query to execute in DuckDB WASM.");
+      return;
+    }
+    setIsDuckdbExecuting(true);
+    setDuckdbExplainPlan(null);
+    setDuckdbPage(0);
+    try {
+      const result = await duckdbEngine.query(query);
+      setDuckdbResult(result);
+      toast.success(`DuckDB WASM executed in ${result.executionTimeMs}ms (${result.rowCount} rows)`);
+    } catch (err: any) {
+      toast.error(`DuckDB execution failed: ${err.message}`);
+    } finally {
+      setIsDuckdbExecuting(false);
+    }
+  };
+
+  // Run EXPLAIN Plan in DuckDB WASM
+  const handleExplainDuckDB = async () => {
+    const query = duckdbSql.trim();
+    if (!query) {
+      toast.error("Please enter a SQL query to explain.");
+      return;
+    }
+    setIsDuckdbExecuting(true);
+    try {
+      const plan = await duckdbEngine.explain(query);
+      setDuckdbExplainPlan(plan);
+      toast.info("DuckDB Vectorized Execution Plan generated.");
+    } catch (err: any) {
+      toast.error(`Explain failed: ${err.message}`);
+    } finally {
+      setIsDuckdbExecuting(false);
+    }
+  };
+
+  // Apply DuckDB Preset Queries
+  const applyDuckDBPreset = (presetKey: string) => {
+    if (!selectedAsset) return;
+    const tableName = (selectedAsset.name || "lakehouse_table").replace(/[^a-zA-Z0-9_]/g, "_").toLowerCase();
+    setDuckdbPreset(presetKey);
+
+    let query = "";
+    if (presetKey === "revenue_by_region") {
+      query = `SELECT \n  region,\n  segment,\n  COUNT(*) AS transaction_count,\n  ROUND(SUM(amount_usd), 2) AS gross_revenue_usd,\n  ROUND(AVG(amount_usd), 2) AS avg_deal_size\nFROM ${tableName}\nGROUP BY region, segment\nORDER BY gross_revenue_usd DESC;`;
+    } else if (presetKey === "top_accounts") {
+      query = `SELECT \n  customer_id,\n  region,\n  plan_tier,\n  COUNT(*) AS orders_placed,\n  ROUND(SUM(amount_usd), 2) AS account_ltv,\n  RANK() OVER (ORDER BY SUM(amount_usd) DESC) AS ltv_rank\nFROM ${tableName}\nGROUP BY customer_id, region, plan_tier\nORDER BY account_ltv DESC\nLIMIT 15;`;
+    } else if (presetKey === "latency_telemetry") {
+      query = `SELECT \n  status,\n  COUNT(*) AS volume,\n  ROUND(AVG(latency_ms), 2) AS avg_latency_ms,\n  MIN(latency_ms) AS min_latency_ms,\n  MAX(latency_ms) AS max_latency_ms\nFROM ${tableName}\nGROUP BY status\nORDER BY volume DESC;`;
+    } else if (presetKey === "cumulative_window") {
+      query = `SELECT \n  transaction_id,\n  region,\n  segment,\n  amount_usd,\n  ROUND(SUM(amount_usd) OVER (PARTITION BY region ORDER BY amount_usd DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 2) AS running_region_total\nFROM ${tableName}\nORDER BY region, amount_usd DESC\nLIMIT 30;`;
+    } else if (presetKey === "filter_recent") {
+      query = `SELECT *\nFROM ${tableName}\nWHERE amount_usd > 2500\nORDER BY amount_usd DESC\nLIMIT 25;`;
+    }
+
+    setDuckdbSql(query);
+    handleExecuteDuckDB(query);
+  };
+
+  // Export DuckDB Result to CSV
+  const handleExportDuckDBCsv = () => {
+    if (!duckdbResult || duckdbResult.rows.length === 0) {
+      toast.error("No DuckDB query results to export.");
+      return;
+    }
+    const headerLine = duckdbResult.columns.join(",");
+    const rowsLines = duckdbResult.rows.map(r => 
+      duckdbResult.columns.map(col => {
+        const val = r[col];
+        if (val === null || val === undefined) return "";
+        const str = String(val);
+        return str.includes(",") || str.includes('"') || str.includes("\n")
+          ? `"${str.replace(/"/g, '""')}"`
+          : str;
+      }).join(",")
+    );
+    const csvContent = [headerLine, ...rowsLines].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `duckdb_query_${selectedAsset?.name || "results"}_${Date.now()}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("DuckDB WASM results exported as CSV!");
+  };
 
   const filteredAssets = useMemo(() => {
     return assets.filter(a => 
@@ -251,8 +391,8 @@ export default function Lakehouse() {
       toast.error("Please provide a prompt to compile.");
       return;
     }
-    // Formulate a dynamic matching mock SQL or fall back gracefully
-    const mockQuery: SampleQuery = {
+    // Formulate a dynamic matching synthetic SQL or fall back gracefully
+    const syntheticQuery: SampleQuery = {
       question: customQueryPrompt,
       sql: `SELECT \n  EXTRACT(HOUR FROM event_timestamp) as hour_of_day,\n  SUM(amount_usd) as aggregate_usd,\n  COUNT(*) as transaction_volume\nFROM delta.${selectedAsset?.name || "active_table"}\nWHERE event_timestamp >= CURRENT_DATE - INTERVAL '7 DAYS'\nGROUP BY 1\nORDER BY 2 DESC;`,
       headers: ["hour_of_day", "aggregate_usd", "transaction_volume"],
@@ -262,7 +402,7 @@ export default function Lakehouse() {
       assumptions: "Assumes current clock context corresponds to local Eastern Standard Timezone alignments.",
       risks: "Underlying stream contains late-arriving logs up to 15m. Real-time metrics might fluctuate dynamically."
     };
-    handleRunQuery(mockQuery);
+    handleRunQuery(syntheticQuery);
   };
 
   // Run Delta optimization
@@ -427,8 +567,9 @@ export default function Lakehouse() {
               </div>
 
               {/* Tabs Nav */}
-              <div className="flex items-center gap-8 mt-8 border-t border-slate-800/40 pt-4">
+              <div className="flex items-center gap-8 mt-8 border-t border-slate-800/40 pt-4 overflow-x-auto no-scrollbar">
                 {[
+                  { id: 'duckdb_wasm', label: 'DuckDB WASM Engine', icon: Cpu, badge: 'Vectorized' },
                   { id: 'catalog', label: 'Schema Explorer', icon: Table },
                   { id: 'history', label: 'Delta Time Travel', icon: Clock },
                   { id: 'medallion', label: 'Medallion Stage', icon: Box },
@@ -438,12 +579,17 @@ export default function Lakehouse() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id as any)}
-                    className={`flex items-center gap-2 pb-4 px-1 text-[11px] font-bold uppercase tracking-[0.1em] transition-all relative ${
+                    className={`flex items-center gap-2 pb-4 px-1 text-[11px] font-bold uppercase tracking-[0.1em] transition-all relative shrink-0 ${
                       activeTab === tab.id ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'
                     }`}
                   >
                     <tab.icon className="h-3.5 w-3.5" />
                     {tab.label}
+                    {tab.badge && (
+                      <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
+                        {tab.badge}
+                      </span>
+                    )}
                     {activeTab === tab.id && (
                       <motion.div 
                         layoutId="activeTab"
@@ -458,6 +604,264 @@ export default function Lakehouse() {
             {/* Tab Content */}
             <div className="flex-1 overflow-y-auto p-8 no-scrollbar">
               <AnimatePresence mode="wait">
+                {/* Major Tab: DuckDB WASM Engine */}
+                {activeTab === 'duckdb_wasm' && (
+                  <motion.div 
+                    key="duckdb_wasm"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="space-y-6"
+                  >
+                    {/* Top Telemetry Header */}
+                    <div className="p-6 bg-slate-950 border border-slate-800 rounded-[24px] flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-indigo-500/10 via-transparent to-transparent pointer-events-none" />
+                      
+                      <div className="space-y-1 text-left relative z-10">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                            <Cpu className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                              DuckDB WASM Vectorized Engine
+                              <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                In-Browser SIMD Active
+                              </span>
+                            </h3>
+                          </div>
+                        </div>
+                        <p className="text-xs text-slate-400 leading-relaxed max-w-2xl mt-1">
+                          Executes ANSI SQL queries locally in the browser utilizing vectorized SIMD and Apache Arrow memory buffers without requiring backend compute round-trips.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3 relative z-10 shrink-0">
+                        <div className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-right">
+                          <span className="text-[9px] uppercase font-mono text-slate-500 block">Memory Table</span>
+                          <span className="text-xs font-bold text-indigo-400 font-mono">
+                            {selectedAsset.name.toLowerCase().replace(/[^a-zA-Z0-9_]/g, "_")}
+                          </span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            syncAssetToDuckDB(selectedAsset);
+                            toast.success(`Reloaded '${selectedAsset.name}' into DuckDB WASM memory buffer.`);
+                          }}
+                          className="bg-slate-900 border-slate-800 text-xs font-bold hover:bg-slate-800 text-slate-300 gap-1.5"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" /> Reload Buffer
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Query Presets Toolbar */}
+                    <div className="space-y-2 text-left">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
+                        Vectorized Analytical Query Presets:
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { id: "revenue_by_region", label: "📊 Revenue by Region & Segment" },
+                          { id: "top_accounts", label: "👑 Top Accounts & LTV Rank" },
+                          { id: "latency_telemetry", label: "⚡ Latency & Status Profiler" },
+                          { id: "cumulative_window", label: "📈 Cumulative Running Window" },
+                          { id: "filter_recent", label: "🔍 High Value Filter (> $2,500)" },
+                        ].map(preset => (
+                          <button
+                            key={preset.id}
+                            onClick={() => applyDuckDBPreset(preset.id)}
+                            className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
+                              duckdbPreset === preset.id
+                                ? "bg-indigo-600/20 border-indigo-500 text-indigo-300 shadow-sm"
+                                : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
+                            }`}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* SQL Editor Box */}
+                    <div className="rounded-2xl border border-slate-800 overflow-hidden bg-slate-950 shadow-xl">
+                      <div className="bg-slate-900/90 px-4 py-2.5 flex items-center justify-between border-b border-slate-800">
+                        <div className="flex items-center gap-2">
+                          <Terminal className="h-4 w-4 text-indigo-400" />
+                          <span className="font-mono text-xs font-bold text-white uppercase tracking-wider">
+                            DuckDB SQL Query Console
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            (ANSI SQL-92 / DuckDB Extensions)
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleExplainDuckDB}
+                            disabled={isDuckdbExecuting}
+                            className="h-7 text-xs bg-slate-950 border-slate-800 text-slate-300 hover:text-white"
+                          >
+                            <Code2 className="h-3 w-3 mr-1" /> EXPLAIN Plan
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleExecuteDuckDB()}
+                            disabled={isDuckdbExecuting}
+                            className="h-7 text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-bold gap-1.5"
+                          >
+                            {isDuckdbExecuting ? (
+                              <>
+                                <RefreshCw className="h-3 w-3 animate-spin" /> Executing SIMD...
+                              </>
+                            ) : (
+                              <>
+                                <Play className="h-3 w-3 fill-white" /> Run in DuckDB WASM
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="p-4 bg-slate-950">
+                        <textarea
+                          rows={6}
+                          value={duckdbSql}
+                          onChange={(e) => setDuckdbSql(e.target.value)}
+                          placeholder="SELECT * FROM table_name LIMIT 20;"
+                          className="w-full bg-slate-900/60 border border-slate-800/80 rounded-xl p-3.5 font-mono text-xs text-indigo-300 focus:outline-none focus:border-indigo-500/60 leading-relaxed resize-y"
+                        />
+                      </div>
+                    </div>
+
+                    {/* EXPLAIN Plan Box if active */}
+                    {duckdbExplainPlan && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        className="rounded-2xl border border-indigo-500/30 overflow-hidden bg-slate-950 p-4 space-y-2 text-left"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-indigo-400 font-mono uppercase tracking-wider flex items-center gap-1.5">
+                            <Zap className="h-3.5 w-3.5 text-amber-400" /> Vectorized Physical Plan Tree
+                          </span>
+                          <button
+                            onClick={() => setDuckdbExplainPlan(null)}
+                            className="text-xs text-slate-500 hover:text-white"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        <pre className="p-3 bg-slate-900/90 rounded-lg text-[11px] font-mono text-slate-300 overflow-x-auto leading-relaxed border border-slate-800">
+                          {duckdbExplainPlan}
+                        </pre>
+                      </motion.div>
+                    )}
+
+                    {/* Tabular Result Grid */}
+                    {duckdbResult && (
+                      <div className="space-y-3 text-left">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                            <span className="text-xs font-bold text-white uppercase tracking-wider">
+                              DuckDB Output Grid
+                            </span>
+                            <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono font-bold">
+                              ⚡ {duckdbResult.executionTimeMs}ms • {duckdbResult.rowCount} rows • {duckdbResult.columns.length} columns
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleExportDuckDBCsv}
+                              className="h-7 text-xs bg-slate-950 border-slate-800 text-slate-300 hover:text-white"
+                            >
+                              <Download className="h-3 w-3 mr-1" /> Export CSV
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Result Table */}
+                        <div className="rounded-xl border border-slate-800 overflow-hidden bg-slate-950">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-900/80 border-b border-slate-800 font-mono text-slate-400 text-[11px]">
+                                <tr>
+                                  <th className="p-3 uppercase font-bold tracking-wider w-12 text-slate-600 text-center">#</th>
+                                  {duckdbResult.columns.map((col, idx) => (
+                                    <th key={idx} className="p-3 uppercase font-bold tracking-wider">
+                                      {col}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-800/40 font-mono text-slate-300 text-xs">
+                                {duckdbResult.rows
+                                  .slice(duckdbPage * DUCKDB_PAGE_SIZE, (duckdbPage + 1) * DUCKDB_PAGE_SIZE)
+                                  .map((row, rIdx) => (
+                                    <tr key={rIdx} className="hover:bg-slate-900/30 transition-colors">
+                                      <td className="p-3 text-slate-600 text-center text-[10px]">
+                                        {duckdbPage * DUCKDB_PAGE_SIZE + rIdx + 1}
+                                      </td>
+                                      {duckdbResult.columns.map((col, cIdx) => (
+                                        <td key={cIdx} className="p-3 whitespace-nowrap">
+                                          {row[col] === null || row[col] === undefined
+                                            ? <span className="text-slate-600 italic">NULL</span>
+                                            : typeof row[col] === "number"
+                                            ? <span className="text-emerald-400 font-semibold">{row[col].toLocaleString()}</span>
+                                            : String(row[col])}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  ))}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Pagination Footer */}
+                          {duckdbResult.rowCount > DUCKDB_PAGE_SIZE && (
+                            <div className="px-4 py-2.5 bg-slate-900/60 border-t border-slate-800 flex items-center justify-between text-xs font-mono text-slate-400">
+                              <span>
+                                Showing {duckdbPage * DUCKDB_PAGE_SIZE + 1} - {Math.min((duckdbPage + 1) * DUCKDB_PAGE_SIZE, duckdbResult.rowCount)} of {duckdbResult.rowCount} rows
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={duckdbPage === 0}
+                                  onClick={() => setDuckdbPage(p => Math.max(0, p - 1))}
+                                  className="h-7 px-2 text-xs"
+                                >
+                                  Prev
+                                </Button>
+                                <span className="px-2 font-bold text-white">
+                                  {duckdbPage + 1} / {Math.ceil(duckdbResult.rowCount / DUCKDB_PAGE_SIZE)}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={(duckdbPage + 1) * DUCKDB_PAGE_SIZE >= duckdbResult.rowCount}
+                                  onClick={() => setDuckdbPage(p => p + 1)}
+                                  className="h-7 px-2 text-xs"
+                                >
+                                  Next
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
                 {activeTab === 'catalog' && (
                   <motion.div 
                     key="catalog"

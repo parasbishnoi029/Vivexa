@@ -37,6 +37,22 @@ interface Connector {
 }
 
 const ALL_CONNECTOR_TEMPLATES: Connector[] = [
+  
+  { id: "stream1", name: "Apache Kafka", category: "Streaming & Event Broker", type: "Event Streaming", status: "Disconnected", color: "text-amber-500", host: "kafka-prod.internal:9092",
+    schemaPreview: [
+      { table: "Topic: clickstream_events", columns: [{ name: "event_id", type: "STRING", key: true }, { name: "payload", type: "JSON" }] }
+    ]
+  },
+  { id: "stream2", name: "AWS Kinesis", category: "Streaming & Event Broker", type: "Event Streaming", status: "Disconnected", color: "text-orange-500", host: "us-east-1 (Data Stream)",
+    schemaPreview: [
+      { table: "Stream: iot_sensor_telemetry", columns: [{ name: "partition_key", type: "STRING" }, { name: "data", type: "BINARY" }] }
+    ]
+  },
+  { id: "stream3", name: "Confluent Cloud", category: "Streaming & Event Broker", type: "Event Streaming", status: "Disconnected", color: "text-slate-200", host: "pkc-1234.region.confluent.cloud:9092",
+    schemaPreview: [
+      { table: "Topic: financial_transactions", columns: [{ name: "tx_id", type: "STRING", key: true }, { name: "amount", type: "DOUBLE" }] }
+    ]
+  },
   // Databases
   { id: "c1", name: "PostgreSQL Database", category: "Databases", type: "Relational DB", status: "Connected", color: "text-blue-400", host: "db.production.internal:5432", lastSync: "10 mins ago", recordsSynced: 124500, syncFrequency: "Hourly",
     schemaPreview: [
@@ -210,7 +226,7 @@ export default function DataConnectors() {
     setActiveTabModal("credentials");
   };
 
-  const categories = ["All", "Databases", "Cloud Storage", "SaaS & CRM", "Analytics & Ads", "APIs & Webhooks"];
+  const categories = ["All", "Databases", "Streaming & Event Broker", "Cloud Storage", "SaaS & CRM", "Analytics & Ads", "APIs & Webhooks"];
 
   const filteredConnectors = useMemo(() => {
     return connectors.filter((c) => {
@@ -469,7 +485,42 @@ export default function DataConnectors() {
       </div>
 
       {/* Grid of Connectors */}
+      
+      {/* Zero-Copy Architecture Banner */}
+      <motion.div variants={itemVariants} className="bg-gradient-to-r from-indigo-950/40 via-slate-900 to-slate-900 border border-indigo-500/20 rounded-2xl p-6 relative overflow-hidden shadow-2xl mb-8">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-[80px] pointer-events-none" />
+        <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
+          <div className="flex-1 space-y-3">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 font-mono bg-indigo-500/10 px-2 py-1 rounded border border-indigo-500/20 inline-block">Enterprise Zero-Copy Architecture</span>
+            <h2 className="text-xl font-bold text-white leading-snug">Direct Warehouse Intelligence</h2>
+            <p className="text-sm text-slate-400 leading-relaxed max-w-xl">
+              Vivexa connects directly to your existing Snowflake, Databricks, or BigQuery instances. 
+              <strong> Your raw PII data never leaves your VPC. </strong> 
+              Our agents generate optimized SQL, push the compute down to your warehouse, and only ingest aggregated, non-sensitive results.
+            </p>
+          </div>
+          <div className="hidden lg:flex items-center justify-center gap-4 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+             <div className="text-center">
+               <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center mx-auto mb-2"><Database className="h-6 w-6 text-blue-400" /></div>
+               <div className="text-[9px] font-bold text-slate-300 font-mono">Your Data<br/>Warehouse</div>
+             </div>
+             <div className="flex flex-col items-center">
+               <span className="text-[8px] text-indigo-400 font-mono mb-1">Push-Down SQL</span>
+               <div className="w-16 h-0.5 bg-indigo-500/30 relative">
+                 <div className="absolute top-1/2 right-0 -translate-y-1/2 border-t-4 border-b-4 border-l-4 border-transparent border-l-indigo-500/50" />
+               </div>
+             </div>
+             <div className="text-center">
+               <div className="w-12 h-12 rounded-xl bg-indigo-900/30 border border-indigo-500/30 flex items-center justify-center mx-auto mb-2"><Zap className="h-6 w-6 text-indigo-400" /></div>
+               <div className="text-[9px] font-bold text-slate-300 font-mono">Vivexa<br/>Edge Node</div>
+             </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Main Grid */}
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+
         {filteredConnectors.map((connector) => (
           <motion.div key={connector.id} variants={itemVariants}>
             <Card className="bg-slate-900/40 border-slate-800/80 backdrop-blur-xl shadow-xl hover:border-slate-700/80 transition-all group flex flex-col justify-between h-full">

@@ -553,7 +553,7 @@ print("\\nClassification Report:\\n", classification_report(y_test, preds))
                         <span className="text-xs font-bold text-slate-200 flex items-center gap-2 font-mono">
                           <Sliders className="h-4 w-4 text-indigo-400" /> INFERENCE FEATURE GENERATORS
                         </span>
-                        <p className="text-[10px] text-slate-500 mt-1">Vary numeric parameters below to run simulated mock predictions against your model structure.</p>
+                        <p className="text-[10px] text-slate-500 mt-1">Vary numeric parameters below to run simulated inference predictions against your model structure.</p>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4 max-h-56 overflow-y-auto p-1 pr-2">

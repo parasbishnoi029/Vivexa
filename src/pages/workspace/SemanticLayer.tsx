@@ -4,12 +4,14 @@ import {
   Database, Layers, Target, Shield, Activity, 
   Plus, Search, Filter, MoreVertical, Settings2,
   Code2, Share2, Info, ChevronRight, BarChart3,
-  Terminal, Zap, Boxes
+  Terminal, Zap, Boxes, GitBranch, RefreshCw, Download
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { ShareDialog } from "@/components/ShareDialog";
+import { DbtCubeSyncModal } from "@/components/workspace/DbtCubeSyncModal";
+import { ParsedSemanticMetric } from "@/lib/dbtCubeParser";
 
 interface SemanticMetric {
   id: string;
@@ -24,10 +26,83 @@ interface SemanticMetric {
   lineage: string[];
 }
 
-const DEFAULT_METRICS: SemanticMetric[] = [];
+const INITIAL_ENTERPRISE_METRICS: SemanticMetric[] = [
+  {
+    id: "m-mrr-01",
+    name: "Monthly Recurring Revenue (MRR)",
+    description: "Normalized monthly subscription revenue excluding one-time professional services.",
+    expression: "SUM(monthly_subscription_amount) - SUM(discounts)",
+    sql: "SELECT SUM(amount) FROM subscriptions WHERE status = 'active' AND type = 'recurring'",
+    type: "Sum",
+    category: "Revenue",
+    status: "Verified",
+    owner: "Finance Data Team",
+    lineage: ["Stripe.Invoices", "Salesforce.Contracts", "Lakehouse.Fact_Revenue"]
+  },
+  {
+    id: "m-churn-02",
+    name: "Logo Churn Rate",
+    description: "Percentage of unique active customer accounts cancelled in the trailing 30 days.",
+    expression: "(Cancelled_Customers_30d / Total_Active_Customers_Start_30d) * 100",
+    sql: "SELECT (COUNT(CASE WHEN churned_at > CURRENT_DATE - 30 THEN 1 END) / COUNT(CASE WHEN created_at < CURRENT_DATE - 30 THEN 1 END)) * 100 FROM customers",
+    type: "Ratio",
+    category: "Risk",
+    status: "Verified",
+    owner: "Customer Success",
+    lineage: ["Zendesk.Accounts", "Lakehouse.Dim_Customer"]
+  },
+  {
+    id: "m-cac-03",
+    name: "Customer Acquisition Cost (CAC)",
+    description: "Fully burdened marketing and sales spend divided by net new logos.",
+    expression: "Total_S&M_Spend / Net_New_Logos",
+    sql: "SELECT SUM(spend) / COUNT(DISTINCT new_customer_id) FROM marketing_attribution",
+    type: "Average",
+    category: "Operational",
+    status: "Draft",
+    owner: "Marketing Analytics",
+    lineage: ["GoogleAds.Spend", "LinkedIn.Spend", "HubSpot.Deals"]
+  },
+  {
+    id: "m-nrr-04",
+    name: "Net Retention Rate (NRR)",
+    description: "Revenue retained from existing customers including expansions, minus downgrades and churn.",
+    expression: "(Starting_MRR + Expansion_MRR - Downgrade_MRR - Churn_MRR) / Starting_MRR",
+    sql: "SELECT ((sum(start_mrr) + sum(expansion) - sum(downgrade) - sum(churn)) / sum(start_mrr)) * 100 FROM mrr_waterfall",
+    type: "Ratio",
+    category: "Revenue",
+    status: "Verified",
+    owner: "Finance Data Team",
+    lineage: ["Lakehouse.Fact_MRR_Waterfall"]
+  },
+  {
+    id: "m-dau-05",
+    name: "Daily Active Users (DAU)",
+    description: "Unique authenticated user sessions performing a core platform action.",
+    expression: "COUNT(DISTINCT user_id) WHERE action_type IN ('query', 'view', 'edit')",
+    sql: "SELECT COUNT(DISTINCT user_id) FROM events_log WHERE timestamp >= CURRENT_DATE - 1",
+    type: "Distinct",
+    category: "User Growth",
+    status: "Verified",
+    owner: "Product Data",
+    lineage: ["Mixpanel.Events", "Lakehouse.Fact_Session"]
+  }
+];
 
 export default function SemanticLayer() {
-  const [metrics, setMetrics] = useState<SemanticMetric[]>(DEFAULT_METRICS);
+  const [metrics, setMetrics] = useState<SemanticMetric[]>(() => {
+    try {
+      const saved = localStorage.getItem('vivexa_semantic_metrics');
+      return saved ? JSON.parse(saved) : INITIAL_ENTERPRISE_METRICS;
+    } catch {
+      return INITIAL_ENTERPRISE_METRICS;
+    }
+  });
+
+  // Auto-persist changes
+  useMemo(() => {
+    localStorage.setItem('vivexa_semantic_metrics', JSON.stringify(metrics));
+  }, [metrics]);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("All");
 
@@ -40,8 +115,30 @@ export default function SemanticLayer() {
     });
   }, [metrics, searchQuery, activeCategory]);
 
-  const [selectedMetric, setSelectedMetric] = useState<SemanticMetric | null>(DEFAULT_METRICS[0]);
+  const [selectedMetric, setSelectedMetric] = useState<SemanticMetric | null>(INITIAL_ENTERPRISE_METRICS[0]);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [isDbtSyncOpen, setIsDbtSyncOpen] = useState(false);
+
+  const handleImportMetrics = (newMetrics: ParsedSemanticMetric[]) => {
+    const formatted: SemanticMetric[] = newMetrics.map(nm => ({
+      id: nm.id,
+      name: nm.name,
+      description: nm.description,
+      expression: nm.expression,
+      sql: nm.sql,
+      type: nm.type,
+      category: nm.category,
+      status: nm.status,
+      owner: nm.owner,
+      lineage: nm.lineage
+    }));
+
+    setMetrics(prev => {
+      const existingIds = new Set(prev.map(m => m.id));
+      const filteredNew = formatted.filter(m => !existingIds.has(m.id));
+      return [...filteredNew, ...prev];
+    });
+  };
 
   return (
     <motion.div 
@@ -66,9 +163,17 @@ export default function SemanticLayer() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          
-          <Button className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl px-6">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button 
+            onClick={() => setIsDbtSyncOpen(true)}
+            variant="outline" 
+            className="border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-slate-200 font-semibold rounded-xl text-xs gap-2"
+          >
+            <GitBranch className="h-4 w-4 text-orange-400" />
+            dbt & Cube.js Sync
+          </Button>
+
+          <Button className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl px-5 text-xs">
             <Plus className="h-4 w-4 mr-2" /> Create Metric
           </Button>
         </div>
@@ -319,6 +424,12 @@ export default function SemanticLayer() {
         isOpen={isShareDialogOpen}
         onClose={() => setIsShareDialogOpen(false)}
         title={selectedMetric ? `Metric: ${selectedMetric.name}` : "Semantic Layer"}
+      />
+      <DbtCubeSyncModal
+        isOpen={isDbtSyncOpen}
+        onClose={() => setIsDbtSyncOpen(false)}
+        onImportMetrics={handleImportMetrics}
+        currentMetrics={metrics}
       />
     </motion.div>
   );

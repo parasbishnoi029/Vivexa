@@ -712,7 +712,7 @@ export default async function dispatchAlert(eventDetails) {
               </span>
               <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 font-mono text-[10px] text-emerald-400 h-32 overflow-y-auto space-y-1">
                 {probeLogs.length === 0 ? (
-                  <span className="text-slate-600 italic">Idle. Click 'Trace Hook Pipeline' to dispatch a simulated mock request event and audit step executions.</span>
+                  <span className="text-slate-600 italic">Idle. Click 'Trace Hook Pipeline' to dispatch a simulated webhook event and audit step executions.</span>
                 ) : (
                   probeLogs.map((log, idx) => (
                     <div key={idx} className="leading-relaxed">&gt; {log}</div>

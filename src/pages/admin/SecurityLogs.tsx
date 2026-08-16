@@ -28,8 +28,8 @@ export default function AdminSecurityLogs() {
 
           <div className="space-y-3">
             {[
-              { event: "User authentication token refreshed", user: "parasbishnoi012@gmail.com", time: "Just now", status: "SUCCESS" },
-              { event: "Scoped API key requested", user: "parasbishnoi012@gmail.com", time: "10 mins ago", status: "SUCCESS" },
+              { event: "User authentication token refreshed", user: "info.vivexa@gmail.com", time: "Just now", status: "SUCCESS" },
+              { event: "Scoped API key requested", user: "info.vivexa@gmail.com", time: "10 mins ago", status: "SUCCESS" },
               { event: "Row Level Security policy checked for notifications", user: "system", time: "25 mins ago", status: "VERIFIED" }
             ].map((log, i) => (
               <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/40 border border-slate-700/50 text-xs">

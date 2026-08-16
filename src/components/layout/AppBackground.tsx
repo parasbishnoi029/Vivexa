@@ -1,101 +1,98 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { motion, useScroll, useTransform, useSpring } from 'motion/react';
+import React, { useEffect, useRef } from 'react';
+import { motion, useScroll, useTransform } from 'motion/react';
 
-export function AppBackground({ children, centered = true }: { children: React.ReactNode, centered?: boolean }) {
-  const [mousePosition, setMousePosition] = useState({ x: 0.5, y: 0.5 });
+export const AppBackground = React.memo(function AppBackground({ 
+  children, 
+  centered = true 
+}: { 
+  children: React.ReactNode; 
+  centered?: boolean; 
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { scrollY } = useScroll();
 
-  const y1 = useTransform(scrollY, [0, 1000], [0, 200]);
-  const y2 = useTransform(scrollY, [0, 1000], [0, -100]);
-  
-  const springConfig = { damping: 25, stiffness: 120 };
-  const smoothMouseX = useSpring(mousePosition.x, springConfig);
-  const smoothMouseY = useSpring(mousePosition.y, springConfig);
+  const y1 = useTransform(scrollY, [0, 1000], [0, 100]);
+  const y2 = useTransform(scrollY, [0, 1000], [0, -50]);
 
   useEffect(() => {
+    let animId: number = 0;
+    let latestX = 0.5;
+    let latestY = 0.5;
+
+    const updateCSSVars = () => {
+      if (containerRef.current) {
+        containerRef.current.style.setProperty('--mouse-x', `${(latestX * 100).toFixed(1)}%`);
+        containerRef.current.style.setProperty('--mouse-y', `${(latestY * 100).toFixed(1)}%`);
+      }
+      animId = 0;
+    };
+
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current) return;
       const { clientX, clientY } = e;
       const { left, top, width, height } = containerRef.current.getBoundingClientRect();
-      const x = (clientX - left) / width;
-      const y = (clientY - top) / height;
-      setMousePosition({ x, y });
+      latestX = Math.max(0, Math.min(1, (clientX - left) / (width || 1)));
+      latestY = Math.max(0, Math.min(1, (clientY - top) / (height || 1)));
+
+      if (!animId) {
+        animId = requestAnimationFrame(updateCSSVars);
+      }
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      if (animId) cancelAnimationFrame(animId);
+    };
   }, []);
 
   return (
     <div 
       ref={containerRef}
-      className={`relative min-h-screen w-full bg-[#030712] overflow-hidden text-slate-50 selection:bg-indigo-500/30 ${centered ? 'flex items-center justify-center' : ''}`}
+      className={`relative min-h-screen w-full bg-[#030712] text-slate-50 selection:bg-indigo-500/30 ${centered ? 'flex items-center justify-center' : ''}`}
+      style={{ '--mouse-x': '50%', '--mouse-y': '50%' } as React.CSSProperties}
     >
-      {/* Premium Animated Background Layers */}
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+      {/* Optimized Hardware-Accelerated Background Layers */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden transform-gpu">
         
-        {/* Soft Noise Texture */}
+        {/* Soft Grid */}
         <div 
-          className="absolute inset-0 opacity-[0.015] mix-blend-overlay" 
-          style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}
+          className="absolute inset-0 opacity-[0.03] pointer-events-none transform-gpu"
+          style={{
+            backgroundImage: `linear-gradient(to right, #6366f1 1px, transparent 1px), linear-gradient(to bottom, #6366f1 1px, transparent 1px)`,
+            backgroundSize: '4rem 4rem',
+            maskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, #000 40%, transparent 100%)',
+            WebkitMaskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, #000 40%, transparent 100%)',
+          }}
         />
 
-        {/* Glowing Perspective Grid */}
-        <div className="absolute inset-0 perspective-1000">
-           <motion.div 
-             className="absolute inset-0 opacity-[0.05]"
-             style={{
-               backgroundImage: `linear-gradient(to right, #6366f1 1px, transparent 1px), linear-gradient(to bottom, #6366f1 1px, transparent 1px)`,
-               backgroundSize: '4rem 4rem',
-               maskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, #000 40%, transparent 100%)',
-               WebkitMaskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, #000 40%, transparent 100%)',
-               transform: 'rotateX(60deg) scale(2)',
-               transformOrigin: 'top center'
-             }}
-             animate={{
-               backgroundPosition: ['0px 0px', '0px 64px']
-             }}
-             transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
-           />
-        </div>
-
-        {/* Aurora Gradient Layers */}
+        {/* Aurora Gradient Layers with lightweight blurs & hardware acceleration */}
         <motion.div 
           style={{ y: y1 }}
-          className="absolute top-[-20%] left-[-10%] w-[50rem] h-[50rem] bg-indigo-600/10 rounded-full mix-blend-screen filter blur-[150px] animate-pulse" 
-          transition={{ duration: 10, repeat: Infinity, repeatType: 'reverse' }}
+          className="absolute top-[-10%] left-[-5%] w-[40rem] h-[40rem] bg-indigo-600/10 rounded-full filter blur-[60px] transform-gpu pointer-events-none" 
         />
         <motion.div 
           style={{ y: y2 }}
-          className="absolute bottom-[-20%] right-[-10%] w-[60rem] h-[60rem] bg-violet-600/10 rounded-full mix-blend-screen filter blur-[150px] animate-pulse" 
-          transition={{ duration: 15, repeat: Infinity, repeatType: 'reverse' }}
+          className="absolute bottom-[-10%] right-[-5%] w-[45rem] h-[45rem] bg-violet-600/10 rounded-full filter blur-[60px] transform-gpu pointer-events-none" 
         />
-        <div className="absolute top-[20%] right-[20%] w-[30rem] h-[30rem] bg-cyan-500/10 rounded-full mix-blend-screen filter blur-[120px]" />
+        <div className="absolute top-[20%] right-[20%] w-[25rem] h-[25rem] bg-cyan-500/5 rounded-full filter blur-[50px] transform-gpu pointer-events-none" />
 
-        {/* Dynamic Lighting following mouse */}
-        <motion.div 
-          className="absolute inset-0 opacity-40 mix-blend-screen"
+        {/* Dynamic Lighting following mouse via CSS variables */}
+        <div 
+          className="absolute inset-0 opacity-40 pointer-events-none transform-gpu transition-opacity duration-300"
           style={{
-            background: useTransform(
-              [smoothMouseX, smoothMouseY],
-              ([x, y]: number[]) => `radial-gradient(800px circle at ${x * 100}% ${y * 100}%, rgba(99, 102, 241, 0.15), transparent 40%)`
-            )
+            background: `radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(99, 102, 241, 0.12), transparent 50%)`
           }}
         />
       </div>
       
       {/* Content Container */}
       <div className={`relative z-10 w-full h-full ${centered ? 'flex flex-col items-center justify-center min-h-screen px-4 py-12' : ''}`}>
-        <motion.div
-          className={centered ? 'w-full flex justify-center flex-col items-center' : 'w-full h-full'}
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-        >
+        <div className={centered ? 'w-full flex justify-center flex-col items-center' : 'w-full h-full'}>
           {children}
-        </motion.div>
+        </div>
       </div>
     </div>
   );
-}
+});
+

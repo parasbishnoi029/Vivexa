@@ -255,20 +255,38 @@ else:
     printed_lines = []
     
     python_code_lines = []
+    SAFE_SHELL_COMMANDS = {'ls', 'head', 'tail', 'wc', 'cat', 'pwd', 'date', 'echo', 'which', 'whoami', 'df', 'free'}
+    APPROVED_PIP_PACKAGES = {
+        'pandas', 'numpy', 'scipy', 'scikit-learn', 'statsmodels', 'duckdb',
+        'polars', 'matplotlib', 'seaborn', 'plotly', 'sympy', 'networkx',
+        'openpyxl', 'xlsxwriter', 'pyarrow', 'fastparquet', 'altair',
+        'spacy', 'nltk', 'torch', 'xgboost', 'lightgbm', 'catboost', 'sqlglot', 'tabulate'
+    }
+
     for line in raw_user_code.split('\n'):
         stripped = line.strip()
         if stripped.startswith('!pip ') or stripped.startswith('%pip '):
             pkg_cmd = stripped.replace('!pip ', '').replace('%pip ', '').strip()
-            printed_lines.append(f"[Magic Command] Running pip install {pkg_cmd}...")
-            res = subprocess.run(f"python3 -m pip install --break-system-packages {pkg_cmd} || pip3 install {pkg_cmd}", shell=True, capture_output=True, text=True)
-            if res.stdout: printed_lines.append(res.stdout.strip())
-            if res.stderr: printed_lines.append(res.stderr.strip())
+            # Clean package extraction
+            base_pkg = re.split(r'[=<>~ ]+', pkg_cmd.replace('install', '').strip())[0].lower()
+            if base_pkg in APPROVED_PIP_PACKAGES or pkg_cmd.startswith('list') or pkg_cmd.startswith('show'):
+                printed_lines.append(f"[Sandbox Magic] Running pip {pkg_cmd}...")
+                res = subprocess.run([sys.executable, "-m", "pip", "install", "--no-cache-dir", pkg_cmd.replace('install', '').strip()], capture_output=True, text=True)
+                if res.stdout: printed_lines.append(res.stdout.strip())
+                if res.stderr: printed_lines.append(res.stderr.strip())
+            else:
+                printed_lines.append(f"[Security Guard] Package '{base_pkg}' blocked. Approved packages: pandas, numpy, scipy, scikit-learn, duckdb, polars, matplotlib, seaborn, etc.")
         elif stripped.startswith('!'):
             sh_cmd = stripped[1:].strip()
-            printed_lines.append(f"[Magic Shell] !{sh_cmd}")
-            res = subprocess.run(sh_cmd, shell=True, capture_output=True, text=True)
-            if res.stdout: printed_lines.append(res.stdout.strip())
-            if res.stderr: printed_lines.append(res.stderr.strip())
+            cmd_root = sh_cmd.split()[0] if sh_cmd else ""
+            if cmd_root in SAFE_SHELL_COMMANDS:
+                printed_lines.append(f"[Sandbox Shell] !{sh_cmd}")
+                cmd_tokens = sh_cmd.split()
+                res = subprocess.run(cmd_tokens, capture_output=True, text=True)
+                if res.stdout: printed_lines.append(res.stdout.strip())
+                if res.stderr: printed_lines.append(res.stderr.strip())
+            else:
+                printed_lines.append(f"[Security Guard] Shell command '{cmd_root}' is restricted in sandbox. Allowed: {', '.join(sorted(SAFE_SHELL_COMMANDS))}")
         elif stripped.startswith('%matplotlib') or stripped.startswith('%config'):
             printed_lines.append(f"[Magic Command] {stripped} enabled.")
         else:

@@ -141,7 +141,7 @@ export default function ForgotPassword() {
                 id="email"
                 type="email"
                 required
-                placeholder="name@company.com"
+                placeholder="info.vivexa@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="flex h-10 w-full rounded-lg border border-slate-700 bg-slate-950/50 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"

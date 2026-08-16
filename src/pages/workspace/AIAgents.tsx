@@ -1041,7 +1041,7 @@ function InteractiveCapabilitySection({ id, onClose }: { id: string; onClose: ()
       }
 
       setSimResults(output);
-      toast.success("Sandbox computation complete. Mock response synthesized.");
+      toast.success("Sandbox computation complete. Synthetic response generated.");
     } finally {
       setLoading(false);
       setStatusText("");

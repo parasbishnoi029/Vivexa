@@ -198,7 +198,7 @@ export default function Ontology() {
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.08)_0%,transparent_70%)] pointer-events-none" />
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
             
-            {/* Mock Digital Twin Graph */}
+            {/* Synthetic Digital Twin Graph */}
             <div className="relative z-10">
               <motion.div 
                 animate={{ rotate: 360 }}

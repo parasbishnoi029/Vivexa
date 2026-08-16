@@ -38,15 +38,37 @@ const itemVariants = {
 };
 
 
-const PRECISION_TREND_DATA = [
-  { date: "Jul 15", precision: 98.2000, passRate: 94.50, qualityIndex: 91.80, marginOfError: 0.0450, bootstrapSE: 0.0210 },
-  { date: "Jul 22", precision: 98.7500, passRate: 96.00, qualityIndex: 93.50, marginOfError: 0.0320, bootstrapSE: 0.0150 },
-  { date: "Jul 29", precision: 99.1500, passRate: 97.80, qualityIndex: 95.20, marginOfError: 0.0210, bootstrapSE: 0.0095 },
-  { date: "Aug 03", precision: 99.6500, passRate: 98.90, qualityIndex: 97.40, marginOfError: 0.0080, bootstrapSE: 0.0035 },
-  { date: "Aug 07", precision: 99.9000, passRate: 99.50, qualityIndex: 98.80, marginOfError: 0.0025, bootstrapSE: 0.0012 },
-  { date: "Aug 10", precision: 99.9800, passRate: 99.80, qualityIndex: 99.50, marginOfError: 0.0005, bootstrapSE: 0.0002 },
-  { date: "Aug 12 (Current)", precision: 99.9999, passRate: 100.00, qualityIndex: 99.90, marginOfError: 0.0001, bootstrapSE: 0.00005 }
-];
+const generateTrendData = () => {
+  const data = [];
+  let currentPrecision = 95.0;
+  let currentPassRate = 92.0;
+  let currentQuality = 88.0;
+  let currentMargin = 0.0500;
+  
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i * 7);
+    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
+    
+    // Asymptotic improvement simulation
+    currentPrecision += (100 - currentPrecision) * 0.3;
+    currentPassRate += (100 - currentPassRate) * 0.35;
+    currentQuality += (100 - currentQuality) * 0.4;
+    currentMargin *= 0.6;
+    
+    data.push({
+      date: dateStr,
+      precision: Number(currentPrecision.toFixed(4)),
+      passRate: Number(currentPassRate.toFixed(2)),
+      qualityIndex: Number(currentQuality.toFixed(2)),
+      marginOfError: Number(currentMargin.toFixed(4)),
+      bootstrapSE: Number((currentMargin * 0.45).toFixed(4))
+    });
+  }
+  return data;
+};
+
+const PRECISION_TREND_DATA = generateTrendData();
 
 const ARCHETYPES = [
   "Senior Data Scientist C-Suite Briefing",

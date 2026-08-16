@@ -43,4 +43,4 @@ The main Dashboard gives you an overview of your workspaces, including total pro
 
 ## Admin (For Administrators Only)
 - A separate interface to view global platform metrics like Total Users and System Health.
-- Only authorized administrator emails (e.g., parasbishnoi012@gmail.com) have access.
+- Only authorized administrator emails (e.g., info.vivexa@gmail.com) have access.

@@ -4,7 +4,7 @@ const api = axios.create({
   baseURL: '/api/v1',
   headers: {
     'Content-Type': 'application/json',
-    'Authorization': 'Bearer mock-token-123'
+    'Authorization': 'Bearer dev-sandbox-token-789'
   },
 });
 

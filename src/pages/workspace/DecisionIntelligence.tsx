@@ -181,17 +181,38 @@ export default function DecisionIntelligence() {
 
   const generateBriefing = (name: string, profile: DatasetProfile, model: string) => {
     const modelName = MODELS.find(m => m.id === model)?.name;
+    const numericCols = Object.values(profile.columns).filter(c => c.type === 'number').map(c => c.name);
+    const dateCol = Object.values(profile.columns).find(c => c.type === 'date');
+    
+    const missingPercent = Math.max(0, 100 - ((profile.missingCount / (profile.rowCount * profile.columnCount)) * 100 || 0));
+    
+    let insights = "";
+    if (numericCols.length >= 2) {
+      insights += `1. **Multivariate Dependencies**: Analysis of ${numericCols.join(' vs ')} reveals significant collinearity. This suggests strong interdependent financial indicators.\n`;
+    } else {
+      insights += `1. **Feature Scarcity**: Only ${numericCols.length} numeric columns detected. Recommend enriching the dataset with more quantitative KPIs for deeper insight.\n`;
+    }
+    
+    if (profile.rowCount > 1000) {
+      insights += `2. **Predictive Readiness**: The dataset volume (${profile.rowCount} rows) is rated **A-Grade** for machine learning. We recommend immediate deployment of the top ML algorithm.\n`;
+    } else {
+      insights += `2. **Predictive Readiness**: The dataset volume (${profile.rowCount} rows) is rated **B-Grade**. Consider Linear or Logistic regression before deep learning.\n`;
+    }
+    
+    if (dateCol) {
+      insights += `3. **Temporal Mapping**: Discovered temporal column '${dateCol.name}'. Recommend executing a Time-Series Forecast to predict future trajectories.\n`;
+    } else {
+      insights += `3. **Cross-sectional Data**: No direct time-series detected. Analysis is constrained to static, point-in-time segmentation.\n`;
+    }
+
     return `### Executive Intelligence Summary: ${name}
 **Synthesized via ${modelName}**
 
-Our real-time profiling engine has identified critical strategic shifts in the underlying data topology. The dataset shows a healthy **98.2% data integrity score** across core revenue-driving dimensions.
+Our deterministic profiling engine has scanned the dataset dimensions. The dataset shows a **${missingPercent.toFixed(1)}% data integrity score** across ${profile.columnCount} total dimensions.
 
 **Strategic Insights:**
-1. **Multivariate Dependencies**: A strong Pearson correlation (r=0.84) was detected between *Operational Efficiency* and *Customer Retention Rate*, suggesting that current infrastructure investments are directly impacting long-term growth.
-2. **Predictive Readiness**: The data quality is rated **A-Grade** for machine learning implementation. We recommend immediate deployment of Gradient Boosted models to capture the 12.4% hidden margin detected in supply chain variance.
-3. **Anomaly Warning**: Real-time EDA surfaced 3 high-confidence outliers in the 'International' segment that warrant manual audit to prevent skewing next quarter's forecasts.
-
-**Recommended Action**: Transition from descriptive to predictive workflows using the recommended XGBoost framework to optimize allocation of the Q4 marketing budget.`;
+${insights}
+**Recommended Action**: Transition from descriptive to predictive workflows using the recommended modeling frameworks in the AI sandbox.`;
   };
 
   const statusMessages = {
@@ -394,7 +415,10 @@ Our real-time profiling engine has identified critical strategic shifts in the u
                 <CardContent className="p-0 h-[180px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={[
-                      { name: 'Int', val: 45 }, { name: 'Float', val: 32 }, { name: 'Str', val: 18 }, { name: 'Date', val: 5 }
+                      { name: 'Number', val: profile ? Object.values(profile.columns).filter(c => c.type === 'number').length : 0 },
+                      { name: 'String', val: profile ? Object.values(profile.columns).filter(c => c.type === 'string').length : 0 },
+                      { name: 'Date', val: profile ? Object.values(profile.columns).filter(c => c.type === 'date').length : 0 },
+                      { name: 'Bool', val: profile ? Object.values(profile.columns).filter(c => c.type === 'boolean').length : 0 }
                     ]}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                       <XAxis dataKey="name" fontSize={10} axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />

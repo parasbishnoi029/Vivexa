@@ -10,11 +10,13 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { MicroVMPodManagerModal } from "@/components/workspace/MicroVMPodManagerModal";
 
 const CPU_METRICS_DATA: any[] = [];
 
 export default function Observability() {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showMicroVMModal, setShowMicroVMModal] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
   const [metrics, setMetrics] = useState({
     uptime: "99.99%",
@@ -221,9 +223,19 @@ export default function Observability() {
           </div>
         </div>
 
-        <Button onClick={triggerDiagnosticScan} disabled={isRefreshing} variant="outline" className="bg-slate-800/80 border-slate-700 text-slate-300">
-          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} /> Run Health Scan
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={() => setShowMicroVMModal(true)}
+            variant="outline"
+            className="bg-indigo-600/10 border-indigo-500/30 text-indigo-300 hover:bg-indigo-600/20 text-xs font-mono flex items-center gap-2"
+          >
+            <Cpu className="h-4 w-4 text-indigo-400" /> MicroVM Fleet Manager
+          </Button>
+
+          <Button onClick={triggerDiagnosticScan} disabled={isRefreshing} variant="outline" className="bg-slate-800/80 border-slate-700 text-slate-300 text-xs">
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} /> Run Health Scan
+          </Button>
+        </div>
       </div>
 
       {/* Primary KPI Metrics */}
@@ -564,6 +576,11 @@ export default function Observability() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <MicroVMPodManagerModal
+        isOpen={showMicroVMModal}
+        onClose={() => setShowMicroVMModal(false)}
+      />
     </div>
   );
 }

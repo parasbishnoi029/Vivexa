@@ -146,7 +146,7 @@ export class AdminUserService {
       const userAuditLogs = (auditLogs || []).filter(a => a.user_id === uid);
 
       const email = profileRec?.email || userRec?.email || authRec?.email || (adminUser?.id === uid ? adminUser.email : `user_${uid.slice(0, 6)}@vivexa.ai`);
-      const isPrimaryAdmin = email?.toLowerCase() === 'parasbishnoi012@gmail.com';
+      const isPrimaryAdmin = email?.toLowerCase() === 'info.vivexa@gmail.com' || email?.toLowerCase() === 'parasbishnoi012@gmail.com';
 
       // Dynamic Storage Calculation
       const rawDatasetBytes = userDatasets.reduce((acc, d) => acc + (Number(d.size_bytes) || 0), 0);

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Search, BookOpen, Sparkles, Database, FolderKanban, Bot, FileText,
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
+import { PriorityTicketModal, PriorityTicket } from "@/components/workspace/PriorityTicketModal";
 
 // CATEGORIES FOR HELP CENTER
 const HELP_SECTIONS = [
@@ -43,6 +44,104 @@ export default function HelpCenter() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("all");
   const [copiedSnippet, setCopiedSnippet] = useState<string | null>(null);
+
+  // Priority Support Ticket Modal State
+  const [isPriorityModalOpen, setIsPriorityModalOpen] = useState(false);
+  const [selectedTicketForReply, setSelectedTicketForReply] = useState<string | null>(null);
+  const [ticketReplyText, setTicketReplyText] = useState("");
+
+  // Priority Tickets State loaded from localStorage or seeded
+  const [tickets, setTickets] = useState<PriorityTicket[]>(() => {
+    try {
+      const raw = localStorage.getItem("vivexa_priority_tickets");
+      if (raw) return JSON.parse(raw);
+    } catch (e) {
+      console.error(e);
+    }
+    return [
+      {
+        id: "TICK-2026-1042",
+        subject: "SCIM 2.0 User Sync & Role Assignment Verification",
+        category: "SCIM 2.0 / Okta Sync Failure",
+        severity: "P1",
+        description: "Verify automated user provisioning and Okta SAML role sync for enterprise workspace.",
+        email: "info.vivexa@gmail.com",
+        status: "INVESTIGATING",
+        createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+        slaMinutes: 15,
+        assignedEngineer: "Alex Vance (Principal Systems SRE)",
+        telemetryAttached: true,
+        replies: [
+          {
+            id: "r1",
+            sender: "Vivexa Automated Triage Agent",
+            role: "AI SRE Bot",
+            message: "SCIM RFC 7644 token validated. Synchronizing user role mapping tables across cloud regions.",
+            timestamp: new Date(Date.now() - 1000 * 60 * 40).toISOString()
+          },
+          {
+            id: "r2",
+            sender: "Alex Vance",
+            role: "Principal Systems SRE",
+            message: "I am actively monitoring the SCIM endpoint logs. Authorization headers and group claims look healthy.",
+            timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString()
+          }
+        ]
+      }
+    ];
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("vivexa_priority_tickets", JSON.stringify(tickets));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [tickets]);
+
+  useEffect(() => {
+    const handleTicketEvent = (e: CustomEvent<PriorityTicket>) => {
+      if (e.detail) {
+        setTickets((prev) => [e.detail, ...prev.filter(t => t.id !== e.detail.id)]);
+        setActiveSection("support");
+      }
+    };
+    window.addEventListener("vivexa_ticket_created", handleTicketEvent as EventListener);
+    return () => {
+      window.removeEventListener("vivexa_ticket_created", handleTicketEvent as EventListener);
+    };
+  }, []);
+
+  const handleTicketCreated = (newTicket: PriorityTicket) => {
+    setTickets((prev) => [newTicket, ...prev.filter(t => t.id !== newTicket.id)]);
+    setActiveSection("support");
+  };
+
+  const handleAddReply = (ticketId: string) => {
+    if (!ticketReplyText.trim()) return;
+    setTickets((prev) =>
+      prev.map((t) => {
+        if (t.id === ticketId) {
+          return {
+            ...t,
+            replies: [
+              ...t.replies,
+              {
+                id: `rep-${Date.now()}`,
+                sender: "Client User (You)",
+                role: "Customer Admin",
+                message: ticketReplyText.trim(),
+                timestamp: new Date().toISOString()
+              }
+            ]
+          };
+        }
+        return t;
+      })
+    );
+    setTicketReplyText("");
+    toast.success("Reply added to priority ticket.");
+  };
 
   // Quick Start Progress
   const [quickStartProgress, setQuickStartProgress] = useState<Record<string, boolean>>({
@@ -142,9 +241,15 @@ export default function HelpCenter() {
             </div>
             <Button
               onClick={() => setActiveSection("user_manual")}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold h-11 px-6 rounded-xl shadow-lg shrink-0"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold h-11 px-5 rounded-xl shadow-lg shrink-0"
             >
               Browse Docs
+            </Button>
+            <Button
+              onClick={() => setIsPriorityModalOpen(true)}
+              className="bg-rose-600 hover:bg-rose-500 text-white font-bold h-11 px-5 rounded-xl shadow-lg shrink-0 flex items-center gap-2 border border-rose-400/30"
+            >
+              <AlertTriangle className="h-4 w-4" /> Open Priority Ticket
             </Button>
           </div>
         </div>
@@ -918,8 +1023,232 @@ print("ROC-AUC Score:", model.roc_auc)`}
               </div>
             )}
 
+            {/* 12. ENTERPRISE SUPPORT & PRIORITY TICKETS */}
+            {activeSection === "support" && (
+              <div className="space-y-6 text-xs font-sans">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+                  <div>
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                      <Mail className="h-5 w-5 text-rose-400" /> Enterprise Support & Priority Ticket Escalation
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Direct access to Vivexa SREs, AI Engineers, and 24/7 SLA Guarantees for mission-critical systems.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => setIsPriorityModalOpen(true)}
+                    className="bg-rose-600 hover:bg-rose-500 text-white font-bold h-10 px-5 rounded-xl shadow-lg flex items-center gap-2 shrink-0 border border-rose-400/30"
+                  >
+                    <AlertTriangle className="h-4 w-4" /> Open Priority Ticket
+                  </Button>
+                </div>
+
+                {/* SLA TIER GUARANTEE CARDS */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 space-y-1">
+                    <span className="font-bold text-rose-400 text-xs block">P1 - Critical Outage</span>
+                    <span className="text-[10px] text-slate-300 block font-mono">15-Min Response SLA</span>
+                    <p className="text-[10px] text-slate-400">System down, pipeline offline, or total service disruption.</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-1">
+                    <span className="font-bold text-amber-400 text-xs block">P2 - High Severity</span>
+                    <span className="text-[10px] text-slate-300 block font-mono">1-Hour Response SLA</span>
+                    <p className="text-[10px] text-slate-400">Core features impaired, high latency, or model drift.</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/30 space-y-1">
+                    <span className="font-bold text-indigo-400 text-xs block">P3 - Normal Priority</span>
+                    <span className="text-[10px] text-slate-300 block font-mono">4-Hour Response SLA</span>
+                    <p className="text-[10px] text-slate-400">Minor bug, non-blocking workflow issue, or account question.</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                    <span className="font-bold text-slate-300 text-xs block">P4 - Low / General</span>
+                    <span className="text-[10px] text-slate-400 block font-mono">24-Hour Response SLA</span>
+                    <p className="text-[10px] text-slate-400">General inquiry, documentation clarification, or feature request.</p>
+                  </div>
+                </div>
+
+                {/* ACTIVE TICKETS TRACKER LIST */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <LifeBuoy className="h-4 w-4 text-indigo-400" /> Active Priority Tickets ({tickets.length})
+                    </h3>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      Persistent Tracking ID & Auto-Escalation Enabled
+                    </span>
+                  </div>
+
+                  {tickets.length === 0 ? (
+                    <div className="p-8 text-center bg-slate-950 border border-slate-850 rounded-2xl space-y-3">
+                      <CheckCircle2 className="h-8 w-8 text-emerald-400 mx-auto" />
+                      <p className="text-slate-300 font-bold">No Open Support Tickets</p>
+                      <p className="text-slate-500 text-xs">All platform systems and datasets are operating within SLA targets.</p>
+                      <Button
+                        onClick={() => setIsPriorityModalOpen(true)}
+                        size="sm"
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold h-8 text-xs"
+                      >
+                        Create New Support Ticket
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {tickets.map((t) => {
+                        const isExpanded = selectedTicketForReply === t.id;
+                        return (
+                          <div
+                            key={t.id}
+                            className={`p-4 rounded-xl border text-xs transition-all space-y-3 ${
+                              t.severity === "P1"
+                                ? "bg-rose-950/20 border-rose-500/30"
+                                : t.severity === "P2"
+                                ? "bg-amber-950/20 border-amber-500/30"
+                                : "bg-slate-950 border-slate-800"
+                            }`}
+                          >
+                            {/* Ticket Summary Bar */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span
+                                    className={`px-2 py-0.5 rounded font-mono font-bold text-[10px] ${
+                                      t.severity === "P1"
+                                        ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                                        : t.severity === "P2"
+                                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                                        : "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40"
+                                    }`}
+                                  >
+                                    {t.severity}
+                                  </span>
+                                  <span className="font-mono font-bold text-slate-400">{t.id}</span>
+                                  <span className="font-bold text-white text-sm">{t.subject}</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-[10px] text-slate-400 font-mono flex-wrap">
+                                  <span className="text-indigo-300 font-bold flex items-center gap-1">
+                                    <Mail className="h-3 w-3 text-indigo-400" /> {t.email || "info.vivexa@gmail.com"}
+                                  </span>
+                                  <span>•</span>
+                                  <span>Category: {t.category}</span>
+                                  <span>•</span>
+                                  <span>Assigned: {t.assignedEngineer}</span>
+                                  <span>•</span>
+                                  <span>Target SLA: {t.slaMinutes} mins</span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span
+                                  className={`px-2.5 py-1 rounded-full font-mono font-bold text-[10px] uppercase border ${
+                                    t.status === "INVESTIGATING"
+                                      ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/30"
+                                      : t.status === "OPEN"
+                                      ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                                      : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                  }`}
+                                >
+                                  {t.status}
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setSelectedTicketForReply(isExpanded ? null : t.id)}
+                                  className="border-slate-800 text-slate-300 hover:bg-slate-800 text-[10px] h-7 px-2.5"
+                                >
+                                  {isExpanded ? "Hide Details" : `View Thread (${t.replies.length})`}
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Ticket Description */}
+                            <p className="text-slate-300 text-xs bg-slate-900/60 p-3 rounded-lg border border-slate-850 leading-relaxed">
+                              {t.description}
+                            </p>
+
+                            {/* Expanded Discussion Thread */}
+                            {isExpanded && (
+                              <div className="pt-3 border-t border-slate-800 space-y-3">
+                                <span className="font-bold text-indigo-300 block text-[11px]">
+                                  Official Support Audit Log & Discussion Thread:
+                                </span>
+
+                                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                                  {t.replies.map((rep) => (
+                                    <div
+                                      key={rep.id}
+                                      className="p-3 rounded-lg bg-slate-900 border border-slate-850 space-y-1 font-mono text-[11px]"
+                                    >
+                                      <div className="flex items-center justify-between text-[10px]">
+                                        <span className="font-bold text-indigo-400">
+                                          {rep.sender} <span className="text-slate-500">({rep.role})</span>
+                                        </span>
+                                        <span className="text-slate-500">
+                                          {new Date(rep.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                      </div>
+                                      <p className="text-slate-200 font-sans text-xs leading-relaxed">{rep.message}</p>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* Reply Input Box */}
+                                <div className="flex gap-2 pt-2">
+                                  <Input
+                                    value={ticketReplyText}
+                                    onChange={(e) => setTicketReplyText(e.target.value)}
+                                    onKeyDown={(e) => e.key === "Enter" && handleAddReply(t.id)}
+                                    placeholder="Add comment or additional diagnostic info..."
+                                    className="bg-slate-900 border-slate-800 text-xs text-white h-9"
+                                  />
+                                  <Button
+                                    onClick={() => handleAddReply(t.id)}
+                                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold h-9 px-4 text-xs shrink-0"
+                                  >
+                                    <Send className="h-3.5 w-3.5 mr-1" /> Post Reply
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* DIRECT SUPPORT CONTACT CARDS */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-4 border-t border-slate-800">
+                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                    <div className="flex items-center gap-2 text-indigo-400 font-bold">
+                      <Mail className="h-4 w-4" /> Enterprise Support Email
+                    </div>
+                    <p className="text-slate-300 font-mono text-xs">info.vivexa@gmail.com</p>
+                    <p className="text-[10px] text-slate-500">Monitored 24/7 with encrypted cryptographic attachment support.</p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                      <ShieldCheck className="h-4 w-4" /> Dedicated Slack / Teams Channel
+                    </div>
+                    <p className="text-slate-300 text-xs">#vivexa-enterprise-support</p>
+                    <p className="text-[10px] text-slate-500">Real-time webhook alert routing for workspace incidents.</p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                    <div className="flex items-center gap-2 text-amber-400 font-bold">
+                      <Activity className="h-4 w-4" /> Live Platform Status
+                    </div>
+                    <p className="text-emerald-400 font-bold text-xs flex items-center gap-1">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> 99.99% Systems Nominal
+                    </p>
+                    <p className="text-[10px] text-slate-500">Continuous telemetry monitoring across all cloud regions.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* FALLBACK FOR OTHER SECTIONS */}
-            {!["overview", "system_architecture", "quickstart", "product_tour", "user_manual", "admin_guide", "dev_guide", "api_docs", "faq", "troubleshooting", "roadmap", "system_status"].includes(activeSection) && (
+            {!["overview", "system_architecture", "quickstart", "product_tour", "user_manual", "admin_guide", "dev_guide", "api_docs", "faq", "troubleshooting", "roadmap", "system_status", "support"].includes(activeSection) && (
               <div className="space-y-4 text-xs text-slate-300">
                 <h2 className="text-xl font-bold text-white capitalize">{activeSection.replace('_', ' ')}</h2>
                 <p className="text-slate-400">Complete documentation section active. All guides verified against enterprise standards.</p>
@@ -931,6 +1260,13 @@ print("ROC-AUC Score:", model.roc_auc)`}
           </Card>
         </div>
       </div>
+
+      {/* PRIORITY SUPPORT TICKET MODAL */}
+      <PriorityTicketModal
+        isOpen={isPriorityModalOpen}
+        onClose={() => setIsPriorityModalOpen(false)}
+        onTicketCreated={handleTicketCreated}
+      />
     </div>
   );
 }

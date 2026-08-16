@@ -268,21 +268,21 @@ export default function LandingPage() {
                 
                 <div className="p-6 rounded-2xl border border-slate-800/80 bg-slate-950/40 hover:border-indigo-500/20 transition-all space-y-4">
                   <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-                    <Brain className="h-4 w-4" />
+                    <Shield className="h-4 w-4" />
                   </div>
-                  <h3 className="text-sm font-bold text-slate-100">AI Data Analyst</h3>
+                  <h3 className="text-sm font-bold text-slate-100">SCIM 2.0 Provisioning</h3>
                   <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Convert normal English queries into perfectly formed, syntax-validated SQL statements optimized for your specific dialect schema.
+                    RFC 7644 compliant endpoints for automated user lifecycle, Okta/Azure AD group synchronization, and SAML role management.
                   </p>
                 </div>
 
                 <div className="p-6 rounded-2xl border border-slate-800/80 bg-slate-950/40 hover:border-indigo-500/20 transition-all space-y-4">
                   <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-                    <BarChart3 className="h-4 w-4" />
+                    <Cpu className="h-4 w-4" />
                   </div>
-                  <h3 className="text-sm font-bold text-slate-100">Predictive Forecasting</h3>
+                  <h3 className="text-sm font-bold text-slate-100">Hybrid AST Query Router</h3>
                   <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Instantly deploy auto-regressive Prophet algorithms with upper/lower bounds, seasonal adjustments, and custom prediction intervals.
+                    Directs simple analytical workloads to local DuckDB-WASM for sub-10ms compute, automatically offloading heavy queries to Snowflake or Databricks.
                   </p>
                 </div>
 
@@ -290,9 +290,9 @@ export default function LandingPage() {
                   <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
                     <Users className="h-4 w-4" />
                   </div>
-                  <h3 className="text-sm font-bold text-slate-100">Multi-Agent Consensus</h3>
+                  <h3 className="text-sm font-bold text-slate-100">Yjs CRDT Real-Time Collaboration</h3>
                   <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Spawns autonomous planner, SQL, and certifier agent nodes that deliberate, audit results, and align outputs dynamically.
+                    Multi-cursor live co-authoring for notebooks and dashboards with Hocuspocus WebSocket sync and Write-Ahead Log (WAL) auditability.
                   </p>
                 </div>
 
@@ -300,9 +300,9 @@ export default function LandingPage() {
                   <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
                     <Terminal className="h-4 w-4" />
                   </div>
-                  <h3 className="text-sm font-bold text-slate-100">Python Sandbox Studio</h3>
+                  <h3 className="text-sm font-bold text-slate-100">E2B MicroVM Sandboxed Python</h3>
                   <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Execute code, perform data cleansing, impute missing values, and transform arrays directly in an isolated WebAssembly compiler.
+                    Secure MicroVM kernel pods for executing Python scripts, pandas dataframes, and ML pipelines with memory limits and zero host exposure.
                   </p>
                 </div>
 

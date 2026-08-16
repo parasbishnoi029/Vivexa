@@ -98,6 +98,7 @@ const GlobalSearch = lazyWithRetry(() => import("./pages/workspace/GlobalSearch"
 const AIAgents = lazyWithRetry(() => import("./pages/workspace/AIAgents"));
 const DataConnectors = lazyWithRetry(() => import("./pages/workspace/DataConnectors"));
 const Notebooks = lazyWithRetry(() => import("./pages/workspace/Notebooks"));
+const DashboardsBuilder = lazyWithRetry(() => import("./pages/workspace/DashboardsBuilder"));
 const Automations = lazyWithRetry(() => import("./pages/workspace/Automations"));
 const Lakehouse = lazyWithRetry(() => import("./pages/workspace/Lakehouse"));
 const SemanticLayer = lazyWithRetry(() => import("./pages/workspace/SemanticLayer"));
@@ -106,6 +107,7 @@ const Ontology = lazyWithRetry(() => import("./pages/workspace/Ontology"));
 const SearchAnalytics = lazyWithRetry(() => import("./pages/workspace/SearchAnalytics"));
 const Plugins = lazyWithRetry(() => import("./pages/workspace/Plugins"));
 const Observability = lazyWithRetry(() => import("./pages/workspace/Observability"));
+const DataQuality = lazyWithRetry(() => import("./pages/workspace/DataQuality"));
 const UserManual = lazyWithRetry(() => import("./pages/workspace/UserManual"));
 const HelpCenter = lazyWithRetry(() => import("./pages/workspace/HelpCenter"));
 const DeveloperSDK = lazyWithRetry(() => import("./pages/workspace/DeveloperSDK"));
@@ -427,6 +429,10 @@ const router = createBrowserRouter([
         element: <Suspense fallback={<PageLoader />}><Notebooks /></Suspense>,
       },
       {
+        path: "dashboards",
+        element: <Suspense fallback={<PageLoader />}><DashboardsBuilder /></Suspense>,
+      },
+      {
         path: "automations",
         element: <Suspense fallback={<PageLoader />}><Automations /></Suspense>,
       },
@@ -437,6 +443,14 @@ const router = createBrowserRouter([
       {
         path: "observability",
         element: <Suspense fallback={<PageLoader />}><Observability /></Suspense>,
+      },
+      {
+        path: "quality",
+        element: <Suspense fallback={<PageLoader />}><DataQuality /></Suspense>,
+      },
+      {
+        path: "data-quality",
+        element: <Suspense fallback={<PageLoader />}><DataQuality /></Suspense>,
       },
       {
         path: "settings",

@@ -81,14 +81,14 @@ export default function AIAnalyst() {
 
       let rawRows: any[] = [];
 
-      // MOCK DATA OR REAL FETCH WITH CACHE
-      if (ds.metadata?.is_mock) {
+      // SYNTHETIC DATA OR REAL FETCH WITH CACHE
+      if (ds.metadata?.is_synthetic) {
         if (datasetCache[ds.id]) {
           rawRows = datasetCache[ds.id];
         } else {
-          setStatusText(`Generating mock simulation buffers for ${ds.name}...`);
-          const { generateMockDataset } = await import('@/lib/datasetParser');
-          rawRows = generateMockDataset(ds.name, 3500);
+          setStatusText(`Generating synthetic simulation buffers for ${ds.name}...`);
+          const { generateDeterministicDataset } = await import('@/lib/datasetParser');
+          rawRows = generateDeterministicDataset(ds.name, 3500);
           setDatasetCache(prev => ({ ...prev, [ds.id]: rawRows }));
         }
       } else if (ds.storage_path) {

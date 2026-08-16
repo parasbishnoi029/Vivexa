@@ -3,9 +3,9 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 async function main() {
-  console.log("Sending a test email to parasbishnoi012@gmail.com...");
+  console.log("Sending a test email to info.vivexa@gmail.com...");
   const result = await sendEmail({
-    recipient: "parasbishnoi012@gmail.com",
+    recipient: "info.vivexa@gmail.com",
     template: "system-alert",
     subject: "Vivexa Test Email",
     data: {

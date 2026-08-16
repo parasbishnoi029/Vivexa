@@ -22,8 +22,8 @@ BEGIN
     
     RETURN EXISTS (
         SELECT 1 FROM public.users 
-        WHERE id = u_id AND (role IN ('superadmin', 'admin') OR email IN ('parasbishnoi012@gmail.com', 'info.vivexa@gmail.com'))
-    ) OR (auth.jwt() ->> 'email') IN ('parasbishnoi012@gmail.com', 'info.vivexa@gmail.com');
+        WHERE id = u_id AND (role IN ('superadmin', 'admin') OR email IN ('info.vivexa@gmail.com', 'parasbishnoi012@gmail.com'))
+    ) OR (auth.jwt() ->> 'email') IN ('info.vivexa@gmail.com', 'parasbishnoi012@gmail.com');
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth, pg_temp;
 

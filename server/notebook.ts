@@ -1,10 +1,11 @@
 import express from "express";
 import { createClient } from "@supabase/supabase-js";
-import { exec } from "child_process";
 import fs from "fs";
 import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
 import { enforceAiQuotaMiddleware } from "./limits";
+import { SandboxExecutionEngine } from "./services/SandboxExecutionEngine";
+import { E2BExecutionConnector } from "./services/E2BExecutionConnector";
 
 export const notebookRouter = express.Router();
 
@@ -112,135 +113,48 @@ notebookRouter.post('/run', async (req, res) => {
       }));
     }
 
-    // 3. File-Based Execution with Master Kernel Script
-    const runnerId = `${Date.now()}_${Math.floor(Math.random() * 10000)}`;
-    const codePath = path.join(process.cwd(), `temp_code_${runnerId}.py`);
-    const configPath = path.join(process.cwd(), `temp_config_${runnerId}.json`);
-    const masterScriptPath = path.join(process.cwd(), 'server', 'notebook_kernel_master.py');
+    // 3. Isolated Ephemeral Sandbox Execution Engine (E2B MicroVM / Firecracker Isolation)
+    let executionResult;
+    if (type === 'python') {
+      executionResult = await E2BExecutionConnector.executePython(code, {
+        datasetPath,
+        datasetName,
+        userId: user.id,
+        timeoutSeconds: 20,
+        memoryLimitMb: 512
+      });
+    } else {
+      executionResult = await SandboxExecutionEngine.execute(code, {
+        datasetPath,
+        datasetName,
+        cellType: type,
+        userId: user.id,
+        timeoutMs: 15000,
+        memoryLimitMb: 512
+      });
+    }
 
-    fs.writeFileSync(codePath, code || "# Empty cell", 'utf-8');
-    fs.writeFileSync(configPath, JSON.stringify({
-      datasetPath,
-      datasetName,
-      cellType: type,
-      codePath
-    }), 'utf-8');
-
-    exec(`python3 "${masterScriptPath}" "${configPath}"`, (error, stdout, stderr) => {
-      try {
-        if (fs.existsSync(codePath)) fs.unlinkSync(codePath);
-        if (fs.existsSync(configPath)) fs.unlinkSync(configPath);
-      } catch (e) {}
-
-      const combinedStderr = stderr ? stderr.toString() : "";
-      const combinedStdout = stdout ? stdout.toString() : "";
-      
-      // Process normally, ignoring the mock
-      
-      if (type === 'sql') {
-        const sqlStart = combinedStdout.indexOf("VIVEXA_SQL_OUTPUT_START");
-        const sqlEnd = combinedStdout.indexOf("VIVEXA_SQL_OUTPUT_END");
-
-        if (sqlStart !== -1 && sqlEnd !== -1) {
-          const jsonText = combinedStdout.substring(sqlStart + "VIVEXA_SQL_OUTPUT_START".length, sqlEnd).trim();
-          try {
-            const tableRows = JSON.parse(jsonText);
-            return res.json(successResponse({
-              outputType: "table",
-              data: tableRows,
-              variables: {}
-            }));
-          } catch (pe) {
-            return res.status(500).json(successResponse(null, { error: `SQL output parse error: ${pe}` }));
-          }
-        } else {
-          const sqlErrStart = combinedStdout.indexOf("VIVEXA_PYTHON_ERROR_START");
-          const sqlErrEnd = combinedStdout.indexOf("VIVEXA_PYTHON_ERROR_END");
-          if (sqlErrStart !== -1 && sqlErrEnd !== -1) {
-            const errJson = combinedStdout.substring(sqlErrStart + "VIVEXA_PYTHON_ERROR_START".length, sqlErrEnd).trim();
-            try {
-              const errPayload = JSON.parse(errJson);
-              return res.json(successResponse({
-                outputType: "error",
-                error: errPayload,
-                variables: {}
-              }));
-            } catch (e) {}
-          }
-          return res.json(successResponse({
-            outputType: "text",
-            text: combinedStdout || combinedStderr || "SQL query executed.",
-            error: {
-              error_class: "SQLExecutionError",
-              message: combinedStderr || "Check database query formatting and table existence.",
-              line_number: 1,
-              suggested_fix: "Check table and column names. Select from 'dataset' or 'df'."
-            }
-          }));
-        }
-      } else {
-        const pyStart = combinedStdout.indexOf("VIVEXA_PYTHON_OUTPUT_START");
-        const pyEnd = combinedStdout.indexOf("VIVEXA_PYTHON_OUTPUT_END");
-
-        const pyErrStart = combinedStdout.indexOf("VIVEXA_PYTHON_ERROR_START");
-        const pyErrEnd = combinedStdout.indexOf("VIVEXA_PYTHON_ERROR_END");
-
-        if (pyStart !== -1 && pyEnd !== -1) {
-          const jsonText = combinedStdout.substring(pyStart + "VIVEXA_PYTHON_OUTPUT_START".length, pyEnd).trim();
-          try {
-            const payload = JSON.parse(jsonText);
-            let outputType = "text";
-            if (payload.images && payload.images.length > 0) {
-              outputType = "chart";
-            } else if (payload.table_data && payload.table_data.length > 0) {
-              outputType = "table";
-            }
-
-            return res.json(successResponse({
-              outputType: outputType,
-              text: payload.stdout || (outputType === "text" ? "Cell executed cleanly." : ""),
-              data: payload.table_data || null,
-              images: payload.images || [],
-              variables: payload.variables || {}
-            }));
-          } catch (pe) {
-            return res.status(500).json(successResponse(null, { error: `Python stdout parse error: ${pe}` }));
-          }
-        } else if (pyErrStart !== -1 && pyErrEnd !== -1) {
-          const jsonText = combinedStdout.substring(pyErrStart + "VIVEXA_PYTHON_ERROR_START".length, pyErrEnd).trim();
-          try {
-            const errPayload = JSON.parse(jsonText);
-            return res.json(successResponse({
-              outputType: "error",
-              text: combinedStdout.substring(0, pyErrStart).trim(),
-              error: errPayload,
-              variables: {}
-            }));
-          } catch (pe) {
-            return res.status(500).json(successResponse(null, { error: `Python stderr parse error: ${pe}` }));
-          }
-        } else {
-          return res.json(successResponse({
-            outputType: "error",
-            text: combinedStdout || "Process terminated.",
-            error: {
-              error_class: "KernelExecutionCrash",
-              message: combinedStderr || "Uncaught Python kernel crash.",
-              line_number: null,
-              suggested_fix: "Restart notebook kernel."
-            },
-            variables: {}
-          }));
-        }
-      }
-    });
+    return res.json(successResponse({
+      outputType: executionResult.outputType,
+      text: executionResult.stdout,
+      data: executionResult.data || null,
+      images: executionResult.images || [],
+      variables: executionResult.variables || {},
+      error: executionResult.error || null,
+      metrics: executionResult.metrics
+    }));
 
   } catch (err: any) {
     res.status(500).json(successResponse(null, { error: err.message || 'Notebook execution failed.' }));
   }
 });
 
-// POST /api/v1/notebook/install - Install custom pip/apt package safely
+// GET /api/v1/notebook/e2b/status - Returns active E2B MicroVM Fleet and runtime isolation metrics
+notebookRouter.get('/e2b/status', (req, res) => {
+  res.json(successResponse(E2BExecutionConnector.getPodFleetStatus()));
+});
+
+// POST /api/v1/notebook/install - Install custom pip package safely via sandbox execution engine
 notebookRouter.post('/install', async (req, res) => {
   const user = (req as any).user;
   const { packageName } = req.body;
@@ -253,24 +167,12 @@ notebookRouter.post('/install', async (req, res) => {
     return res.status(400).json(successResponse(null, { error: 'No package specified' }));
   }
 
-  const cleanPackage = packageName.trim().replace(/[^a-zA-Z0-9_=-]/g, '');
-
-  exec(`python3 -m pip install --break-system-packages ${cleanPackage} || pip3 install ${cleanPackage} || apt-get install -y python3-${cleanPackage}`, (err, stdout, stderr) => {
-    if (err) {
-      return res.json(successResponse({
-        success: false,
-        stdout: stdout ? stdout.toString() : "",
-        stderr: stderr ? stderr.toString() : "",
-        message: `Package install failed for '${cleanPackage}': ${stderr ? stderr.toString() : err.message}`
-      }));
-    }
-
-    res.json(successResponse({
-      success: true,
-      stdout: stdout ? stdout.toString() : "",
-      message: `Package '${cleanPackage}' installed successfully into active notebook kernel!`
-    }));
-  });
+  try {
+    const installResult = await SandboxExecutionEngine.installPackage(packageName);
+    res.json(successResponse(installResult));
+  } catch (err: any) {
+    res.status(500).json(successResponse(null, { error: err.message || 'Package installation failed.' }));
+  }
 });
 
 // POST /api/v1/notebook/copilot - Notebook AI Copilot Endpoint

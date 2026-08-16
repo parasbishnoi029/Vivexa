@@ -98,14 +98,14 @@ export function hasPermission(roleName: string | undefined | null, permission: P
 }
 
 export function isAdminRole(roleName?: string | null, email?: string | null): boolean {
-  if (email === 'parasbishnoi012@gmail.com') return true;
+  if (email === 'info.vivexa@gmail.com' || email === 'parasbishnoi012@gmail.com') return true;
   if (!roleName) return false;
   const norm = normalizeRole(roleName);
   return norm === 'Admin' || norm === 'Super Admin';
 }
 
 export async function getUserRoleFromDb(userId: string, email?: string): Promise<string> {
-  if (email === 'parasbishnoi012@gmail.com') return 'Super Admin';
+  if (email === 'info.vivexa@gmail.com' || email === 'parasbishnoi012@gmail.com') return 'Super Admin';
 
   try {
     const { data: userData } = await supabase.from('users').select('role').eq('id', userId).maybeSingle();

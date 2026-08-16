@@ -18,7 +18,7 @@ const successResponse = (data: any, meta?: any) => {
 
 function isUserAdminRole(user: any): boolean {
   if (!user) return false;
-  if (user.email === 'parasbishnoi012@gmail.com') return true;
+  if (user.email === 'info.vivexa@gmail.com' || user.email === 'parasbishnoi012@gmail.com') return true;
   const role = (user.role || user.user_metadata?.role || '').toLowerCase();
   return role === 'admin' || role === 'super admin' || role === 'superadmin' || role === 'owner' || role === 'cto';
 }
@@ -494,8 +494,8 @@ adminUsersRouter.post('/users/sync-directory', async (req: express.Request, res:
         await supabase.from('users').upsert({
           id: uid,
           email,
-          role: email === 'parasbishnoi012@gmail.com' ? 'superadmin' : 'user',
-          plan: email === 'parasbishnoi012@gmail.com' ? 'enterprise' : 'free',
+          role: (email === 'info.vivexa@gmail.com' || email === 'parasbishnoi012@gmail.com') ? 'superadmin' : 'user',
+          plan: (email === 'info.vivexa@gmail.com' || email === 'parasbishnoi012@gmail.com') ? 'enterprise' : 'free',
           is_active: true,
           updated_at: new Date().toISOString()
         }, { onConflict: 'id' });
@@ -509,7 +509,7 @@ adminUsersRouter.post('/users/sync-directory', async (req: express.Request, res:
           full_name: fullName,
           avatar_url: authUser?.user_metadata?.avatar_url || '',
           company: authUser?.user_metadata?.company || 'Vivexa HQ',
-          role: email === 'parasbishnoi012@gmail.com' ? 'Super Admin' : 'Analyst',
+          role: (email === 'info.vivexa@gmail.com' || email === 'parasbishnoi012@gmail.com') ? 'Super Admin' : 'Analyst',
           country: 'India',
           language: 'en',
           timezone: 'Asia/Kolkata',
@@ -607,7 +607,7 @@ adminUsersRouter.post('/users/sync-directory', async (req: express.Request, res:
           await supabase.from('workspace_members').insert({
             workspace_id: wsId,
             user_id: uid,
-            role: email === 'parasbishnoi012@gmail.com' ? 'owner' : 'member',
+            role: (email === 'info.vivexa@gmail.com' || email === 'parasbishnoi012@gmail.com') ? 'owner' : 'member',
             status: 'active'
           });
           repairedMemberships++;
@@ -618,7 +618,7 @@ adminUsersRouter.post('/users/sync-directory', async (req: express.Request, res:
       if (!hasSub) {
         await supabase.from('subscriptions').insert({
           user_id: uid,
-          plan_id: email === 'parasbishnoi012@gmail.com' ? 'enterprise' : 'free',
+          plan_id: (email === 'info.vivexa@gmail.com' || email === 'parasbishnoi012@gmail.com') ? 'enterprise' : 'free',
           status: 'active',
           renews_at: new Date(Date.now() + 365*24*60*60*1000).toISOString()
         });

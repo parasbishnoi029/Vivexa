@@ -1,7 +1,7 @@
 # Vivexa Administrator Guide
 
 ## Overview
-Vivexa administrators have global access to platform health and metric data. Admin functions are restricted and only available to specified accounts (e.g., parasbishnoi012@gmail.com).
+Vivexa administrators have global access to platform health and metric data. Admin functions are restricted and only available to specified accounts (e.g., info.vivexa@gmail.com).
 
 ## Dashboard
 The Admin Dashboard gives a high-level view of:
