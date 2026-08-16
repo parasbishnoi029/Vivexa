@@ -9,6 +9,8 @@ export interface CleaningOptions {
   outlierMethod: 'iqr' | 'zscore' | 'modified_zscore';
   outlierTreatment: 'flag' | 'remove' | 'winsorize' | 'cap';
   removeDuplicates: boolean;
+  fuzzyDeduplicate?: boolean;
+  fuzzySimilarityThreshold?: number; // 0.0 to 1.0, e.g. 0.85
   cleanColumnNames: boolean;
   trimWhitespace: boolean;
   standardizeDates: boolean;
@@ -122,6 +124,40 @@ function quantile(sorted: number[], q: number): number {
   const hi = Math.ceil(index);
   const h = index - lo;
   return sorted[lo] * (1 - h) + sorted[hi] * h;
+}
+
+/**
+ * Calculates Levenshtein string similarity score (0.0 to 1.0)
+ */
+export function levenshteinSimilarity(s1: string, s2: string): number {
+  if (s1 === s2) return 1.0;
+  if (!s1 || !s2) return 0.0;
+  const str1 = s1.toLowerCase().trim();
+  const str2 = s2.toLowerCase().trim();
+  if (str1 === str2) return 1.0;
+
+  const len1 = str1.length;
+  const len2 = str2.length;
+  if (len1 === 0 || len2 === 0) return 0.0;
+
+  const track = Array(len2 + 1).fill(null).map(() => Array(len1 + 1).fill(0));
+  for (let i = 0; i <= len1; i += 1) track[0][i] = i;
+  for (let j = 0; j <= len2; j += 1) track[j][0] = j;
+
+  for (let j = 1; j <= len2; j += 1) {
+    for (let i = 1; i <= len1; i += 1) {
+      const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+      track[j][i] = Math.min(
+        track[j][i - 1] + 1, // deletion
+        track[j - 1][i] + 1, // insertion
+        track[j - 1][i - 1] + indicator // substitution
+      );
+    }
+  }
+
+  const maxLen = Math.max(len1, len2);
+  const distance = track[len2][len1];
+  return parseFloat(((maxLen - distance) / maxLen).toFixed(4));
 }
 
 /**
@@ -407,7 +443,7 @@ export function cleanDataset(
   });
   transformationsApplied.push("Trimmed whitespace, parsed currency values, and standardized date formats");
 
-  // 3. Remove Duplicate Rows
+  // 3. Remove Duplicate Rows (Exact & Optional Fuzzy Matching)
   let duplicateRowsRemoved = 0;
   if (opts.removeDuplicates) {
     const uniqueRows: Record<string, any>[] = [];
@@ -425,6 +461,47 @@ export function cleanDataset(
     rows = uniqueRows;
     if (duplicateRowsRemoved > 0) {
       transformationsApplied.push(`Removed ${duplicateRowsRemoved} exact duplicate row(s)`);
+    }
+
+    // Optional Fuzzy Deduplication using Levenshtein distance on text fields
+    if (opts.fuzzyDeduplicate && rows.length > 1) {
+      const threshold = opts.fuzzySimilarityThreshold || 0.88;
+      const textCols = cols.filter(c => typeof rows[0][c] === 'string' && !c.includes('id') && !c.includes('date'));
+      
+      if (textCols.length > 0) {
+        const keptRows: Record<string, any>[] = [];
+        let fuzzyRemoved = 0;
+
+        for (const candidate of rows) {
+          let isFuzzyDuplicate = false;
+          for (const kept of keptRows) {
+            let matches = 0;
+            for (const tCol of textCols) {
+              const val1 = String(candidate[tCol] || '');
+              const val2 = String(kept[tCol] || '');
+              if (val1 && val2 && levenshteinSimilarity(val1, val2) >= threshold) {
+                matches++;
+              }
+            }
+            if (textCols.length > 0 && matches / textCols.length >= 0.75) {
+              isFuzzyDuplicate = true;
+              break;
+            }
+          }
+
+          if (isFuzzyDuplicate) {
+            fuzzyRemoved++;
+          } else {
+            keptRows.push(candidate);
+          }
+        }
+
+        if (fuzzyRemoved > 0) {
+          duplicateRowsRemoved += fuzzyRemoved;
+          rows = keptRows;
+          transformationsApplied.push(`Removed ${fuzzyRemoved} fuzzy near-duplicate row(s) (similarity >= ${Math.round(threshold * 100)}%)`);
+        }
+      }
     }
   }
 

@@ -326,7 +326,7 @@ export default function UserManual() {
                 }`}
               >
                 <SecIcon className="h-3.5 w-3.5" />
-                {sec.title.split('. ')[1]}
+                {sec.title.split('. ')[1] || sec.title}
               </button>
             );
           })}

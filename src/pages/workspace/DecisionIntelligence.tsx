@@ -181,22 +181,22 @@ export default function DecisionIntelligence() {
 
   const generateBriefing = (name: string, profile: DatasetProfile, model: string) => {
     const modelName = MODELS.find(m => m.id === model)?.name;
-    const numericCols = Object.values(profile.columns).filter(c => c.type === 'number').map(c => c.name);
-    const dateCol = Object.values(profile.columns).find(c => c.type === 'date');
+    const numericCols = profile.columns.filter(c => c.type === 'numeric').map(c => c.name);
+    const dateCol = profile.columns.find(c => c.type === 'datetime');
     
-    const missingPercent = Math.max(0, 100 - ((profile.missingCount / (profile.rowCount * profile.columnCount)) * 100 || 0));
+    const missingPercent = profile.scores.completenessScore ?? 95;
     
     let insights = "";
     if (numericCols.length >= 2) {
-      insights += `1. **Multivariate Dependencies**: Analysis of ${numericCols.join(' vs ')} reveals significant collinearity. This suggests strong interdependent financial indicators.\n`;
+      insights += `1. **Multivariate Dependencies**: Analysis of ${numericCols.slice(0, 3).join(' vs ')} reveals significant collinearity. This suggests strong interdependent financial indicators.\n`;
     } else {
       insights += `1. **Feature Scarcity**: Only ${numericCols.length} numeric columns detected. Recommend enriching the dataset with more quantitative KPIs for deeper insight.\n`;
     }
     
-    if (profile.rowCount > 1000) {
-      insights += `2. **Predictive Readiness**: The dataset volume (${profile.rowCount} rows) is rated **A-Grade** for machine learning. We recommend immediate deployment of the top ML algorithm.\n`;
+    if (profile.totalRows > 1000) {
+      insights += `2. **Predictive Readiness**: The dataset volume (${profile.totalRows} rows) is rated **A-Grade** for machine learning. We recommend immediate deployment of the top ML algorithm.\n`;
     } else {
-      insights += `2. **Predictive Readiness**: The dataset volume (${profile.rowCount} rows) is rated **B-Grade**. Consider Linear or Logistic regression before deep learning.\n`;
+      insights += `2. **Predictive Readiness**: The dataset volume (${profile.totalRows} rows) is rated **B-Grade**. Consider Linear or Logistic regression before deep learning.\n`;
     }
     
     if (dateCol) {
@@ -208,7 +208,7 @@ export default function DecisionIntelligence() {
     return `### Executive Intelligence Summary: ${name}
 **Synthesized via ${modelName}**
 
-Our deterministic profiling engine has scanned the dataset dimensions. The dataset shows a **${missingPercent.toFixed(1)}% data integrity score** across ${profile.columnCount} total dimensions.
+Our deterministic profiling engine has scanned the dataset dimensions. The dataset shows a **${missingPercent.toFixed(1)}% data integrity score** across ${profile.totalCols} total dimensions.
 
 **Strategic Insights:**
 ${insights}
@@ -415,10 +415,10 @@ ${insights}
                 <CardContent className="p-0 h-[180px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={[
-                      { name: 'Number', val: profile ? Object.values(profile.columns).filter(c => c.type === 'number').length : 0 },
-                      { name: 'String', val: profile ? Object.values(profile.columns).filter(c => c.type === 'string').length : 0 },
-                      { name: 'Date', val: profile ? Object.values(profile.columns).filter(c => c.type === 'date').length : 0 },
-                      { name: 'Bool', val: profile ? Object.values(profile.columns).filter(c => c.type === 'boolean').length : 0 }
+                      { name: 'Number', val: profile ? profile.columns.filter(c => c.type === 'numeric').length : 0 },
+                      { name: 'String', val: profile ? profile.columns.filter(c => c.type === 'categorical').length : 0 },
+                      { name: 'Date', val: profile ? profile.columns.filter(c => c.type === 'datetime').length : 0 },
+                      { name: 'Bool', val: profile ? profile.columns.filter(c => c.type === 'boolean').length : 0 }
                     ]}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                       <XAxis dataKey="name" fontSize={10} axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />

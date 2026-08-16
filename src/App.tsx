@@ -14,11 +14,6 @@ import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { useAuthStore } from "./stores/authStore";
 import { AnimatePresence, motion } from "motion/react";
 
-// Core layouts
-import WorkspaceLayout from "./layouts/WorkspaceLayout";
-import AdminLayout from "./layouts/AdminLayout";
-import PublicLayout from "./layouts/PublicLayout";
-
 // Helper for resilient lazy imports
 function lazyWithRetry<T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>) {
   return lazy(async () => {
@@ -40,6 +35,11 @@ function lazyWithRetry<T extends React.ComponentType<any>>(factory: () => Promis
     }
   });
 }
+
+// Core layouts - Lazy loaded for code splitting
+const WorkspaceLayout = lazyWithRetry(() => import("./layouts/WorkspaceLayout"));
+const AdminLayout = lazyWithRetry(() => import("./layouts/AdminLayout"));
+const PublicLayout = lazyWithRetry(() => import("./layouts/PublicLayout"));
 
 // Lazy-loaded pages
 const LandingPage = lazyWithRetry(() => import("./pages/Landing"));
@@ -224,8 +224,11 @@ function RootLayout() {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 2,
+      staleTime: 1000 * 60 * 5, // 5 minutes fresh cache
+      gcTime: 1000 * 60 * 30, // 30 minutes garbage collection hold
+      retry: 1,
       refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
     },
   },
 });
@@ -235,7 +238,7 @@ const router = createBrowserRouter([
     element: <RootLayout />,
     children: [
       {
-        element: <PublicLayout />,
+        element: <Suspense fallback={<PageLoader />}><PublicLayout /></Suspense>,
         children: [
       {
         path: "/",
@@ -317,7 +320,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/workspace",
-    element: <ProtectedRoute><WorkspaceLayout /></ProtectedRoute>,
+    element: <ProtectedRoute><Suspense fallback={<PageLoader />}><WorkspaceLayout /></Suspense></ProtectedRoute>,
     errorElement: <Suspense fallback={<PageLoader />}><NotFound /></Suspense>,
     children: [
       {
@@ -488,7 +491,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/admin",
-    element: <ProtectedRoute><AdminLayout /></ProtectedRoute>,
+    element: <ProtectedRoute><Suspense fallback={<PageLoader />}><AdminLayout /></Suspense></ProtectedRoute>,
     errorElement: <Suspense fallback={<PageLoader />}><NotFound /></Suspense>,
     children: [
       {

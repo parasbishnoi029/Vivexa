@@ -810,9 +810,9 @@ export default function AdminUsers() {
                           <div className="flex items-center gap-3">
                             <div className="h-10 w-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0">
                               {user.avatar_url ? (
-                                <img loading="lazy" src={user.avatar_url} alt={user.full_name} className="h-full w-full object-cover" />
+                                <img loading="lazy" src={user.avatar_url} alt={user.full_name || 'User'} className="h-full w-full object-cover" />
                               ) : (
-                                <span className="text-xs font-bold text-indigo-400">{user.full_name.split(' ').map(n => n[0]).join('')}</span>
+                                <span className="text-xs font-bold text-indigo-400">{(user.full_name || 'User').split(' ').map(n => n[0]).join('')}</span>
                               )}
                             </div>
                             <div>
@@ -1452,9 +1452,9 @@ export default function AdminUsers() {
                 <div className="flex items-start gap-6">
                   <div className="h-24 w-24 rounded-3xl bg-slate-900 border border-slate-800 flex items-center justify-center relative shadow-inner">
                     {selectedUser.avatar_url ? (
-                      <img loading="lazy" src={selectedUser.avatar_url} alt={selectedUser.full_name} className="h-full w-full object-cover" />
+                      <img loading="lazy" src={selectedUser.avatar_url} alt={selectedUser.full_name || 'User'} className="h-full w-full object-cover" />
                     ) : (
-                      <span className="text-3xl font-black text-indigo-400">{selectedUser.full_name.split(' ').map(n => n[0]).join('')}</span>
+                      <span className="text-3xl font-black text-indigo-400">{(selectedUser.full_name || 'User').split(' ').map(n => n[0]).join('')}</span>
                     )}
                     <div className={`absolute -bottom-1 -right-1 h-6 w-6 rounded-full border-4 border-slate-950 ${
                       selectedUser.status === 'active' ? 'bg-emerald-500' : 'bg-rose-500'

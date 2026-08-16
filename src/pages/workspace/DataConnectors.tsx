@@ -24,7 +24,7 @@ const itemVariants = {
 interface Connector {
   id: string;
   name: string;
-  category: "Databases" | "Cloud Storage" | "SaaS & CRM" | "Analytics & Ads" | "APIs & Webhooks";
+  category: "Databases" | "Cloud Storage" | "SaaS & CRM" | "Analytics & Ads" | "APIs & Webhooks" | "Streaming & Event Broker";
   type: string;
   status: "Connected" | "Disconnected" | "Syncing" | "Error";
   color: string;
@@ -32,25 +32,25 @@ interface Connector {
   lastSync?: string;
   recordsSynced?: number;
   syncFrequency: "Realtime" | "Hourly" | "Daily" | "Weekly" | "Manual";
-  schemaPreview: { table: string; columns: { name: string; type: string; key?: boolean }[]; sampleRows: any[] }[];
+  schemaPreview: { table: string; columns: { name: string; type: string; key?: boolean }[]; sampleRows?: any[] }[];
   syncLogs: { timestamp: string; status: "Success" | "Failed"; records: number; latency: string }[];
 }
 
 const ALL_CONNECTOR_TEMPLATES: Connector[] = [
   
-  { id: "stream1", name: "Apache Kafka", category: "Streaming & Event Broker", type: "Event Streaming", status: "Disconnected", color: "text-amber-500", host: "kafka-prod.internal:9092",
+  { id: "stream1", name: "Apache Kafka", category: "Streaming & Event Broker", type: "Event Streaming", status: "Disconnected", color: "text-amber-500", host: "kafka-prod.internal:9092", syncFrequency: "Realtime", syncLogs: [],
     schemaPreview: [
-      { table: "Topic: clickstream_events", columns: [{ name: "event_id", type: "STRING", key: true }, { name: "payload", type: "JSON" }] }
+      { table: "Topic: clickstream_events", columns: [{ name: "event_id", type: "STRING", key: true }, { name: "payload", type: "JSON" }], sampleRows: [] }
     ]
   },
-  { id: "stream2", name: "AWS Kinesis", category: "Streaming & Event Broker", type: "Event Streaming", status: "Disconnected", color: "text-orange-500", host: "us-east-1 (Data Stream)",
+  { id: "stream2", name: "AWS Kinesis", category: "Streaming & Event Broker", type: "Event Streaming", status: "Disconnected", color: "text-orange-500", host: "us-east-1 (Data Stream)", syncFrequency: "Realtime", syncLogs: [],
     schemaPreview: [
-      { table: "Stream: iot_sensor_telemetry", columns: [{ name: "partition_key", type: "STRING" }, { name: "data", type: "BINARY" }] }
+      { table: "Stream: iot_sensor_telemetry", columns: [{ name: "partition_key", type: "STRING" }, { name: "data", type: "BINARY" }], sampleRows: [] }
     ]
   },
-  { id: "stream3", name: "Confluent Cloud", category: "Streaming & Event Broker", type: "Event Streaming", status: "Disconnected", color: "text-slate-200", host: "pkc-1234.region.confluent.cloud:9092",
+  { id: "stream3", name: "Confluent Cloud", category: "Streaming & Event Broker", type: "Event Streaming", status: "Disconnected", color: "text-slate-200", host: "pkc-1234.region.confluent.cloud:9092", syncFrequency: "Realtime", syncLogs: [],
     schemaPreview: [
-      { table: "Topic: financial_transactions", columns: [{ name: "tx_id", type: "STRING", key: true }, { name: "amount", type: "DOUBLE" }] }
+      { table: "Topic: financial_transactions", columns: [{ name: "tx_id", type: "STRING", key: true }, { name: "amount", type: "DOUBLE" }], sampleRows: [] }
     ]
   },
   // Databases

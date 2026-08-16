@@ -155,14 +155,14 @@ class DuckDBEngineService {
     
     // Parse sample for metadata
     const lines = csvContent.trim().split("\n");
-    const headers = lines[0]?.split(",").map((h) => h.trim().replace(/^["']|["']$/g, "")) || [];
+    const headers = lines[0]?.split(",").map((h, i) => h.trim().replace(/^["']|["']$/g, "") || `column_${i + 1}`) || [];
     const rowCount = Math.max(0, lines.length - 1);
 
     const info: DuckDBTableInfo = {
       name: cleanName,
       rowCount,
       columnCount: headers.length,
-      columns: headers.map((h) => ({ name: h, type: "VARCHAR" })),
+      columns: headers.map((h, i) => ({ name: h || `column_${i + 1}`, type: "VARCHAR" })),
       sizeEstimate: `${Math.max(1, Math.round((csvContent.length / 1024))).toLocaleString()} KB`,
       sourceType: "CSV",
     };

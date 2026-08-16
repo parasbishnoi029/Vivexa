@@ -15,11 +15,19 @@ export default defineConfig({
     hmr: false,
   },
   build: {
+    target: 'es2022',
+    minify: 'esbuild',
+    cssCodeSplit: true,
+    reportCompressedSize: false,
     chunkSizeWarningLimit: 800,
+    modulePreload: {
+      polyfill: false,
+    },
     rollupOptions: {
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
+            if (id.includes('@duckdb') || id.includes('apache-arrow')) return 'vendor-duckdb';
             if (id.includes('xlsx')) return 'vendor-xlsx';
             if (id.includes('zod')) return 'vendor-zod';
             if (id.includes('react-markdown')) return 'vendor-markdown';
