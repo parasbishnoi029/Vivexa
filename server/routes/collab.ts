@@ -15,6 +15,8 @@ interface CollabRoom {
   roomType: "notebook" | "dashboard" | "lakehouse";
   activeUsers: Record<string, UserPresence>;
   documentState: Record<string, any>;
+  crdtVector: number; // Incrementing state vector for Yjs CRDT changes
+  crdtUpdates: { vector: number; author: string; timestamp: string; delta: any }[];
   updatedAt: string;
 }
 
@@ -43,11 +45,13 @@ const ACTIVE_ROOMS: Record<string, CollabRoom> = {
       cellsCount: 5,
       version: 12
     },
+    crdtVector: 12,
+    crdtUpdates: [],
     updatedAt: new Date().toISOString()
   }
 };
 
-// GET /api/v1/collab/rooms/:roomId - Get active room status and collaborators
+// GET /api/v1/collab/rooms/:roomId - Get active room status, CRDT vector, and collaborators
 collabRouter.get("/rooms/:roomId", (req, res) => {
   const { roomId } = req.params;
   let room = ACTIVE_ROOMS[roomId];
@@ -68,6 +72,8 @@ collabRouter.get("/rooms/:roomId", (req, res) => {
       documentState: {
         version: 1
       },
+      crdtVector: 1,
+      crdtUpdates: [],
       updatedAt: new Date().toISOString()
     };
     ACTIVE_ROOMS[roomId] = room;
@@ -79,6 +85,7 @@ collabRouter.get("/rooms/:roomId", (req, res) => {
       roomId: room.roomId,
       roomType: room.roomType,
       collaborators: Object.values(room.activeUsers),
+      crdtVector: room.crdtVector,
       documentState: room.documentState,
       updatedAt: room.updatedAt
     }
@@ -98,6 +105,8 @@ collabRouter.post("/rooms/:roomId/presence", (req, res) => {
         roomType: "notebook",
         activeUsers: {},
         documentState: {},
+        crdtVector: 1,
+        crdtUpdates: [],
         updatedAt: new Date().toISOString()
       };
       ACTIVE_ROOMS[roomId] = room;
@@ -119,6 +128,46 @@ collabRouter.post("/rooms/:roomId/presence", (req, res) => {
       success: true,
       collaboratorsCount: Object.keys(room.activeUsers).length,
       collaborators: Object.values(room.activeUsers)
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/v1/collab/rooms/:roomId/crdt-sync - Push Yjs CRDT delta update
+collabRouter.post("/rooms/:roomId/crdt-sync", (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const { author = "usr-me", delta } = req.body;
+
+    let room = ACTIVE_ROOMS[roomId];
+    if (!room) {
+      room = {
+        roomId,
+        roomType: "notebook",
+        activeUsers: {},
+        documentState: {},
+        crdtVector: 0,
+        crdtUpdates: [],
+        updatedAt: new Date().toISOString()
+      };
+      ACTIVE_ROOMS[roomId] = room;
+    }
+
+    room.crdtVector += 1;
+    const updateEntry = {
+      vector: room.crdtVector,
+      author,
+      timestamp: new Date().toISOString(),
+      delta
+    };
+    room.crdtUpdates.push(updateEntry);
+    room.updatedAt = new Date().toISOString();
+
+    res.json({
+      success: true,
+      crdtVector: room.crdtVector,
+      appliedUpdate: updateEntry
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

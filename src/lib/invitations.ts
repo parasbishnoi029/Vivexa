@@ -180,7 +180,15 @@ export async function acceptWorkspaceInvitation(invitationId: string): Promise<a
     throw new Error(json.error || 'Failed to accept invitation');
   }
 
-  return json.data;
+  const memberData = json.data;
+  if (memberData && memberData.workspace_id) {
+    useWorkspaceStore.getState().setSelectedWorkspaceId(memberData.workspace_id);
+    try {
+      await supabase.auth.refreshSession();
+    } catch (_) {}
+  }
+
+  return memberData;
 }
 
 export async function inviteTeamMember(

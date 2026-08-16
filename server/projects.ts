@@ -5,6 +5,12 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUP
 const supabaseKey = process.env.SUPABASE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl || "", supabaseKey || "");
 
+const getAdminClient = () => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+  return createClient(url || "", key || "");
+};
+
 export const projectsRouter = express.Router();
 
 const successResponse = (data: any, meta?: any) => {
@@ -18,8 +24,10 @@ projectsRouter.get('/:id/milestones', async (req: express.Request, res: express.
     const user = (req as any).user;
     if (!user) return res.status(401).json(successResponse(null, { error: 'Unauthorized' }));
 
+    const adminClient = getAdminClient();
+
     // Verify user has access to project
-    const { data: project } = await supabase
+    const { data: project } = await adminClient
       .from('projects')
       .select('owner_id, workspace_id')
       .eq('id', id)
@@ -28,7 +36,7 @@ projectsRouter.get('/:id/milestones', async (req: express.Request, res: express.
     if (project && project.owner_id !== user.id) {
       // Check workspace membership
       if (project.workspace_id) {
-        const { data: member } = await supabase
+        const { data: member } = await adminClient
           .from('workspace_members')
           .select('id')
           .eq('workspace_id', project.workspace_id)
@@ -69,8 +77,10 @@ projectsRouter.post('/:id/milestones', async (req: express.Request, res: express
 
     if (!user) return res.status(401).json(successResponse(null, { error: 'Unauthorized' }));
 
+    const adminClient = getAdminClient();
+
     // Verify user has edit access to project
-    const { data: project } = await supabase
+    const { data: project } = await adminClient
       .from('projects')
       .select('owner_id, workspace_id')
       .eq('id', id)
@@ -78,7 +88,7 @@ projectsRouter.post('/:id/milestones', async (req: express.Request, res: express
 
     if (project && project.owner_id !== user.id) {
       if (project.workspace_id) {
-        const { data: member } = await supabase
+        const { data: member } = await adminClient
           .from('workspace_members')
           .select('role')
           .eq('workspace_id', project.workspace_id)

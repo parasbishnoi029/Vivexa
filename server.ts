@@ -22,6 +22,10 @@ import { dbtRouter } from "./server/routes/dbt";
 import { qualityRouter } from "./server/routes/quality";
 import { collabRouter } from "./server/routes/collab";
 import { auditRouter } from "./server/routes/audit";
+import { sharingRouter } from "./server/routes/sharing";
+import { enterpriseComputeRouter } from "./server/routes/enterpriseCompute";
+import { lakehouseRouter } from "./server/routes/lakehouse";
+import { llmApiRouter } from "./server/routes/llm";
 import { 
   authRateLimiter, 
   publicApiRateLimiter, 
@@ -760,62 +764,11 @@ async function resolveRecoveryUrl(actionLink: string, publicOrigin: string): Pro
     }
   });
 
-  // Protected Sharing API: Share Dataset
-  apiRouter.post('/datasets/:id/share', async (req, res) => {
-    try {
-      const user = (req as any).user;
-      const { id } = req.params;
-      const { email } = req.body;
-
-      if (!email || !email.includes('@')) {
-        return res.status(400).json(successResponse(null, { error: 'Valid email address is required' }));
-      }
-
-      // Fetch dataset details
-      const { data: dataset, error: dErr } = await supabase
-        .from('datasets')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
-
-      if (dErr || !dataset) {
-        return res.status(404).json(successResponse(null, { error: 'Dataset not found' }));
-      }
-
-      const origin = req.headers.referer || `${req.protocol}://${req.get('host') || 'localhost:3000'}`;
-      const cleanOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
-      const datasetUrl = `${cleanOrigin}/workspace/datasets/${dataset.id}`;
-
-      const emailResult = await sendEmail({
-        recipient: email.trim().toLowerCase(),
-        template: 'dataset_shared',
-        subject: `Dataset Access Shared: "${dataset.name}" on Vivexa`,
-        data: {
-          dataset_name: dataset.name,
-          dataset_type: dataset.type?.toUpperCase() || 'CSV',
-          dataset_url: datasetUrl
-        }
-      });
-
-      if (!emailResult.success) {
-        return res.status(500).json(successResponse(null, { error: `Dataset sharing email delivery failed: ${emailResult.error}` }));
-      }
-
-      // Log in audit_logs
-      await supabase.from('audit_logs').insert({
-        user_id: user.id,
-        action: 'DATASET_SHARED',
-        resource_type: 'DATASET',
-        resource_id: id,
-        payload: { shared_with: email }
-      });
-
-      return res.json(successResponse({ message: `Dataset successfully shared with ${email}.` }));
-    } catch (err: any) {
-      console.error('[DATASETS API] Share dataset error:', err);
-      return res.status(500).json(successResponse(null, { error: err.message || 'Internal Server Error' }));
-    }
-  });
+  // Mount Microservice Gateway Routers
+  apiRouter.use('/sharing', sharingRouter);
+  apiRouter.use('/enterprise-compute', enterpriseComputeRouter);
+  apiRouter.use('/lakehouse', lakehouseRouter);
+  apiRouter.use('/llm', llmApiRouter);
 
   apiRouter.get('/auth/me', (req, res) => {
     res.json(successResponse((req as any).user));
@@ -836,140 +789,6 @@ async function resolveRecoveryUrl(actionLink: string, publicOrigin: string): Pro
   apiRouter.use('/sdk', sdkRouter);
   apiRouter.use('/enterprise', enterpriseRouter);
   apiRouter.use('/scim', scimRouter);
-  
-  
-  // ==========================================
-  // VIVEXA ENTERPRISE ENGINE (REAL EXECUTION)
-  // ==========================================
-
-  // 1. Server-Side Data Streaming (Fixes Client-Side Bottlenecks)
-  apiRouter.post('/enterprise/dataset/upload', upload.single('file'), (req, res) => {
-    if (!req.file) {
-      return res.status(400).json(successResponse(null, { error: 'No file uploaded.' }));
-    }
-
-    const filePath = req.file.path;
-    const tableName = 't_' + Math.random().toString(36).substring(2, 9);
-    
-    // Create an initial table based on the first row's columns
-    let tableCreated = false;
-    let rowCount = 0;
-    const columns = [];
-    
-    // We stream the large file instead of loading into RAM
-    const stream = require('fs').createReadStream(filePath).pipe(csvParser());
-    
-    stream.on('headers', (headers) => {
-      columns.push(...headers.map(h => h.replace(/[^a-zA-Z0-9_]/g, '')));
-      const colsDef = columns.map(c => `${c} TEXT`).join(', ');
-      enterpriseDB.run(`CREATE TABLE ${tableName} (tenant_id TEXT DEFAULT 'demo_tenant', ${colsDef})`, (err) => {
-         if(err) console.error("DB Create Error:", err);
-         tableCreated = true;
-      });
-    });
-
-    stream.on('data', (data) => {
-      rowCount++;
-      if (tableCreated && rowCount <= 1000) { // Limit insertions for demo speed
-         const placeholders = columns.map(() => '?').join(',');
-         const values = columns.map(col => data[col] || null);
-         enterpriseDB.run(`INSERT INTO ${tableName} (tenant_id, ${columns.join(',')}) VALUES ('demo_tenant', ${placeholders})`, values);
-      }
-    });
-
-    stream.on('end', () => {
-      // Clean up file
-      require('fs').unlinkSync(filePath);
-      return res.json({
-        success: true,
-        data: {
-          table_name: tableName,
-          columns: columns,
-          processed_rows: rowCount,
-          message: 'File successfully streamed and ingested into backend.'
-        }
-      });
-    });
-  });
-
-  // 2. Security Execution (AST Sandboxing & RLS Enforcement)
-  apiRouter.post('/enterprise/sql/query', (req, res) => {
-    const { sql, tableName } = req.body;
-    
-    if (!sql) return res.status(400).json({ success: false, error: "Missing SQL query." });
-    
-    try {
-      // Parse AST to prevent destructive injection
-      const ast = sqlParser.astify(sql);
-      
-      // Ensure only SELECT statements are executed by the LLM
-      if (Array.isArray(ast)) {
-         if(ast.some(q => q.type !== 'select')) throw new Error("Only SELECT queries allowed.");
-      } else {
-         if(ast.type !== 'select') throw new Error("Only SELECT queries allowed.");
-      }
-      
-      // Enforce RLS (Row Level Security) safely using Regex on backend (for demo simplicity, AST deep modification is complex)
-      // In production, we modify the AST WHERE clause. Here, we wrap the query securely.
-      const secureQuery = `SELECT * FROM (${sql}) AS secure_view WHERE tenant_id = 'demo_tenant' LIMIT 100`;
-      
-      const startTime = performance.now();
-      enterpriseDB.all(secureQuery, [], (err, rows) => {
-        if (err) return res.status(400).json({ success: false, error: err.message, ast_validated: true });
-        
-        return res.json({
-           success: true,
-           ast_validated: true,
-           rls_applied: true,
-           execution_ms: (performance.now() - startTime).toFixed(2),
-           data: rows
-        });
-      });
-      
-    } catch (err: any) {
-      // Catch prompt injection / invalid SQL
-      return res.status(403).json({ 
-        success: false, 
-        error: "Security Violation: SQL rejected by AST Sandbox.", 
-        details: err.message 
-      });
-    }
-  });
-
-  // 3. Distributed Cluster Compute (Worker Threads)
-  apiRouter.post('/enterprise/cluster/execute', (req, res) => {
-    const { script } = req.body;
-    
-    // Spawn a real background worker to execute heavy logic so main thread doesn't block
-    const workerCode = `
-      const { parentPort, workerData } = require('worker_threads');
-      const start = performance.now();
-      
-      // Simulate heavy distributed compute (e.g. Spark MapReduce)
-      let sum = 0;
-      for(let i = 0; i < 50000000; i++) { sum += Math.sqrt(i); }
-      
-      const execTime = performance.now() - start;
-      const memUsage = process.memoryUsage().heapUsed / 1024 / 1024;
-      
-      parentPort.postMessage({ 
-         success: true, 
-         metrics: { cpu_time_ms: execTime.toFixed(2), memory_mb: memUsage.toFixed(2) },
-         result: sum
-      });
-    `;
-    
-    const worker = new WorkerThread(workerCode, { eval: true });
-    
-    worker.on('message', (result) => {
-      res.json(result);
-    });
-    
-    worker.on('error', (err) => {
-      res.status(500).json({ success: false, error: err.message });
-    });
-  });
-
   apiRouter.use('/rag', ragRouter);
   apiRouter.use('/dbt', dbtRouter);
   apiRouter.use('/quality', qualityRouter);

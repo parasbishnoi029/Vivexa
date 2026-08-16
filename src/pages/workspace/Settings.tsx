@@ -69,15 +69,15 @@ export default function WorkspaceSettings() {
   // Profile Form States
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
-  const [phone, setPhone] = useState("+91 98765 43210");
+  const [phone, setPhone] = useState("");
   const [company, setCompany] = useState("");
   const [department, setDepartment] = useState("");
   const [role, setRole] = useState("");
   const [designation, setDesignation] = useState("");
   const [bio, setBio] = useState("");
   const [location, setLocation] = useState("");
-  const [website, setWebsite] = useState("https://vivexa.ai");
-  const [portfolio, setPortfolio] = useState("https://github.com");
+  const [website, setWebsite] = useState("");
+  const [portfolio, setPortfolio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
@@ -437,15 +437,28 @@ Thank you for scaling with Vivexa!
 
       if (!profileRes.error && data) {
         setProfile(data);
-        setFullName(data.full_name || "");
+        setFullName(data.full_name || (user?.user_metadata?.first_name ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ''}`.trim() : ""));
         setUsername(prefs.username || user?.email?.split('@')[0] || "");
-        setCompany(data.company || "Vivexa Enterprise");
-        setRole(data.role || "CTO");
-        setDepartment(prefs.department || "Analytics & AI");
-        setDesignation(prefs.designation || "Principal Analyst");
-        setBio(data.bio || "Data-driven analytics decision strategist.");
-        setLocation(prefs.location || "Bengaluru, India");
+        setCompany(data.company || user?.user_metadata?.company || "");
+        setRole(data.role || "");
+        setDepartment(prefs.department || "");
+        setDesignation(prefs.designation || "");
+        setBio(data.bio || "");
+        setLocation(prefs.location || "");
+        setPhone(prefs.phone || data.phone || "");
+        setWebsite(prefs.website || data.website || "");
+        setPortfolio(prefs.portfolio || data.portfolio || "");
         setAvatarUrl(data.avatar_url || "");
+      } else {
+        if (user?.user_metadata?.first_name) {
+          setFullName(`${user.user_metadata.first_name} ${user.user_metadata.last_name || ''}`.trim());
+        }
+        if (user?.user_metadata?.company) {
+          setCompany(user.user_metadata.company);
+        }
+        if (user?.email) {
+          setUsername(user.email.split('@')[0]);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -569,6 +582,9 @@ Thank you for scaling with Vivexa!
       await saveSetting('department', department);
       await saveSetting('designation', designation);
       await saveSetting('location', location);
+      await saveSetting('phone', phone);
+      await saveSetting('website', website);
+      await saveSetting('portfolio', portfolio);
 
       toast.success("Profile saved successfully!");
 
@@ -576,7 +592,7 @@ Thank you for scaling with Vivexa!
       await supabase.from('audit_logs').insert({
         user_id: user.id,
         action: "Profile Details Saved",
-        metadata: { full_name: fullName, username }
+        metadata: { full_name: fullName, username, company, role }
       });
       loadAuditLogs();
     } catch (err: any) {
@@ -837,6 +853,17 @@ Thank you for scaling with Vivexa!
               {/* PROFILE TAB */}
               {activeTab === "profile" && (
                 <div className="space-y-6">
+                  {/* Callout Notice to update original details */}
+                  <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-amber-300 text-sm">Please Update With Your Original Profile Details</h4>
+                      <p className="text-xs text-amber-200/80 leading-relaxed">
+                        Placeholder profile data has been removed. Please enter your authentic full name, organization, job title, phone number, and location below so your team members and workspace collaborators can identify you accurately.
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="flex items-center gap-6 pb-4 border-b border-slate-850">
                     <div className="relative">
                       <div className="h-20 w-20 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold text-2xl overflow-hidden shadow-lg">
@@ -856,7 +883,7 @@ Thank you for scaling with Vivexa!
                       <p className="text-xs text-slate-400">{user?.email}</p>
                       <div className="flex items-center gap-2 mt-2">
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                          {role || "Enterprise Admin"}
+                          {role || "Member"}
                         </span>
                         <span className="text-xs text-emerald-400 font-bold">Completeness: {profileCompletion}%</span>
                       </div>
@@ -865,34 +892,60 @@ Thank you for scaling with Vivexa!
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                     <div className="space-y-1.5">
-                      <label className="text-slate-300 font-medium block">Full Name</label>
-                      <Input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className="bg-slate-950/60 border-slate-800 rounded-xl" />
+                      <label className="text-slate-300 font-medium block">Full Name <span className="text-amber-400">*</span></label>
+                      <Input type="text" placeholder="e.g. Paras Bishnoi" value={fullName} onChange={(e) => setFullName(e.target.value)} className="bg-slate-950/60 border-slate-800 rounded-xl placeholder:text-slate-600" />
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-slate-300 font-medium block">Username</label>
-                      <Input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="bg-slate-950/60 border-slate-800 rounded-xl" />
+                      <Input type="text" placeholder="e.g. parasbishnoi" value={username} onChange={(e) => setUsername(e.target.value)} className="bg-slate-950/60 border-slate-800 rounded-xl placeholder:text-slate-600" />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-slate-300 font-medium block">Company / Organization</label>
-                      <Input type="text" value={company} onChange={(e) => setCompany(e.target.value)} className="bg-slate-950/60 border-slate-800 rounded-xl" />
+                      <label className="text-slate-300 font-medium block">Company / Organization <span className="text-amber-400">*</span></label>
+                      <Input type="text" placeholder="e.g. Acme Corp" value={company} onChange={(e) => setCompany(e.target.value)} className="bg-slate-950/60 border-slate-800 rounded-xl placeholder:text-slate-600" />
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-slate-300 font-medium block">Department</label>
-                      <Input type="text" value={department} onChange={(e) => setDepartment(e.target.value)} className="bg-slate-950/60 border-slate-800 rounded-xl" />
+                      <Input type="text" placeholder="e.g. Data Analytics" value={department} onChange={(e) => setDepartment(e.target.value)} className="bg-slate-950/60 border-slate-800 rounded-xl placeholder:text-slate-600" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-slate-300 font-medium block">Job Role / Title</label>
+                      <Input type="text" placeholder="e.g. Senior Data Analyst" value={role} onChange={(e) => setRole(e.target.value)} className="bg-slate-950/60 border-slate-800 rounded-xl placeholder:text-slate-600" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-slate-300 font-medium block">Designation</label>
+                      <Input type="text" placeholder="e.g. Lead Engineer" value={designation} onChange={(e) => setDesignation(e.target.value)} className="bg-slate-950/60 border-slate-800 rounded-xl placeholder:text-slate-600" />
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-slate-300 font-medium block">Phone Number</label>
-                      <Input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className="bg-slate-950/60 border-slate-800 rounded-xl" />
+                      <Input type="text" placeholder="e.g. +1 (555) 000-0000" value={phone} onChange={(e) => setPhone(e.target.value)} className="bg-slate-950/60 border-slate-800 rounded-xl placeholder:text-slate-600" />
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-slate-300 font-medium block">Location / Country</label>
-                      <Input type="text" value={location} onChange={(e) => setLocation(e.target.value)} className="bg-slate-950/60 border-slate-800 rounded-xl" />
+                      <Input type="text" placeholder="e.g. San Francisco, CA" value={location} onChange={(e) => setLocation(e.target.value)} className="bg-slate-950/60 border-slate-800 rounded-xl placeholder:text-slate-600" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-slate-300 font-medium block">Personal / Organization Website</label>
+                      <Input type="text" placeholder="e.g. https://example.com" value={website} onChange={(e) => setWebsite(e.target.value)} className="bg-slate-950/60 border-slate-800 rounded-xl placeholder:text-slate-600" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-slate-300 font-medium block">Portfolio / GitHub Profile</label>
+                      <Input type="text" placeholder="e.g. https://github.com/yourusername" value={portfolio} onChange={(e) => setPortfolio(e.target.value)} className="bg-slate-950/60 border-slate-800 rounded-xl placeholder:text-slate-600" />
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="text-slate-300 font-medium block text-xs">Bio & Executive Summary</label>
-                    <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className="w-full px-3 py-2 bg-slate-950/40 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-indigo-500" />
+                    <textarea placeholder="Write a brief summary of your role, responsibilities, or expertise..." value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className="w-full px-3 py-2 bg-slate-950/40 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-indigo-500 placeholder:text-slate-600" />
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-slate-800">
+                    <p className="text-[11px] text-slate-400">
+                      <span className="text-amber-400 font-semibold">*</span> Completing your profile details improves workspace collaboration and identity verification.
+                    </p>
+                    <Button onClick={handleSaveProfile} disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl px-5 py-2 flex items-center gap-2 shrink-0">
+                      {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                      Save Original Profile Details
+                    </Button>
                   </div>
                 </div>
               )}

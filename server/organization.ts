@@ -82,8 +82,9 @@ async function resolveUserWorkspace(user: any, requestedWorkspaceId?: string, cl
   const adminClient = getAdminSupabaseClient();
   let workspace: any = null;
 
+  // 1. Explicit requestedWorkspaceId parameter
   if (requestedWorkspaceId && requestedWorkspaceId !== "all" && requestedWorkspaceId !== "undefined" && requestedWorkspaceId !== "default") {
-    const { data: ws } = await dbClient
+    const { data: ws } = await adminClient
       .from('workspaces')
       .select('*')
       .eq('id', requestedWorkspaceId)
@@ -94,23 +95,76 @@ async function resolveUserWorkspace(user: any, requestedWorkspaceId?: string, cl
         return { workspace: ws, isOwner: true, isAuthorized: true };
       }
       // Check membership
-      const { data: isMember } = await dbClient
+      const { data: isMember } = await adminClient
         .from('workspace_members')
         .select('role, status')
         .eq('workspace_id', requestedWorkspaceId)
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (isMember) {
+      if (isMember && isMember.status !== 'inactive') {
         const role = isMember.role?.toLowerCase();
-        const auth = role === 'owner' || role === 'admin' || role === 'manager' || role === 'analyst';
+        const auth = role === 'owner' || role === 'admin' || role === 'manager' || role === 'analyst' || role === 'member';
         return { workspace: ws, isOwner: false, isAuthorized: auth };
       }
     }
   }
 
-  // Fallback 1: Query workspaces owned by user
-  const { data: ownedWsList } = await dbClient
+  // 2. Check if user metadata or profile has an active workspace_id bound
+  const metaWsId = user.user_metadata?.workspace_id;
+  if (metaWsId && metaWsId !== "all" && metaWsId !== "undefined" && metaWsId !== "default") {
+    const { data: metaWs } = await adminClient
+      .from('workspaces')
+      .select('*')
+      .eq('id', metaWsId)
+      .maybeSingle();
+
+    if (metaWs) {
+      if (metaWs.owner_id === user.id) {
+        return { workspace: metaWs, isOwner: true, isAuthorized: true };
+      }
+      const { data: isMember } = await adminClient
+        .from('workspace_members')
+        .select('role, status')
+        .eq('workspace_id', metaWsId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (isMember && isMember.status !== 'inactive') {
+        const role = isMember.role?.toLowerCase();
+        const auth = role === 'owner' || role === 'admin' || role === 'manager' || role === 'analyst' || role === 'member';
+        return { workspace: metaWs, isOwner: false, isAuthorized: auth };
+      }
+    }
+  }
+
+  // 3. Query active memberships in workspace_members table (prefer joined organization workspaces)
+  const { data: memberships } = await adminClient
+    .from('workspace_members')
+    .select('workspace_id, role, status')
+    .eq('user_id', user.id)
+    .neq('status', 'inactive');
+
+  if (memberships && memberships.length > 0) {
+    const wsIds = memberships.map((m: any) => m.workspace_id);
+    const { data: memberWsList } = await adminClient
+      .from('workspaces')
+      .select('*')
+      .in('id', wsIds);
+
+    if (memberWsList && memberWsList.length > 0) {
+      // Prefer organization / non-personal workspaces over personal workspace
+      const orgWs = memberWsList.find(w => !w.is_personal || w.owner_id !== user.id);
+      workspace = orgWs || memberWsList[0];
+      const mem = memberships.find((m: any) => m.workspace_id === workspace.id);
+      const role = mem?.role?.toLowerCase();
+      const auth = role === 'owner' || role === 'admin' || role === 'manager' || role === 'analyst' || role === 'member';
+      return { workspace, isOwner: workspace.owner_id === user.id, isAuthorized: auth };
+    }
+  }
+
+  // 4. Fallback: Query workspaces owned by user
+  const { data: ownedWsList } = await adminClient
     .from('workspaces')
     .select('*')
     .eq('owner_id', user.id)
@@ -119,29 +173,6 @@ async function resolveUserWorkspace(user: any, requestedWorkspaceId?: string, cl
   if (ownedWsList && ownedWsList.length > 0) {
     workspace = ownedWsList[0];
     return { workspace, isOwner: true, isAuthorized: true };
-  }
-
-  // Fallback 2: Query workspaces user is member of
-  const { data: memberships } = await dbClient
-    .from('workspace_members')
-    .select('workspace_id, role, status')
-    .eq('user_id', user.id);
-
-  if (memberships && memberships.length > 0) {
-    const wsIds = memberships.map((m: any) => m.workspace_id);
-    const { data: memberWsList } = await dbClient
-      .from('workspaces')
-      .select('*')
-      .in('id', wsIds)
-      .limit(1);
-
-    if (memberWsList && memberWsList.length > 0) {
-      workspace = memberWsList[0];
-      const mem = memberships.find((m: any) => m.workspace_id === workspace.id);
-      const role = mem?.role?.toLowerCase();
-      const auth = role === 'owner' || role === 'admin' || role === 'manager' || role === 'analyst';
-      return { workspace, isOwner: workspace.owner_id === user.id, isAuthorized: auth };
-    }
   }
 
   // Try adminClient if dbClient found nothing
@@ -292,6 +323,18 @@ organizationRouter.get('/data', async (req: express.Request, res: express.Respon
     const userMap = new Map((usersList || []).map(u => [u.id, u]));
     const authUserMap = new Map(authUsers.map(u => [u.id, u]));
 
+    // Fetch missing users individually from Supabase Auth admin if not present in maps
+    for (const uid of memberUserIds) {
+      if (uid && !userMap.has(uid) && !authUserMap.has(uid)) {
+        try {
+          const { data: singleAuth } = await adminClient.auth.admin.getUserById(uid);
+          if (singleAuth?.user) {
+            authUserMap.set(uid, singleAuth.user);
+          }
+        } catch (_) {}
+      }
+    }
+
     // Format Owner as first member
     const ownerUser = userMap.get(workspace.owner_id) || authUserMap.get(workspace.owner_id);
     const ownerProfile = profileMap.get(workspace.owner_id);
@@ -311,23 +354,37 @@ organizationRouter.get('/data', async (req: express.Request, res: express.Respon
     ];
 
     // Format other members
-    (rawMembers || []).forEach(m => {
+    for (const m of (rawMembers || [])) {
       if (m.user_id !== workspace.owner_id) {
-        const u = userMap.get(m.user_id) || authUserMap.get(m.user_id);
+        let u = userMap.get(m.user_id) || authUserMap.get(m.user_id);
+        if (!u) {
+          try {
+            const { data: singleAuth } = await adminClient.auth.admin.getUserById(m.user_id);
+            if (singleAuth?.user) {
+              u = singleAuth.user;
+              authUserMap.set(m.user_id, u);
+            }
+          } catch (_) {}
+        }
         const p = profileMap.get(m.user_id);
+        const memberEmail = u?.email || m.email || 'team.member@domain.com';
+        const memberName = p?.full_name || u?.user_metadata?.full_name || u?.user_metadata?.first_name 
+          ? `${u?.user_metadata?.first_name || ''} ${u?.user_metadata?.last_name || ''}`.trim()
+          : memberEmail.split('@')[0];
+
         members.push({
           id: m.id,
           user_id: m.user_id,
-          email: u?.email || 'team.member@domain.com',
-          full_name: p?.full_name || u?.user_metadata?.full_name || u?.email?.split('@')[0] || 'Team Member',
-          avatar_url: p?.avatar_url,
+          email: memberEmail,
+          full_name: memberName || 'Team Member',
+          avatar_url: p?.avatar_url || u?.user_metadata?.avatar_url,
           role: m.role || 'Analyst',
           status: m.status || 'active',
           created_at: m.created_at,
           is_owner: false
         });
       }
-    });
+    }
 
     // Fetch Pending Invitations from both workspace_invitations table AND workspace metadata
     const wsMetadata = workspace.metadata || {};
@@ -1417,7 +1474,7 @@ const handleAcceptInvitation = async (req: express.Request, res: express.Respons
             }
             return inv;
           });
-          await userClient
+          await adminClient
             .from('workspaces')
             .update({ metadata: targetMeta, updated_at: new Date().toISOString() })
             .eq('id', targetWs.id);
@@ -1454,6 +1511,24 @@ const handleAcceptInvitation = async (req: express.Request, res: express.Respons
         throw memberErr;
       }
       memberData = newMember;
+    } else {
+      console.log(`[InviteService:Accept] Updating existing workspace_member ${existingMember.id} for user ${user.id} to active status`);
+      const { data: updatedMember, error: updateMemberErr } = await adminClient
+        .from('workspace_members')
+        .update({
+          status: 'active',
+          role: invite.role || existingMember.role || 'Analyst',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingMember.id)
+        .select()
+        .single();
+
+      if (!updateMemberErr && updatedMember) {
+        memberData = updatedMember;
+      } else if (updateMemberErr) {
+        console.warn(`[InviteService:Accept] Error updating existing member status:`, updateMemberErr.message);
+      }
     }
 
     // 3. Supabase Auth User-Metadata Synchronization (organization_id verification)

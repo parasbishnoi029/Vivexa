@@ -10,6 +10,12 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUP
 const supabaseKey = process.env.SUPABASE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl || '', supabaseKey || '');
 
+const getAdminClient = () => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+  return createClient(url || '', key || '');
+};
+
 const connectionString = process.env.DATABASE_URL;
 let pool: pg.Pool | null = null;
 
@@ -452,7 +458,8 @@ forecastRouter.post('/generate', enforceAiQuotaMiddleware, async (req, res) => {
     let hasAccess = isOwner || isAdmin || dataset.is_public;
 
     if (!hasAccess && dataset.workspace_id) {
-      const { data: membership } = await supabase
+      const adminClient = getAdminClient();
+      const { data: membership } = await adminClient
         .from('workspace_members')
         .select('id')
         .eq('workspace_id', dataset.workspace_id)
