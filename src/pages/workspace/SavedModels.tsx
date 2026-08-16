@@ -33,26 +33,7 @@ export default function SavedModels() {
     if (saved) {
       try { return JSON.parse(saved); } catch (e) { /* fallback */ }
     }
-    return [
-      {
-        id: "m-1",
-        name: "Customer Churn Random Forest",
-        accuracy: "94.2%",
-        dataset: "Q3 Customer Churn Data",
-        version: "v1.2.0",
-        status: "Active",
-        endpoint: "/api/v1/predict/churn-rf"
-      },
-      {
-        id: "m-2",
-        name: "Q4 Revenue TimeSeries Forecast",
-        accuracy: "91.8%",
-        dataset: "Global Sales 2023-2024",
-        version: "v2.0.1",
-        status: "Active",
-        endpoint: "/api/v1/predict/revenue-ts"
-      }
-    ];
+    return [];
   });
 
   const [activeTestModel, setActiveTestModel] = useState<MLModel | null>(null);

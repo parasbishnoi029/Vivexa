@@ -139,7 +139,7 @@ export default function DataQuality() {
             <div>
               <p className="text-xs text-slate-400 font-medium">Dataset Health Score</p>
               <h3 className="text-2xl font-bold text-emerald-400 mt-1">
-                {profile?.overallHealthScore || 98}%
+                {profile?.overallHealthScore != null ? `${profile.overallHealthScore}%` : "100%"}
               </h3>
               <p className="text-[11px] text-slate-500 mt-0.5">SLA Compliance Gate Passed</p>
             </div>
@@ -156,7 +156,9 @@ export default function DataQuality() {
               <h3 className="text-2xl font-bold text-amber-400 mt-1">
                 {incidents.filter((i) => i.status === "Active").length}
               </h3>
-              <p className="text-[11px] text-slate-500 mt-0.5">1 P1 High, 0 P0 Blocker</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                {incidents.length > 0 ? `${incidents.filter(i => i.severity?.includes('P1')).length} P1, ${incidents.filter(i => i.severity?.includes('P0')).length} P0` : "No active incidents"}
+              </p>
             </div>
             <div className="p-3 bg-amber-500/10 text-amber-400 rounded-xl">
               <AlertTriangle className="w-6 h-6" />
@@ -171,7 +173,7 @@ export default function DataQuality() {
               <h3 className="text-2xl font-bold text-indigo-400 mt-1">
                 {profile?.schemaAudit?.driftDetected ? "Drift Alert" : "In Sync"}
               </h3>
-              <p className="text-[11px] text-slate-500 mt-0.5">Matched with dbt Manifest</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">Schema Sentinel</p>
             </div>
             <div className="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl">
               <Layers className="w-6 h-6" />
@@ -184,9 +186,9 @@ export default function DataQuality() {
             <div>
               <p className="text-xs text-slate-400 font-medium">Assertions Evaluated</p>
               <h3 className="text-2xl font-bold text-slate-200 mt-1">
-                {profile?.checksRun || 14}
+                {profile?.checksRun ?? rules.length}
               </h3>
-              <p className="text-[11px] text-slate-500 mt-0.5">Every 15 mins (Continuous)</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">Automated Rules</p>
             </div>
             <div className="p-3 bg-slate-800 text-slate-300 rounded-xl">
               <Activity className="w-6 h-6" />

@@ -54,51 +54,51 @@ const ALL_CONNECTOR_TEMPLATES: Connector[] = [
     ]
   },
   // Databases
-  { id: "c1", name: "PostgreSQL Database", category: "Databases", type: "Relational DB", status: "Connected", color: "text-blue-400", host: "db.production.internal:5432", lastSync: "10 mins ago", recordsSynced: 124500, syncFrequency: "Hourly",
+  { id: "c1", name: "PostgreSQL Database", category: "Databases", type: "Relational DB", status: "Disconnected", color: "text-blue-400", host: "db.production.internal:5432", syncFrequency: "Hourly",
     schemaPreview: [
-      { table: "users", columns: [{ name: "id", type: "UUID", key: true }, { name: "email", type: "VARCHAR" }, { name: "created_at", type: "TIMESTAMP" }], sampleRows: [{ id: "usr_101", email: "alex@enterprise.io", created_at: "2026-08-01" }, { id: "usr_102", email: "sarah@tech.co", created_at: "2026-08-02" }] },
-      { table: "orders", columns: [{ name: "order_id", type: "UUID", key: true }, { name: "amount", type: "DECIMAL" }, { name: "status", type: "VARCHAR" }], sampleRows: [{ order_id: "ord_881", amount: 499.00, status: "completed" }] }
+      { table: "users", columns: [{ name: "id", type: "UUID", key: true }, { name: "email", type: "VARCHAR" }, { name: "created_at", type: "TIMESTAMP" }], sampleRows: [] },
+      { table: "orders", columns: [{ name: "order_id", type: "UUID", key: true }, { name: "amount", type: "DECIMAL" }, { name: "status", type: "VARCHAR" }], sampleRows: [] }
     ],
-    syncLogs: [{ timestamp: "Today 08:00 AM", status: "Success", records: 1250, latency: "14ms" }, { timestamp: "Yesterday 08:00 AM", status: "Success", records: 3400, latency: "18ms" }]
+    syncLogs: []
   },
-  { id: "c2", name: "Snowflake Warehouse", category: "Databases", type: "Data Warehouse", status: "Connected", color: "text-sky-400", host: "xy12345.snowflakecomputing.com", lastSync: "1 hour ago", recordsSynced: 890000, syncFrequency: "Daily",
-    schemaPreview: [{ table: "ANALYTICS.FACT_SALES", columns: [{ name: "SALE_ID", type: "NUMBER", key: true }, { name: "REVENUE", type: "FLOAT" }], sampleRows: [{ SALE_ID: 991, REVENUE: 1250.50 }] }],
-    syncLogs: [{ timestamp: "Today 07:00 AM", status: "Success", records: 45000, latency: "85ms" }]
+  { id: "c2", name: "Snowflake Warehouse", category: "Databases", type: "Data Warehouse", status: "Disconnected", color: "text-sky-400", host: "xy12345.snowflakecomputing.com", syncFrequency: "Daily",
+    schemaPreview: [{ table: "ANALYTICS.FACT_SALES", columns: [{ name: "SALE_ID", type: "NUMBER", key: true }, { name: "REVENUE", type: "FLOAT" }], sampleRows: [] }],
+    syncLogs: []
   },
   { id: "c3", name: "Google BigQuery", category: "Databases", type: "Cloud DW", status: "Disconnected", color: "text-amber-400", host: "bigquery.googleapis.com/v2/projects/prod-ai", syncFrequency: "Daily",
-    schemaPreview: [{ table: "ga_events_2026", columns: [{ name: "event_name", type: "STRING" }, { name: "user_pseudo_id", type: "STRING" }], sampleRows: [{ event_name: "page_view", user_pseudo_id: "1098231" }] }],
+    schemaPreview: [{ table: "ga_events", columns: [{ name: "event_name", type: "STRING" }, { name: "user_pseudo_id", type: "STRING" }], sampleRows: [] }],
     syncLogs: []
   },
   { id: "c4", name: "MongoDB Enterprise", category: "Databases", type: "NoSQL DB", status: "Disconnected", color: "text-emerald-400", host: "cluster0.mongodb.net:27017", syncFrequency: "Realtime",
-    schemaPreview: [{ table: "customer_logs", columns: [{ name: "_id", type: "ObjectId", key: true }, { name: "action", type: "String" }], sampleRows: [{ _id: "66b3d1", action: "login" }] }],
+    schemaPreview: [{ table: "customer_logs", columns: [{ name: "_id", type: "ObjectId", key: true }, { name: "action", type: "String" }], sampleRows: [] }],
     syncLogs: []
   },
   { id: "c5", name: "Microsoft SQL Server", category: "Databases", type: "Relational DB", status: "Disconnected", color: "text-red-400", host: "sqlserver.corp.local:1433", syncFrequency: "Hourly", schemaPreview: [], syncLogs: [] },
   { id: "c6", name: "MySQL Cluster", category: "Databases", type: "Relational DB", status: "Disconnected", color: "text-blue-500", host: "mysql.prod.internal:3306", syncFrequency: "Hourly", schemaPreview: [], syncLogs: [] },
   { id: "c7", name: "ClickHouse OLAP", category: "Databases", type: "Columnar DB", status: "Disconnected", color: "text-yellow-400", host: "clickhouse.analytics.net:8123", syncFrequency: "Realtime", schemaPreview: [], syncLogs: [] },
-  { id: "c8", name: "DuckDB In-Memory", category: "Databases", type: "Embedded OLAP", status: "Connected", color: "text-amber-300", host: "local.duckdb.store", lastSync: "5 mins ago", recordsSynced: 45000, syncFrequency: "Realtime",
-    schemaPreview: [{ table: "temp_metrics", columns: [{ name: "metric_id", type: "INTEGER" }, { name: "val", type: "DOUBLE" }], sampleRows: [{ metric_id: 1, val: 98.4 }] }],
-    syncLogs: [{ timestamp: "Just now", status: "Success", records: 500, latency: "2ms" }]
+  { id: "c8", name: "DuckDB In-Memory", category: "Databases", type: "Embedded OLAP", status: "Disconnected", color: "text-amber-300", host: "local.duckdb.store", syncFrequency: "Realtime",
+    schemaPreview: [{ table: "temp_metrics", columns: [{ name: "metric_id", type: "INTEGER" }, { name: "val", type: "DOUBLE" }], sampleRows: [] }],
+    syncLogs: []
   },
   { id: "c_db_9", name: "Oracle Enterprise DB", category: "Databases", type: "Relational DB", status: "Disconnected", color: "text-red-500", host: "oracle-db.production.net:1521", syncFrequency: "Daily", schemaPreview: [], syncLogs: [] },
   { id: "c_db_10", name: "Cassandra Distributed NoSQL", category: "Databases", type: "Wide Column Store", status: "Disconnected", color: "text-cyan-500", host: "cassandra.cluster.internal:9042", syncFrequency: "Hourly", schemaPreview: [], syncLogs: [] },
   { id: "c_db_11", name: "Amazon DynamoDB", category: "Databases", type: "Cloud Key-Value NoSQL", status: "Disconnected", color: "text-blue-600", host: "dynamodb.us-east-1.amazonaws.com", syncFrequency: "Realtime", schemaPreview: [], syncLogs: [] },
   { id: "c_db_12", name: "SQLite Embedded", category: "Databases", type: "File-Based DB", status: "Disconnected", color: "text-indigo-400", host: "file:///var/lib/sqlite/prod.db", syncFrequency: "Manual", schemaPreview: [], syncLogs: [] },
   { id: "c_db_13", name: "Amazon Redshift DW", category: "Databases", type: "Columnar Cloud DW", status: "Disconnected", color: "text-orange-500", host: "redshift.cluster.us-west-2.es.amazonaws.com:5439", syncFrequency: "Daily", schemaPreview: [], syncLogs: [] },
-  { id: "c_db_14", name: "Apache Spark Engine", category: "Databases", type: "Big Data Processing", status: "Disconnected", color: "text-red-600", host: "spark://spark-master:7077", syncFrequency: "Hourly", schemaPreview: [], syncLogs: [] },
+  { id: "c_db_14", name: "Apache Spark Engine", category: "Databases", type: "Big Big Data Processing", status: "Disconnected", color: "text-red-600", host: "spark://spark-master:7077", syncFrequency: "Hourly", schemaPreview: [], syncLogs: [] },
   { id: "c_db_15", name: "Databricks Lakehouse", category: "Databases", type: "Delta Lake Unified Platform", status: "Disconnected", color: "text-amber-500", host: "adb-8127391.azuredatabricks.net", syncFrequency: "Realtime", schemaPreview: [], syncLogs: [] },
   { id: "c_db_16", name: "Azure Synapse Analytics", category: "Databases", type: "Enterprise Cloud DW", status: "Disconnected", color: "text-sky-600", host: "synapse.sql.azuresynapse.net", syncFrequency: "Daily", schemaPreview: [], syncLogs: [] },
 
   // Cloud Storage
-  { id: "c9", name: "AWS S3 Bucket", category: "Cloud Storage", type: "Object Storage", status: "Connected", color: "text-orange-400", host: "s3://enterprise-data-lake-prod", lastSync: "30 mins ago", recordsSynced: 340000, syncFrequency: "Hourly",
-    schemaPreview: [{ table: "parquet_partition_2026", columns: [{ name: "timestamp", type: "BIGINT" }, { name: "payload", type: "JSON" }], sampleRows: [{ timestamp: 178921820, payload: "{\"sensor\": 1}" }] }],
-    syncLogs: [{ timestamp: "Today 07:30 AM", status: "Success", records: 12000, latency: "45ms" }]
+  { id: "c9", name: "AWS S3 Bucket", category: "Cloud Storage", type: "Object Storage", status: "Disconnected", color: "text-orange-400", host: "s3://enterprise-data-lake-prod", syncFrequency: "Hourly",
+    schemaPreview: [{ table: "parquet_partition", columns: [{ name: "timestamp", type: "BIGINT" }, { name: "payload", type: "JSON" }], sampleRows: [] }],
+    syncLogs: []
   },
   { id: "c10", name: "Google Cloud Storage", category: "Cloud Storage", type: "Object Storage", status: "Disconnected", color: "text-blue-400", host: "gs://analytics-export-buckets", syncFrequency: "Daily", schemaPreview: [], syncLogs: [] },
   { id: "c11", name: "Azure Blob Storage", category: "Cloud Storage", type: "Blob Store", status: "Disconnected", color: "text-sky-500", host: "mystorageaccount.blob.core.windows.net", syncFrequency: "Daily", schemaPreview: [], syncLogs: [] },
-  { id: "c12", name: "Google Drive Sync", category: "Cloud Storage", type: "Cloud Documents", status: "Connected", color: "text-emerald-400", host: "drive.google.com/folders/1A2b3C", lastSync: "2 hours ago", recordsSynced: 85, syncFrequency: "Daily",
-    schemaPreview: [{ table: "Q3_Financial_Model.xlsx", columns: [{ name: "Month", type: "String" }, { name: "Revenue", type: "Currency" }], sampleRows: [{ Month: "July 2026", Revenue: "$240,000" }] }],
-    syncLogs: [{ timestamp: "Today 06:00 AM", status: "Success", records: 85, latency: "120ms" }]
+  { id: "c12", name: "Google Drive Sync", category: "Cloud Storage", type: "Cloud Documents", status: "Disconnected", color: "text-emerald-400", host: "drive.google.com/folders/", syncFrequency: "Daily",
+    schemaPreview: [{ table: "Financial_Model.xlsx", columns: [{ name: "Month", type: "String" }, { name: "Revenue", type: "Currency" }], sampleRows: [] }],
+    syncLogs: []
   },
   { id: "c_store_13", name: "Microsoft OneDrive", category: "Cloud Storage", type: "Enterprise File Sync", status: "Disconnected", color: "text-blue-500", host: "onedrive.live.com/business/shared_data", syncFrequency: "Daily", schemaPreview: [], syncLogs: [] },
   { id: "c_store_14", name: "Dropbox Cloud Business", category: "Cloud Storage", type: "Secure Document Cloud", status: "Disconnected", color: "text-indigo-500", host: "dropbox.com/teams/finance-vault", syncFrequency: "Weekly", schemaPreview: [], syncLogs: [] },
@@ -111,28 +111,28 @@ const ALL_CONNECTOR_TEMPLATES: Connector[] = [
   { id: "c_file_19", name: "Computer Vision & OCR Images", category: "Cloud Storage", type: "AI OCR Image Scanner", status: "Disconnected", color: "text-purple-500", host: "file://receipts/invoice_scans/", syncFrequency: "Hourly", schemaPreview: [], syncLogs: [] },
 
   // SaaS & CRM
-  { id: "c13", name: "Salesforce CRM", category: "SaaS & CRM", type: "Enterprise CRM", status: "Connected", color: "text-cyan-400", host: "na120.salesforce.com", lastSync: "15 mins ago", recordsSynced: 54000, syncFrequency: "Hourly",
-    schemaPreview: [{ table: "Opportunity", columns: [{ name: "Id", type: "ID", key: true }, { name: "Amount", type: "Currency" }, { name: "StageName", type: "String" }], sampleRows: [{ Id: "0065g00000", Amount: 150000, StageName: "Closed Won" }] }],
-    syncLogs: [{ timestamp: "15 mins ago", status: "Success", records: 210, latency: "95ms" }]
+  { id: "c13", name: "Salesforce CRM", category: "SaaS & CRM", type: "Enterprise CRM", status: "Disconnected", color: "text-cyan-400", host: "na120.salesforce.com", syncFrequency: "Hourly",
+    schemaPreview: [{ table: "Opportunity", columns: [{ name: "Id", type: "ID", key: true }, { name: "Amount", type: "Currency" }, { name: "StageName", type: "String" }], sampleRows: [] }],
+    syncLogs: []
   },
   { id: "c14", name: "HubSpot Marketing", category: "SaaS & CRM", type: "CRM & Marketing", status: "Disconnected", color: "text-orange-500", host: "api.hubapi.com/v3", syncFrequency: "Daily", schemaPreview: [], syncLogs: [] },
   { id: "c15", name: "Jira Enterprise", category: "SaaS & CRM", type: "Project Mgmt", status: "Disconnected", color: "text-blue-400", host: "vivexa.atlassian.net", syncFrequency: "Daily", schemaPreview: [], syncLogs: [] },
-  { id: "c16", name: "Stripe Financials", category: "SaaS & CRM", type: "Payments Engine", status: "Connected", color: "text-indigo-400", host: "api.stripe.com/v1", lastSync: "5 mins ago", recordsSynced: 12890, syncFrequency: "Realtime",
-    schemaPreview: [{ table: "charges", columns: [{ name: "ch_id", type: "String", key: true }, { name: "amount", type: "Integer" }, { name: "paid", type: "Boolean" }], sampleRows: [{ ch_id: "ch_3N82b", amount: 4900, paid: true }] }],
-    syncLogs: [{ timestamp: "Just now", status: "Success", records: 14, latency: "35ms" }]
+  { id: "c16", name: "Stripe Financials", category: "SaaS & CRM", type: "Payments Engine", status: "Disconnected", color: "text-indigo-400", host: "api.stripe.com/v1", syncFrequency: "Realtime",
+    schemaPreview: [{ table: "charges", columns: [{ name: "ch_id", type: "String", key: true }, { name: "amount", type: "Integer" }, { name: "paid", type: "Boolean" }], sampleRows: [] }],
+    syncLogs: []
   },
 
   // Analytics & Ads
-  { id: "c17", name: "Google Analytics 4", category: "Analytics & Ads", type: "Web Analytics", status: "Connected", color: "text-amber-400", host: "analyticsdata.googleapis.com", lastSync: "1 hour ago", recordsSynced: 420000, syncFrequency: "Hourly",
-    schemaPreview: [{ table: "user_engagement", columns: [{ name: "session_id", type: "STRING" }, { name: "active_users", type: "INT64" }], sampleRows: [{ session_id: "sess_91283", active_users: 1 }] }],
-    syncLogs: [{ timestamp: "1 hour ago", status: "Success", records: 15400, latency: "110ms" }]
+  { id: "c17", name: "Google Analytics 4", category: "Analytics & Ads", type: "Web Analytics", status: "Disconnected", color: "text-amber-400", host: "analyticsdata.googleapis.com", syncFrequency: "Hourly",
+    schemaPreview: [{ table: "user_engagement", columns: [{ name: "session_id", type: "STRING" }, { name: "active_users", type: "INT64" }], sampleRows: [] }],
+    syncLogs: []
   },
   { id: "c18", name: "Meta Ads Manager", category: "Analytics & Ads", type: "Ad Telemetry", status: "Disconnected", color: "text-blue-600", host: "graph.facebook.com/v19.0", syncFrequency: "Daily", schemaPreview: [], syncLogs: [] },
 
   // APIs & Webhooks
-  { id: "c19", name: "Custom REST API", category: "APIs & Webhooks", type: "REST Webhook", status: "Connected", color: "text-purple-400", host: "https://api.internal.org/v1/metrics", lastSync: "Realtime", recordsSynced: 98000, syncFrequency: "Realtime",
-    schemaPreview: [{ table: "payload_stream", columns: [{ name: "event_id", type: "string" }, { name: "payload", type: "object" }], sampleRows: [{ event_id: "evt_901", payload: { cpu: 24, mem: 48 } }] }],
-    syncLogs: [{ timestamp: "Continuous stream", status: "Success", records: 120, latency: "5ms" }]
+  { id: "c19", name: "Custom REST API", category: "APIs & Webhooks", type: "REST Webhook", status: "Disconnected", color: "text-purple-400", host: "https://api.internal.org/v1/metrics", syncFrequency: "Realtime",
+    schemaPreview: [{ table: "payload_stream", columns: [{ name: "event_id", type: "string" }, { name: "payload", type: "object" }], sampleRows: [] }],
+    syncLogs: []
   },
   { id: "c20", name: "GraphQL Subscriptions", category: "APIs & Webhooks", type: "GraphQL API", status: "Disconnected", color: "text-pink-400", host: "https://api.internal.org/graphql", syncFrequency: "Manual", schemaPreview: [], syncLogs: [] },
   { id: "c_api_21", name: "Legacy SOAP API", category: "APIs & Webhooks", type: "XML SOAP Web Service", status: "Disconnected", color: "text-red-400", host: "https://soap.enterprise.com/ws/v1/billing?wsdl", syncFrequency: "Daily", schemaPreview: [], syncLogs: [] }

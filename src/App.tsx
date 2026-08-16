@@ -57,6 +57,7 @@ const PrivacyPage = lazyWithRetry(() => import("./pages/public/PrivacyPage"));
 
 const Login = lazyWithRetry(() => import("./pages/auth/Login"));
 const Register = lazyWithRetry(() => import("./pages/auth/Register"));
+const AcceptInvite = lazyWithRetry(() => import("./pages/auth/AcceptInvite"));
 const ForgotPassword = lazyWithRetry(() => import("./pages/auth/ForgotPassword"));
 const ResetPassword = lazyWithRetry(() => import("./pages/auth/ResetPassword"));
 const WorkspaceDashboard = lazyWithRetry(() => import("./pages/workspace/Dashboard"));
@@ -304,11 +305,11 @@ const router = createBrowserRouter([
   },
   {
     path: "/invite",
-    element: <Suspense fallback={<PageLoader />}><Register /></Suspense>,
+    element: <Suspense fallback={<PageLoader />}><AcceptInvite /></Suspense>,
   },
   {
     path: "/invite/accept",
-    element: <Suspense fallback={<PageLoader />}><Register /></Suspense>,
+    element: <Suspense fallback={<PageLoader />}><AcceptInvite /></Suspense>,
   },
   {
     path: "/forgot-password",
