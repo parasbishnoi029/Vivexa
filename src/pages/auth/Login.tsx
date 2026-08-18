@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { AppBackground } from "@/components/layout/AppBackground";
-import { Loader2, CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
+import { Loader2, CheckCircle2, ShieldCheck, Sparkles, ArrowLeft, Home } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
 import { Logo } from "@/components/ui/Logo";
@@ -110,8 +110,23 @@ export default function Login() {
 
   return (
     <AppBackground>
+      {/* Top Navigation Back to Home */}
+      <div className="w-full max-w-md mx-auto mb-6 flex items-center justify-between">
+        <Link
+          to="/"
+          id="login-back-to-home-btn"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-slate-800/80 bg-slate-900/70 hover:bg-slate-850 hover:border-slate-700 text-xs font-semibold text-slate-300 hover:text-white transition-all shadow-sm group backdrop-blur-md"
+        >
+          <ArrowLeft className="h-3.5 w-3.5 text-slate-400 group-hover:text-indigo-400 transition-transform group-hover:-translate-x-1" />
+          <span>Back to Home</span>
+        </Link>
+        <span className="text-[11px] font-mono text-slate-500">Vivexa Intelligence</span>
+      </div>
+
       <div className="flex flex-col items-center mb-8">
-        <Logo size="lg" showText={false} className="mb-4" />
+        <Link to="/" className="group transition-transform hover:scale-105 mb-4" title="Return to Vivexa Home">
+          <Logo size="lg" showText={false} />
+        </Link>
         <h2 className="text-3xl font-bold tracking-tight text-white mb-2">
           Welcome back
         </h2>
@@ -297,12 +312,23 @@ export default function Login() {
         )}
       </div>
       
-      <p className="mt-8 text-center text-sm text-slate-500">
-        Don't have an account?{" "}
-        <Link to="/register" className="font-medium text-indigo-400 hover:text-indigo-300 transition-colors">
-          Create a workspace
+      <div className="mt-8 flex flex-col items-center gap-3">
+        <p className="text-center text-sm text-slate-500">
+          Don't have an account?{" "}
+          <Link to="/register" className="font-medium text-indigo-400 hover:text-indigo-300 transition-colors">
+            Create a workspace
+          </Link>
+        </p>
+
+        <Link
+          to="/"
+          id="login-bottom-home-link"
+          className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+        >
+          <Home className="h-3.5 w-3.5" />
+          <span>Return to main homepage</span>
         </Link>
-      </p>
+      </div>
     </AppBackground>
   );
 }

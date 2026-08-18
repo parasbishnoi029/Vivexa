@@ -69,14 +69,251 @@ interface SampleQuery {
   risks: string;
 }
 
-const DEFAULT_ASSETS: LakehouseAsset[] = [];
+const DEFAULT_ASSETS: LakehouseAsset[] = [
+  {
+    id: "a1",
+    name: "gold_enterprise_revenue",
+    type: "Table",
+    source: "Snowflake",
+    format: "Delta",
+    size: "1.4 TB",
+    rows: "48.2M",
+    lastUpdated: "4 mins ago (Synced)",
+    status: "Healthy",
+    owner: "FinOps Data Platform",
+    tags: ["Production", "Gold Layer", "Financial", "Z-Ordered", "SOC2 Compliant"],
+    columns: [
+      { name: "transaction_id", type: "BIGINT", null: "0.0%", desc: "Primary financial transaction identifier", completeness: 100, distinct: "48.2M", isPii: false, alert: null },
+      { name: "customer_id", type: "VARCHAR(64)", null: "0.0%", desc: "Hashed customer organization identifier", completeness: 100, distinct: "1.2M", isPii: true, alert: null },
+      { name: "amount_usd", type: "DECIMAL(18,2)", null: "0.0%", desc: "Net recognized transaction revenue in USD", completeness: 100, distinct: "4.8M", isPii: false, alert: null },
+      { name: "discount_rate", type: "FLOAT", null: "1.2%", desc: "Contracted percentage discount applied", completeness: 98.8, distinct: "45", isPii: false, alert: "Mild right-skewed tail" },
+      { name: "region", type: "VARCHAR(32)", null: "0.0%", desc: "Geographic operational jurisdiction (NA, EMEA, APAC, LATAM)", completeness: 100, distinct: "4", isPii: false, alert: null },
+      { name: "channel", type: "VARCHAR(32)", null: "0.0%", desc: "Sales acquisition channel (Direct Enterprise, Partner, Digital)", completeness: 100, distinct: "3", isPii: false, alert: null },
+      { name: "is_recurring", type: "BOOLEAN", null: "0.0%", desc: "Flag denoting recurring subscription revenue (ARR)", completeness: 100, distinct: "2", isPii: false, alert: null },
+      { name: "event_timestamp", type: "TIMESTAMP", null: "0.0%", desc: "UTC timestamp of recognized billing ledger event", completeness: 100, distinct: "48.2M", isPii: false, alert: null }
+    ],
+    history: [
+      { version: 4, timestamp: "2026-08-18 09:12", author: "dbt-cloud-runner", operation: "OPTIMIZE", details: "Z-ORDER BY (region, event_timestamp); compacted 1,420 small Parquet files into 84 vectorized blocks", size: "1.4 TB", rows: "48.2M" },
+      { version: 3, timestamp: "2026-08-18 06:00", author: "Airflow-ETL-Worker", operation: "MERGE", details: "Upserted 340,000 new ledger entries from silver_customer_billing", size: "1.4 TB", rows: "48.2M" },
+      { version: 2, timestamp: "2026-08-17 18:30", author: "DataOps Admin", operation: "ALTER TABLE", details: "Enforced SOC2 row-level security masking on customer_id", size: "1.38 TB", rows: "47.8M" },
+      { version: 1, timestamp: "2026-08-10 12:00", author: "System Architect", operation: "CREATE TABLE", details: "Initialized Delta Lake gold aggregation table with ACID transaction logs", size: "1.2 TB", rows: "42.0M" }
+    ],
+    aiInsights: [
+      "Revenue Concentration: 72.4% of total ARR originates from Direct Enterprise contracts with zero missing billing identifiers.",
+      "Z-Order Efficiency: Vectorized Parquet scanning achieved 94.2% partition pruning on time-series aggregation queries.",
+      "Anomaly Signal: Regional transaction volume in APAC showed a +18.4% YoY variance inflection with high statistical confidence."
+    ]
+  },
+  {
+    id: "a2",
+    name: "silver_customer_telemetry",
+    type: "Table",
+    source: "BigQuery",
+    format: "Delta",
+    size: "840 GB",
+    rows: "19.4M",
+    lastUpdated: "12 mins ago",
+    status: "Healthy",
+    owner: "Core Analytics Eng",
+    tags: ["Silver Layer", "Cleaned", "Iceberg Spec", "Streaming"],
+    columns: [
+      { name: "session_id", type: "VARCHAR(64)", null: "0.0%", desc: "Unique user telemetry session UUID", completeness: 100, distinct: "19.4M", isPii: false, alert: null },
+      { name: "user_id", type: "VARCHAR(64)", null: "0.0%", desc: "Hashed user entity ID", completeness: 100, distinct: "450K", isPii: true, alert: null },
+      { name: "device_type", type: "VARCHAR(24)", null: "0.4%", desc: "Client platform (Desktop, Mobile, Tablet, API)", completeness: 99.6, distinct: "4", isPii: false, alert: null },
+      { name: "feature_name", type: "VARCHAR(64)", null: "0.0%", desc: "Interacted product module or API gateway route", completeness: 100, distinct: "86", isPii: false, alert: null },
+      { name: "duration_seconds", type: "DOUBLE", null: "0.1%", desc: "Active focus duration on interactive canvas", completeness: 99.9, distinct: "12.4K", isPii: false, alert: "Right-tailed continuous metric" },
+      { name: "latency_ms", type: "INTEGER", null: "0.0%", desc: "Client-side P99 roundtrip network latency", completeness: 100, distinct: "1.8K", isPii: false, alert: null },
+      { name: "error_count", type: "INTEGER", null: "0.0%", desc: "Handled client runtime exceptions", completeness: 100, distinct: "12", isPii: false, alert: null },
+      { name: "timestamp", type: "TIMESTAMP", null: "0.0%", desc: "UTC timestamp of client telemetry beacon", completeness: 100, distinct: "19.4M", isPii: false, alert: null }
+    ],
+    history: [
+      { version: 3, timestamp: "2026-08-18 08:30", author: "Streaming Kafka Ingest", operation: "APPEND", details: "Streamed 1.2M micro-batch records from Kafka topic 'telemetry-raw'", size: "840 GB", rows: "19.4M" },
+      { version: 2, timestamp: "2026-08-17 22:00", author: "Soda Data Quality", operation: "VALIDATE", details: "Executed Great Expectations schema assertion suite; 100% assertions passed", size: "810 GB", rows: "18.2M" },
+      { version: 1, timestamp: "2026-08-12 14:00", author: "Core Analytics", operation: "CREATE TABLE", details: "Created silver layer telemetry delta table", size: "650 GB", rows: "14.5M" }
+    ],
+    aiInsights: [
+      "Session Health: 99.4% of client sessions recorded 0 runtime errors with median P99 latency below 42ms.",
+      "Engagement Vector: Analytics Studio and Lakehouse query modules drive 64.8% of daily active time."
+    ]
+  },
+  {
+    id: "a3",
+    name: "bronze_clickstream_events",
+    type: "Stream",
+    source: "S3",
+    format: "Parquet",
+    size: "3.8 TB",
+    rows: "142.8M",
+    lastUpdated: "Real-time (Active)",
+    status: "Healthy",
+    owner: "Data Ingestion Pipeline",
+    tags: ["Bronze Layer", "Raw", "Append-Only", "CDC Stream"],
+    columns: [
+      { name: "event_id", type: "VARCHAR(64)", null: "0.0%", desc: "Raw ingestion payload message ID", completeness: 100, distinct: "142.8M", isPii: false, alert: null },
+      { name: "ip_address", type: "VARCHAR(45)", null: "0.2%", desc: "Client IPv4 / IPv6 ingress address", completeness: 99.8, distinct: "8.4M", isPii: true, alert: "Masked at Silver Layer" },
+      { name: "page_url", type: "VARCHAR(256)", null: "0.0%", desc: "Request path or application endpoint", completeness: 100, distinct: "3.2K", isPii: false, alert: null },
+      { name: "payload_json", type: "JSON", null: "0.0%", desc: "Raw unparsed telemetry payload", completeness: 100, distinct: "142.8M", isPii: false, alert: null },
+      { name: "ingest_time", type: "TIMESTAMP", null: "0.0%", desc: "Kinesis buffer ingestion arrival time", completeness: 100, distinct: "142.8M", isPii: false, alert: null }
+    ],
+    history: [
+      { version: 5, timestamp: "2026-08-18 09:30", author: "Kinesis Firehose", operation: "STREAMING WRITE", details: "Continuous append ingestion stream", size: "3.8 TB", rows: "142.8M" }
+    ],
+    aiInsights: [
+      "Throughput Rate: Ingest stream averaging 4,200 events/sec with zero payload schema validation rejections.",
+      "Compression Ratio: Snappy Parquet encoding achieved 4.2x raw JSON footprint reduction."
+    ]
+  },
+  {
+    id: "a4",
+    name: "gold_supply_chain_optimization",
+    type: "Table",
+    source: "Snowflake",
+    format: "Delta",
+    size: "620 GB",
+    rows: "8.9M",
+    lastUpdated: "1 hour ago",
+    status: "Healthy",
+    owner: "Operations Research Team",
+    tags: ["Gold Layer", "Operations", "ML Feature Store"],
+    columns: [
+      { name: "shipment_id", type: "BIGINT", null: "0.0%", desc: "Unique shipment tracking identifier", completeness: 100, distinct: "8.9M", isPii: false, alert: null },
+      { name: "warehouse_origin", type: "VARCHAR(32)", null: "0.0%", desc: "Fulfillment distribution hub code", completeness: 100, distinct: "28", isPii: false, alert: null },
+      { name: "destination_hub", type: "VARCHAR(32)", null: "0.0%", desc: "Regional delivery dispatch center", completeness: 100, distinct: "140", isPii: false, alert: null },
+      { name: "lead_time_days", type: "DECIMAL(5,2)", null: "0.0%", desc: "Order-to-delivery transit elapsed days", completeness: 100, distinct: "450", isPii: false, alert: null },
+      { name: "shipping_cost_usd", type: "DECIMAL(10,2)", null: "0.0%", desc: "Carrier contract freight expense", completeness: 100, distinct: "3.2K", isPii: false, alert: null },
+      { name: "carrier_rating", type: "FLOAT", null: "0.8%", desc: "Service level SLA rating score (1.0 to 5.0)", completeness: 99.2, distinct: "40", isPii: false, alert: null },
+      { name: "on_time_status", type: "VARCHAR(16)", null: "0.0%", desc: "Fulfillment outcome (ON_TIME, DELAYED, EXPEDITED)", completeness: 100, distinct: "3", isPii: false, alert: null }
+    ],
+    history: [
+      { version: 2, timestamp: "2026-08-18 07:45", author: "SupplyChain-Airflow", operation: "MERGE", details: "Updated freight cost models and regional route delivery SLAs", size: "620 GB", rows: "8.9M" },
+      { version: 1, timestamp: "2026-08-14 09:00", author: "Ops Architect", operation: "CREATE TABLE", details: "Initialized Gold supply chain optimization catalog", size: "580 GB", rows: "8.2M" }
+    ],
+    aiInsights: [
+      "On-Time Performance: 94.6% of shipments met contract delivery SLAs, saving an estimated $2.4M in carrier penalty fees.",
+      "Route Efficiency: Automated hub load-balancing reduced East Coast transit lead times by 1.4 days."
+    ]
+  },
+  {
+    id: "a5",
+    name: "silver_credit_risk_scoring",
+    type: "Table",
+    source: "Local",
+    format: "Delta",
+    size: "410 GB",
+    rows: "5.2M",
+    lastUpdated: "30 mins ago",
+    status: "Healthy",
+    owner: "Risk & Quantitative Modeling",
+    tags: ["Silver Layer", "Risk", "Underwriting", "SOC2 Compliant"],
+    columns: [
+      { name: "account_id", type: "VARCHAR(64)", null: "0.0%", desc: "Anonymized account reference identifier", completeness: 100, distinct: "5.2M", isPii: true, alert: null },
+      { name: "credit_score", type: "INTEGER", null: "0.0%", desc: "FICO risk score index (300 - 850)", completeness: 100, distinct: "550", isPii: false, alert: null },
+      { name: "debt_to_income", type: "DECIMAL(6,4)", null: "0.1%", desc: "Verified monthly DTI debt ratio", completeness: 99.9, distinct: "8.2K", isPii: false, alert: null },
+      { name: "annual_income_usd", type: "DECIMAL(12,2)", null: "0.0%", desc: "Underwritten annual income baseline", completeness: 100, distinct: "64K", isPii: false, alert: null },
+      { name: "revolving_utilization", type: "FLOAT", null: "0.0%", desc: "Active revolving credit utilization fraction", completeness: 100, distinct: "1.2K", isPii: false, alert: null },
+      { name: "default_flag", type: "INTEGER", null: "0.0%", desc: "Target binary label (0 = performing, 1 = default)", completeness: 100, distinct: "2", isPii: false, alert: "Unbalanced class: 3.8% positive rate" }
+    ],
+    history: [
+      { version: 2, timestamp: "2026-08-18 08:00", author: "FeatureStore-Job", operation: "UPDATE", details: "Generated rolling 24-month payment delinquency features", size: "410 GB", rows: "5.2M" },
+      { version: 1, timestamp: "2026-08-11 11:00", author: "Risk Quant", operation: "CREATE TABLE", details: "Initialized underwriting feature store", size: "380 GB", rows: "4.9M" }
+    ],
+    aiInsights: [
+      "Model Predictive Power: XGBoost ensemble achieves 0.942 ROC-AUC on default probability classification with high Gini separation.",
+      "Class Balance: 3.8% baseline default rate allows calibrated SMOTE / scale_pos_weight optimization."
+    ]
+  }
+];
 
-const SAMPLE_QUERIES: Record<string, SampleQuery[]> = {};
+const SAMPLE_QUERIES: Record<string, SampleQuery[]> = {
+  gold_enterprise_revenue: [
+    {
+      question: "What is the quarterly revenue trajectory grouped by geographic region and sales channel?",
+      sql: `SELECT \n  region,\n  channel,\n  DATE_TRUNC('quarter', event_timestamp) AS fiscal_quarter,\n  SUM(amount_usd) AS gross_revenue_usd,\n  ROUND(AVG(discount_rate) * 100, 2) AS avg_discount_pct,\n  COUNT(DISTINCT customer_id) AS active_org_count\nFROM delta.gold_enterprise_revenue\nGROUP BY 1, 2, 3\nORDER BY fiscal_quarter DESC, gross_revenue_usd DESC;`,
+      headers: ["region", "channel", "fiscal_quarter", "gross_revenue_usd", "avg_discount_pct", "active_org_count"],
+      rows: [
+        ["North America", "Direct Enterprise", "2026-Q3", "$28,450,200", "8.4%", "14,200"],
+        ["EMEA", "Direct Enterprise", "2026-Q3", "$18,920,500", "7.9%", "9,800"],
+        ["APAC", "Digital & Partner", "2026-Q3", "$12,340,000", "11.2%", "18,400"],
+        ["LATAM", "Digital", "2026-Q3", "$4,120,800", "14.0%", "6,100"]
+      ],
+      confidence: 99.8,
+      explanation: "Scanned 48.2M delta records with partition pruning on event_timestamp. Execution completed in 14ms via vectorized parquet scan.",
+      assumptions: "Amounts calculated post-discount recognition under ASC 606 standards.",
+      risks: "Q3 metrics reflect recognized invoices to date; pending billing reconciliations not included."
+    },
+    {
+      question: "Identify high-value recurring subscription cohorts with 90-day moving average ARR",
+      sql: `SELECT \n  DATE_TRUNC('month', event_timestamp) AS billing_month,\n  SUM(CASE WHEN is_recurring THEN amount_usd ELSE 0 END) AS monthly_arr_usd,\n  AVG(SUM(amount_usd)) OVER (\n    ORDER BY DATE_TRUNC('month', event_timestamp) \n    ROWS BETWEEN 2 PRECEDING AND CURRENT ROW\n  ) AS trailing_3m_avg_revenue\nFROM delta.gold_enterprise_revenue\nGROUP BY 1\nORDER BY 1 DESC\nLIMIT 6;`,
+      headers: ["billing_month", "monthly_arr_usd", "trailing_3m_avg_revenue"],
+      rows: [
+        ["2026-08", "$16,840,000", "$16,210,000"],
+        ["2026-07", "$16,120,000", "$15,890,000"],
+        ["2026-06", "$15,670,000", "$15,420,000"],
+        ["2026-05", "$15,280,000", "$15,010,000"]
+      ],
+      confidence: 99.9,
+      explanation: "Calculated moving average window function over indexed time partitions.",
+      assumptions: "Includes all active recurring subscriptions with zero payment delinquency.",
+      risks: "FX exchange rate volatility accounted for at month-end closing fix."
+    }
+  ],
+  silver_customer_telemetry: [
+    {
+      question: "Calculate P95 and P99 client interaction latency across product feature modules",
+      sql: `SELECT \n  feature_name,\n  COUNT(*) AS total_interactions,\n  ROUND(AVG(latency_ms), 1) AS avg_latency_ms,\n  QUANTILE_CONT(latency_ms, 0.95) AS p95_latency_ms,\n  QUANTILE_CONT(latency_ms, 0.99) AS p99_latency_ms,\n  SUM(error_count) AS total_errors\nFROM delta.silver_customer_telemetry\nGROUP BY 1\nORDER BY total_interactions DESC\nLIMIT 5;`,
+      headers: ["feature_name", "total_interactions", "avg_latency_ms", "p95_latency_ms", "p99_latency_ms", "total_errors"],
+      rows: [
+        ["Analytics Studio Canvas", "8,420,000", "18.4 ms", "38.0 ms", "72.5 ms", "12"],
+        ["Lakehouse Schema Explorer", "4,190,000", "12.1 ms", "24.0 ms", "48.0 ms", "4"],
+        ["DuckDB Vectorized Query", "3,820,000", "8.2 ms", "16.5 ms", "32.0 ms", "2"],
+        ["Executive Briefing Generator", "1,940,000", "24.6 ms", "52.0 ms", "98.0 ms", "1"]
+      ],
+      confidence: 99.7,
+      explanation: "Aggregated 19.4M telemetry observations using vectorized exact quantile estimators.",
+      assumptions: "Client clocks synchronized via NTP with drift under 250ms.",
+      risks: "Network latency spikes in mobile carriers might bias raw P99 estimates."
+    }
+  ],
+  gold_supply_chain_optimization: [
+    {
+      question: "Analyze route fulfillment reliability, average transit lead time, and freight costs by distribution hub",
+      sql: `SELECT \n  warehouse_origin,\n  COUNT(*) AS total_shipments,\n  ROUND(AVG(lead_time_days), 2) AS avg_lead_time_days,\n  ROUND(AVG(shipping_cost_usd), 2) AS avg_cost_per_shipment,\n  ROUND(SUM(CASE WHEN on_time_status = 'ON_TIME' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS on_time_pct\nFROM delta.gold_supply_chain_optimization\nGROUP BY 1\nORDER BY total_shipments DESC\nLIMIT 5;`,
+      headers: ["warehouse_origin", "total_shipments", "avg_lead_time_days", "avg_cost_per_shipment", "on_time_pct"],
+      rows: [
+        ["HUB-CHICAGO-01", "2,420,000", "2.1 days", "$148.50", "96.4%"],
+        ["HUB-DALLAS-04", "1,980,000", "2.4 days", "$162.20", "94.8%"],
+        ["HUB-NEWARK-02", "1,850,000", "1.9 days", "$155.00", "97.1%"],
+        ["HUB-SEATTLE-03", "1,420,000", "2.8 days", "$184.10", "92.6%"]
+      ],
+      confidence: 99.9,
+      explanation: "Aggregated multi-modal freight fulfillment records across 28 distribution centers.",
+      assumptions: "Lead time measured from packing scan to verified delivery receipt signature.",
+      risks: "Weather disruptions during winter months excluded from baseline SLA penalties."
+    }
+  ],
+  silver_credit_risk_scoring: [
+    {
+      question: "Evaluate default rate distribution across FICO credit score brackets and debt-to-income quintiles",
+      sql: `SELECT \n  CASE \n    WHEN credit_score >= 750 THEN '750+ (Excellent)'\n    WHEN credit_score >= 680 THEN '680-749 (Good)'\n    WHEN credit_score >= 620 THEN '620-679 (Fair)'\n    ELSE '<620 (Subprime)'\n  END AS credit_tier,\n  COUNT(*) AS applicant_count,\n  ROUND(AVG(debt_to_income) * 100, 2) AS avg_dti_pct,\n  ROUND(AVG(default_flag) * 100, 2) AS default_rate_pct\nFROM delta.silver_credit_risk_scoring\nGROUP BY 1\nORDER BY default_rate_pct ASC;`,
+      headers: ["credit_tier", "applicant_count", "avg_dti_pct", "default_rate_pct"],
+      rows: [
+        ["750+ (Excellent)", "2,140,000", "22.4%", "0.42%"],
+        ["680-749 (Good)", "1,890,000", "31.8%", "1.85%"],
+        ["620-679 (Fair)", "920,000", "42.1%", "6.40%"],
+        ["<620 (Subprime)", "250,000", "54.6%", "18.20%"]
+      ],
+      confidence: 99.9,
+      explanation: "Categorized 5.2M underwriting records into standardized regulatory risk brackets.",
+      assumptions: "Validated with 24-month vintage performance observation windows.",
+      risks: "Macroeconomic interest rate shifts may affect marginal subprime default rates."
+    }
+  ]
+};
 
 export default function Lakehouse() {
   const navigate = useNavigate();
   const [assets, setAssets] = useState<LakehouseAsset[]>(DEFAULT_ASSETS);
-  const [selectedAsset, setSelectedAsset] = useState<LakehouseAsset | null>(DEFAULT_ASSETS[0]);
+  const [selectedAsset, setSelectedAsset] = useState<LakehouseAsset | null>(DEFAULT_ASSETS[0] || null);
   
   useEffect(() => {
     const fetchAssets = async () => {
@@ -90,6 +327,11 @@ export default function Lakehouse() {
           });
           const json = await res.json();
           if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+            const fallbackTemplate = DEFAULT_ASSETS[0] || {
+              columns: [],
+              history: [],
+              aiInsights: []
+            };
             const mapped = json.data.map((ds: any) => ({
               id: ds.id,
               name: ds.name || "custom_dataset",
@@ -102,9 +344,9 @@ export default function Lakehouse() {
               status: "Healthy" as const,
               owner: "Authenticated User",
               tags: ["Production"],
-              columns: ds.schema?.columns || DEFAULT_ASSETS[0].columns,
-              history: DEFAULT_ASSETS[0].history,
-              aiInsights: DEFAULT_ASSETS[0].aiInsights
+              columns: ds.schema?.columns || fallbackTemplate.columns,
+              history: fallbackTemplate.history,
+              aiInsights: fallbackTemplate.aiInsights
             }));
             setAssets([...mapped, ...DEFAULT_ASSETS]);
             setSelectedAsset(mapped[0]);
@@ -720,6 +962,15 @@ export default function Lakehouse() {
                     title="Run Compaction & Vacuum (Z-Order Optimization)"
                   >
                     <RefreshCw className={`h-4 w-4 ${isOptimizing ? 'animate-spin text-indigo-400' : ''}`} />
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      toast.info(`Preparing Executive Briefing for ${selectedAsset.name}`);
+                      navigate('/workspace/reports');
+                    }}
+                    className="bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 border border-violet-500/40 rounded-xl h-9 px-4 font-bold text-xs gap-2"
+                  >
+                    <FileText className="h-3.5 w-3.5 text-violet-400" /> Executive Report
                   </Button>
                   <Button 
                     onClick={() => {

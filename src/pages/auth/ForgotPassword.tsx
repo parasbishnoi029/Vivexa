@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { AppBackground } from "@/components/layout/AppBackground";
-import { Loader2, CheckCircle2, ArrowLeft, ExternalLink, Copy, Check } from "lucide-react";
+import { Loader2, CheckCircle2, ArrowLeft, ExternalLink, Copy, Check, Home } from "lucide-react";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -66,10 +66,23 @@ export default function ForgotPassword() {
 
   return (
     <AppBackground>
+      {/* Top Navigation Back to Home */}
+      <div className="w-full max-w-md mx-auto mb-6 flex items-center justify-between">
+        <Link
+          to="/"
+          id="forgot-password-back-to-home-btn"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-slate-800/80 bg-slate-900/70 hover:bg-slate-850 hover:border-slate-700 text-xs font-semibold text-slate-300 hover:text-white transition-all shadow-sm group backdrop-blur-md"
+        >
+          <ArrowLeft className="h-3.5 w-3.5 text-slate-400 group-hover:text-indigo-400 transition-transform group-hover:-translate-x-1" />
+          <span>Back to Home</span>
+        </Link>
+        <span className="text-[11px] font-mono text-slate-500">Vivexa Security</span>
+      </div>
+
       <div className="flex flex-col items-center mb-8">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-500/20 text-indigo-400 font-bold text-2xl shadow-inner border border-indigo-500/30 mb-6">
+        <Link to="/" className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-500/20 text-indigo-400 font-bold text-2xl shadow-inner border border-indigo-500/30 mb-6 hover:scale-105 transition-transform" title="Return to Vivexa Home">
           V
-        </div>
+        </Link>
         <h2 className="text-3xl font-bold tracking-tight text-white mb-2">
           Reset password
         </h2>
@@ -180,9 +193,17 @@ export default function ForgotPassword() {
         )}
       </div>
       
-      <div className="mt-8 text-center">
+      <div className="mt-8 flex flex-col items-center gap-3">
         <Link to="/login" className="inline-flex items-center text-sm font-medium text-slate-400 hover:text-white transition-colors">
           <ArrowLeft className="h-4 w-4 mr-2" /> Back to sign in
+        </Link>
+        <Link
+          to="/"
+          id="forgot-bottom-home-link"
+          className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+        >
+          <Home className="h-3.5 w-3.5" />
+          <span>Return to main homepage</span>
         </Link>
       </div>
     </AppBackground>

@@ -16,6 +16,7 @@ import {
   PieChart as RechartsPieChart, Pie, Cell, ComposedChart, Line, Area, Legend
 } from "recharts";
 import { exportReportToPPT } from "@/lib/pptExporter";
+import { exportReportToPDF } from "@/lib/pdfExporter";
 import { toast } from "sonner";
 
 interface ExecutiveReportViewerProps {
@@ -414,7 +415,14 @@ export default function ExecutiveReportViewer({
 
           <div className="flex items-center gap-1.5 shrink-0">
             <Button
-              onClick={() => window.print()}
+              onClick={() => {
+                if (onDownloadPDF) {
+                  onDownloadPDF(report);
+                } else {
+                  exportReportToPDF(report);
+                  toast.success("Executive PDF report exported successfully.");
+                }
+              }}
               className="bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold gap-1.5 h-8 px-3"
             >
               <Download className="h-3.5 w-3.5" /> PDF
