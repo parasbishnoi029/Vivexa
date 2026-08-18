@@ -114,145 +114,204 @@
 
 /* Print-Specific Media Query for High-Fidelity PDF and Paper Reports */
 @media print {
-  .print-modal-wrapper {
-    position: absolute !important;
-    inset: 0 !important;
+  @page {
+    size: auto;
+    margin: 12mm 10mm 12mm 10mm;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Expand Modal Wrapper & Container to Native Flow */
+  .print-modal-wrapper,
+  .fixed.inset-0.z-\[9999\],
+  .fixed.inset-0.z-50 {
+    position: static !important;
+    inset: auto !important;
     display: block !important;
-    background: transparent !important;
+    background: #ffffff !important;
     overflow: visible !important;
     padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
   }
   
-  .print-modal-content {
+  .print-modal-content,
+  .h-\[92vh\] {
+    position: static !important;
     height: auto !important;
     max-height: none !important;
     overflow: visible !important;
     border: none !important;
     box-shadow: none !important;
     background: #ffffff !important;
-    color: #000000 !important;
-  }
-  
-  /* Make sure scrolling content areas also show all content */
-  .overflow-y-auto {
-    overflow: visible !important;
-    max-height: none !important;
-    height: auto !important;
-  }
-  
-  /* Hide unnecessary UI elements during print */
-  .print-modal-wrapper .border-b,
-  .print-modal-wrapper button {
-    /* We still want the header, just not the buttons maybe? Or keep them but hide the buttons */
-  }
-
-  .print-modal-wrapper .bg-slate-900,
-  .print-modal-wrapper .bg-slate-950,
-  .print-modal-wrapper .bg-slate-900\/50 {
-    background-color: transparent !important;
-  }
-
-  .fixed.inset-0.z-50 {
-    position: relative !important;
-    height: auto !important;
-    overflow: visible !important;
-    background: white !important;
-  }
-  
-  .h-\[92vh\] {
-    height: auto !important;
-    max-height: none !important;
-  }
-  
-  .overflow-hidden {
-    overflow: visible !important;
-  }
-
-  .overflow-y-auto {
-    overflow: visible !important;
-  }
-
-  /* Print Watermark */
-  body::after {
-    content: "Vivexa";
-    position: fixed;
-    bottom: 10mm;
-    right: 10mm;
-    font-size: 14pt;
-    font-weight: bold;
-    font-style: italic;
-    color: #94a3b8 !important;
-    z-index: 999999;
-    opacity: 0.6;
-    pointer-events: none;
-  }
-
-  header, 
-  footer, 
-  aside, 
-  nav, 
-  button, 
-  .no-print,
-  [role="dialog"],
-  [aria-modal="true"],
-  .ai-copilot-drawer,
-  .quick-actions-bar {
-    display: none !important;
-  }
-
-  body, 
-  html, 
-  main, 
-  .workspace-container,
-  .print-full-width {
-    background: #ffffff !important;
     color: #0f172a !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
+  }
+  
+  /* Make sure all scrolling and nested container areas unroll cleanly */
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .overflow-hidden,
+  .overflow-scroll {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+    width: 100% !important;
+  }
+
+  /* High-Contrast Print Cards */
+  .print-card,
+  .card,
+  .anomaly-card,
+  .kpi-card,
+  .print-keep-together,
+  .enterprise-card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    background-color: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
     box-shadow: none !important;
+    border-radius: 8px !important;
+    margin-bottom: 12px !important;
+  }
+
+  /* Tables: clean pagination & repeating headers */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    table-layout: auto !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+    margin-bottom: 14pt !important;
+    background: #ffffff !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tfoot {
+    display: table-footer-group !important;
+  }
+
+  tbody {
+    display: table-row-group !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+  }
+
+  th {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+    font-weight: 700 !important;
+    border-bottom: 2px solid #94a3b8 !important;
+    padding: 6pt 8pt !important;
+    font-size: 8pt !important;
+    text-align: left !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  td {
+    padding: 6pt 8pt !important;
+    font-size: 8pt !important;
+    color: #1e293b !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    word-break: break-word !important;
+  }
+
+  /* Charts & Visuals Pagination & Rendering */
+  .recharts-responsive-container,
+  .chart-container,
+  .recharts-wrapper,
+  .recharts-surface,
+  svg {
+    max-width: 100% !important;
+    width: 100% !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
     overflow: visible !important;
   }
 
-  * {
-    color-scheme: light !important;
+  /* Text & Heading Hierarchy */
+  h1, h2, h3, h4, h5, h6,
+  .print-heading {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
     color: #0f172a !important;
-    background-color: transparent !important;
-    border-color: #cbd5e1 !important;
-    text-shadow: none !important;
-    box-shadow: none !important;
   }
 
+  p, span, div, li {
+    color: #1e293b !important;
+  }
+
+  /* Page Break Utilities */
   .page-break,
   .print-page-break {
     page-break-before: always !important;
     break-before: page !important;
   }
 
-  tr, 
-  .card,
-  .print-keep-together {
+  .print-avoid-break {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
 
-  .recharts-responsive-container,
-  .chart-container,
-  svg {
-    max-width: 100% !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
+  /* Hide interactive controls, buttons, toolbars in print */
+  header, 
+  footer, 
+  aside, 
+  nav, 
+  button,
+  input,
+  select,
+  textarea,
+  .no-print,
+  .ai-copilot-drawer,
+  .quick-actions-bar {
+    display: none !important;
   }
 
+  /* Print Watermark Footer */
+  body::after {
+    content: "Vivexa Senior Data Scientist Executive Dossier";
+    position: fixed;
+    bottom: 5mm;
+    right: 10mm;
+    font-size: 8pt;
+    font-weight: bold;
+    font-style: italic;
+    color: #94a3b8 !important;
+    z-index: 999999;
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  /* Hide link annotations in print */
   a[href]:after {
-    content: " (" attr(href) ")";
-    font-size: 0.8rem;
-    color: #64748b;
-  }
-
-  a[href^="#"]:after,
-  a[href^="javascript:"]:after {
     content: "" !important;
   }
 }

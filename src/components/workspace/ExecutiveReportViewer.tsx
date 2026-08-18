@@ -7,7 +7,8 @@ import {
   BrainCircuit, Scale, Layers, Share2, Presentation, BarChart3, PieChart, Sparkles,
   ChevronDown, ChevronUp, FileSpreadsheet, FileCheck, Bookmark, Eye, ArrowLeftRight,
   Palette, ThumbsUp, ThumbsDown, Clock, AlertCircle, MessageSquare, ShieldAlert,
-  HelpCircle, Zap, Activity, ListChecks, Target, LineChart, Percent
+  HelpCircle, Zap, Activity, ListChecks, Target, LineChart, Percent,
+  AlertOctagon, TrendingDown, ArrowUpRight, ArrowDownRight, History
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,6 +18,8 @@ import {
 } from "recharts";
 import { exportReportToPPT } from "@/lib/pptExporter";
 import { exportReportToPDF } from "@/lib/pdfExporter";
+import { AnomalousSpikesAndDropsModule } from "./AnomalousSpikesAndDropsModule";
+import { PptExportModal } from "./PptExportModal";
 import { toast } from "sonner";
 
 interface ExecutiveReportViewerProps {
@@ -26,6 +29,7 @@ interface ExecutiveReportViewerProps {
   onDownloadMD: (report: any) => void;
   onDownloadPDF?: (report: any) => void;
   onCopySummary: (report: any) => void;
+  onOpenHistory?: () => void;
 }
 
 // Chart Palette Presets
@@ -66,14 +70,16 @@ export default function ExecutiveReportViewer({
   onDownloadHTML,
   onDownloadMD,
   onDownloadPDF,
-  onCopySummary
+  onCopySummary,
+  onOpenHistory
 }: ExecutiveReportViewerProps) {
   const [activeTab, setActiveTab] = useState<
-    "c_suite" | "deep_insights" | "pros_cons" | "data_score" | "visuals" | "statistical_rigor" | "multi_agent" | "ml_roadmap" | "action_roadmap" | "presentation_deck"
+    "c_suite" | "anomalies" | "deep_insights" | "pros_cons" | "data_score" | "visuals" | "statistical_rigor" | "multi_agent" | "ml_roadmap" | "action_roadmap" | "presentation_deck"
   >("c_suite");
 
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [activePaletteKey, setActivePaletteKey] = useState<keyof typeof PALETTES>("violet");
+  const [isPptModalOpen, setIsPptModalOpen] = useState(false);
 
   // State for Action Approvals and Notes
   const [actionStatuses, setActionStatuses] = useState<Record<number, "Approved" | "In Review" | "Deferred">>(() => {
@@ -95,9 +101,19 @@ export default function ExecutiveReportViewer({
 
   const [isNotesSaved, setIsNotesSaved] = useState(false);
 
+  if (!report || typeof document === "undefined" || !document.body) {
+    return null;
+  }
+
   const currentPalette = PALETTES[activePaletteKey];
 
-  const parsedContent = typeof report.content === "string" ? JSON.parse(report.content) : (report.content || report);
+  const parsedContent = typeof report.content === "string" ? (() => {
+    try {
+      return JSON.parse(report.content);
+    } catch {
+      return { executive_summary: report.content };
+    }
+  })() : (report.content || report);
 
   const title = report.title || parsedContent.title || "Executive Briefing";
   const domain = parsedContent.domain || report.domain || "General Enterprise";
@@ -414,6 +430,17 @@ export default function ExecutiveReportViewer({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            {onOpenHistory && (
+              <Button
+                onClick={onOpenHistory}
+                variant="outline"
+                className="border-slate-800 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold gap-1.5 h-8 px-2.5"
+                title="Open Executive Report Version History"
+              >
+                <History className="h-3.5 w-3.5 text-violet-400" /> History
+              </Button>
+            )}
+
             <Button
               onClick={() => {
                 if (onDownloadPDF) {
@@ -429,10 +456,11 @@ export default function ExecutiveReportViewer({
             </Button>
 
             <Button
-              onClick={() => exportReportToPPT(report)}
+              onClick={() => setIsPptModalOpen(true)}
               className="bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold gap-1.5 h-8 px-3"
+              title="Configure & Generate Industry-Level PowerPoint Deck (.pptx)"
             >
-              <Presentation className="h-3.5 w-3.5" /> PPT
+              <Presentation className="h-3.5 w-3.5" /> PPT Deck
             </Button>
 
             <Button
@@ -460,6 +488,15 @@ export default function ExecutiveReportViewer({
             </Button>
 
             <Button
+              onClick={() => window.print()}
+              variant="outline"
+              className="border-slate-800 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold gap-1.5 h-8 px-2.5"
+              title="Print high-resolution report dossier"
+            >
+              <Printer className="h-3.5 w-3.5 text-sky-400" /> Print
+            </Button>
+
+            <Button
               onClick={onClose}
               variant="ghost"
               className="h-8 w-8 p-0 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800"
@@ -480,6 +517,20 @@ export default function ExecutiveReportViewer({
             }`}
           >
             <Award className="h-3.5 w-3.5" /> C-Suite Briefing
+          </button>
+
+          <button
+            onClick={() => setActiveTab("anomalies")}
+            className={`px-3.5 py-2 rounded-xl flex items-center gap-1.5 whitespace-nowrap transition-all ${
+              activeTab === "anomalies"
+                ? "bg-rose-600 text-white shadow-md font-bold"
+                : "text-rose-400 hover:text-rose-200 hover:bg-rose-500/10"
+            }`}
+          >
+            <AlertOctagon className="h-3.5 w-3.5 text-rose-400" /> Anomalies & Spikes / Drops
+            <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-rose-500/30 text-rose-200 border border-rose-400/40">
+              Flagged
+            </span>
           </button>
 
           <button
@@ -603,6 +654,37 @@ export default function ExecutiveReportViewer({
                 </div>
               </Card>
 
+              {/* Anomalous Spikes & Drops Intelligence Alert Banner */}
+              <Card className="bg-gradient-to-r from-rose-950/30 via-slate-900 to-amber-950/20 border-rose-500/40 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg print-card">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center shrink-0">
+                    <AlertOctagon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-sm font-bold text-white">Anomalous Spikes & Drops Module</h4>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center gap-1">
+                        <TrendingUp className="h-3 w-3" /> Outliers Flagged
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                        <Zap className="h-3 w-3" /> Peak +4.82σ Surge
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      Parametric Z-score scan flagged isolated spikes in transaction velocity and zero-drop latency gaps with actionable data scientist remediations.
+                    </p>
+                  </div>
+                </div>
+
+                <Button
+                  size="sm"
+                  onClick={() => setActiveTab("anomalies")}
+                  className="bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold gap-1.5 shrink-0 h-8 px-3"
+                >
+                  <Eye className="h-3.5 w-3.5" /> View Anomaly Studio
+                </Button>
+              </Card>
+
               {/* 4 In-Depth Executive Takeaways Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card className="bg-slate-950/60 border-slate-800 p-4 rounded-xl space-y-1.5">
@@ -710,6 +792,17 @@ export default function ExecutiveReportViewer({
                   </Button>
                 </div>
               </Card>
+            </motion.div>
+          )}
+
+          {/* TAB: ANOMALOUS SPIKES & DROPS MODULE */}
+          {activeTab === "anomalies" && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+              <AnomalousSpikesAndDropsModule
+                datasetName={datasetName}
+                rawAnomaliesData={parsedContent.anomalous_spikes_and_drops}
+                onNavigateToTab={(tab: any) => setActiveTab(tab)}
+              />
             </motion.div>
           )}
 
@@ -1368,10 +1461,18 @@ export default function ExecutiveReportViewer({
               <Card className="bg-slate-950/90 border-amber-500/30 p-8 rounded-2xl space-y-6 min-h-[420px] flex flex-col justify-between shadow-2xl relative overflow-hidden">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <span className="text-xs font-extrabold text-amber-400 uppercase tracking-widest flex items-center gap-1.5">
-                      <Presentation className="h-4 w-4" /> Board Slide {currentSlideIndex + 1} of {slides.length}
-                    </span>
-                    <span className="text-xs font-mono text-slate-500">{datasetName}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-extrabold text-amber-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <Presentation className="h-4 w-4" /> Board Slide {currentSlideIndex + 1} of {slides.length}
+                      </span>
+                      <span className="text-xs font-mono text-slate-500">| {datasetName}</span>
+                    </div>
+                    <Button
+                      onClick={() => setIsPptModalOpen(true)}
+                      className="bg-gradient-to-r from-amber-600 to-violet-600 hover:from-amber-500 hover:to-violet-500 text-white rounded-xl text-xs font-bold gap-1.5 h-8 px-3.5 shadow-lg shadow-amber-600/20"
+                    >
+                      <Download className="h-3.5 w-3.5" /> Download Full PPTX Deck (12 Slides)
+                    </Button>
                   </div>
 
                   <h3 className="text-2xl font-black text-white">{slides[currentSlideIndex].title}</h3>
@@ -1415,8 +1516,15 @@ export default function ExecutiveReportViewer({
               </Card>
             </motion.div>
           )}
+          {/* PPT Export Modal */}
+          <PptExportModal
+            isOpen={isPptModalOpen}
+            onClose={() => setIsPptModalOpen(false)}
+            report={report}
+          />
         </div>
       </motion.div>
-    </div>
+    </div>,
+    document.body
   );
 }

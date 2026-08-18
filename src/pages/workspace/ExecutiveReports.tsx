@@ -21,6 +21,8 @@ import ExecutiveReportViewer from "@/components/workspace/ExecutiveReportViewer"
 import { Skeleton } from "@/components/ui/skeleton";
 import { exportReportToPDF } from "@/lib/pdfExporter";
 import { exportReportToPPT } from "@/lib/pptExporter";
+import { SynthesizeReportModal } from "@/components/workspace/SynthesizeReportModal";
+import { ExecutiveReportHistorySidebar } from "@/components/workspace/ExecutiveReportHistorySidebar";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, LineChart, Line, Legend
@@ -303,7 +305,24 @@ const DEFAULT_ENTERPRISE_REPORTS = [
 
 export default function ExecutiveReports() {
   const { user, session } = useAuthStore();
-  const [reports, setReports] = useState<any[]>(DEFAULT_ENTERPRISE_REPORTS);
+  const [reports, setReports] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem("executive_reports_history_v1");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const merged = [
+            ...parsed,
+            ...DEFAULT_ENTERPRISE_REPORTS.filter(def => !parsed.some((r: any) => r.id === def.id))
+          ];
+          return merged;
+        }
+      }
+    } catch (e) {
+      console.warn("Could not load local reports:", e);
+    }
+    return DEFAULT_ENTERPRISE_REPORTS;
+  });
   const [datasets, setDatasets] = useState<any[]>(DEFAULT_ENTERPRISE_DATASETS);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -317,6 +336,8 @@ export default function ExecutiveReports() {
   const [reportTitle, setReportTitle] = useState<string>(`Senior Data Scientist Briefing: ${DEFAULT_ENTERPRISE_DATASETS[0].name.replace(/\.[^/.]+$/, "")}`);
   const [reportArchetype, setReportArchetype] = useState<string>(ARCHETYPES[0]);
   const [reportDomain, setReportDomain] = useState<string>(DOMAINS[0]);
+  const [audienceFocus, setAudienceFocus] = useState<string>("C-Suite & Board of Directors");
+  const [statisticalRigorMode, setStatisticalRigorMode] = useState<string>("4-Pass Max Precision (95% Bootstrap CI + Z-Score Outlier Audit)");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState<string>("");
   const [generationProgress, setGenerationProgress] = useState(0);
@@ -327,6 +348,8 @@ export default function ExecutiveReports() {
 
   // History Sidebar & Version Comparison State
   const [isHistorySidebarOpen, setIsHistorySidebarOpen] = useState(false);
+  const [historySearchQuery, setHistorySearchQuery] = useState("");
+  const [historyFilter, setHistoryFilter] = useState<"all" | "pinned" | "deck" | "strategy">("all");
   const [pinnedReportIds, setPinnedReportIds] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem("pinned_reports_v1");
@@ -337,17 +360,53 @@ export default function ExecutiveReports() {
   });
   const [compareReportIds, setCompareReportIds] = useState<string[]>([]);
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+  const [sharedReportTitle, setSharedReportTitle] = useState("Executive Briefing");
+
+  const safeJsonParse = (content: any) => {
+    if (!content) return {};
+    if (typeof content === "object") return content;
+    try {
+      return JSON.parse(content);
+    } catch {
+      return { executive_summary: String(content) };
+    }
+  };
   const [selectedChartMetric, setSelectedChartMetric] = useState<"precision" | "passRate" | "qualityIndex" | "marginOfError">("precision");
   const [deepInsightsSubTab, setDeepInsightsSubTab] = useState<"findings" | "pros" | "cons" | "summary" | "suggestions">("findings");
 
+  // Persist reports to localStorage
+  const updateReportsAndPersist = (newReports: any[] | ((prev: any[]) => any[])) => {
+    setReports(prev => {
+      const resolved = typeof newReports === "function" ? newReports(prev) : newReports;
+      try {
+        localStorage.setItem("executive_reports_history_v1", JSON.stringify(resolved));
+      } catch (err) {
+        console.warn("Error saving reports to localStorage:", err);
+      }
+      return resolved;
+    });
+  };
+
+  const handleDeleteReport = async (reportId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    updateReportsAndPersist(prev => prev.filter(r => r.id !== reportId));
+    setCompareReportIds(prev => prev.filter(id => id !== reportId));
+    setPinnedReportIds(prev => prev.filter(id => id !== reportId));
+
+    if (user?.id) {
+      try {
+        await supabase.from('reports').delete().eq('id', reportId).eq('user_id', user.id);
+      } catch (err) {
+        console.warn("Could not delete from remote DB:", err);
+      }
+    }
+    toast.success("Executive report removed from history.");
+  };
+
   useEffect(() => {
     async function initData() {
-      if (!user) return;
       try {
-        const [{ data: rData }, { data: dData }] = await Promise.all([
-          supabase.from('reports').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-          supabase.from('datasets').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
-        ]);
+        const { data: dData } = await supabase.from('datasets').select('*').order('created_at', { ascending: false });
 
         const mergedDatasets = [
           ...(dData || []),
@@ -355,11 +414,18 @@ export default function ExecutiveReports() {
         ];
         setDatasets(mergedDatasets);
 
-        const mergedReports = [
-          ...(rData || []),
-          ...DEFAULT_ENTERPRISE_REPORTS.filter(def => !(rData || []).some((r: any) => r.id === def.id))
-        ];
-        setReports(mergedReports);
+        if (user?.id) {
+          const { data: rData } = await supabase.from('reports').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+          if (rData && rData.length > 0) {
+            updateReportsAndPersist(prev => {
+              const merged = [
+                ...rData,
+                ...prev.filter(p => !rData.some(r => r.id === p.id))
+              ];
+              return merged;
+            });
+          }
+        }
 
         if (mergedDatasets.length > 0 && !selectedDatasetId) {
           setSelectedDatasetId(mergedDatasets[0].id);
@@ -389,11 +455,20 @@ export default function ExecutiveReports() {
       if (prev.includes(id)) {
         return prev.filter(item => item !== id);
       }
-      if (prev.length >= 2) {
-        toast.info("You can compare up to 2 report versions at a time.");
-        return [prev[1], id];
+      if (prev.length === 1) {
+        const next = [prev[0], id];
+        setIsCompareModalOpen(true);
+        toast.success("Opening side-by-side comparison modal!");
+        return next;
       }
-      return [...prev, id];
+      if (prev.length >= 2) {
+        const next = [prev[1], id];
+        setIsCompareModalOpen(true);
+        toast.success("Updated comparison version.");
+        return next;
+      }
+      toast.info("Selected 1st report. Select a 2nd report to launch side-by-side comparison.");
+      return [id];
     });
   };
 
@@ -486,6 +561,8 @@ export default function ExecutiveReports() {
             title: reportTitle || `Senior Data Scientist C-Suite Briefing: ${cleanDatasetName}`,
             archetype: reportArchetype,
             domain: reportDomain,
+            audience: audienceFocus,
+            rigor_mode: statisticalRigorMode,
             profile,
             validation
           }),
@@ -649,6 +726,17 @@ export default function ExecutiveReports() {
     }
   };
 
+  const handleExportPPT = async (report: any) => {
+    try {
+      toast.info("Generating 16:9 Widescreen PowerPoint Presentation Deck (.pptx)...");
+      await exportReportToPPT(report);
+      toast.success("PowerPoint presentation (.pptx) downloaded successfully!");
+    } catch (err) {
+      console.error("PPT Export failed:", err);
+      toast.error("Failed to generate PowerPoint deck.");
+    }
+  };
+
   const handleDownloadHTML = (report: any) => {
     const content = typeof report.content === "string" ? JSON.parse(report.content) : (report.content || report);
     const title = report.title || content.title || "Executive Briefing";
@@ -804,8 +892,8 @@ export default function ExecutiveReports() {
 
   const reportA = reports.find(r => r.id === compareReportIds[0]);
   const reportB = reports.find(r => r.id === compareReportIds[1]);
-  const parsedA = reportA ? (typeof reportA.content === "string" ? JSON.parse(reportA.content) : reportA.content) : null;
-  const parsedB = reportB ? (typeof reportB.content === "string" ? JSON.parse(reportB.content) : reportB.content) : null;
+  const parsedA = reportA ? safeJsonParse(reportA.content) : null;
+  const parsedB = reportB ? safeJsonParse(reportB.content) : null;
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 relative z-10 w-full max-w-6xl mx-auto">
@@ -1343,133 +1431,16 @@ export default function ExecutiveReports() {
         </div>
       </motion.div>
 
-      {/* Report Generation Modal */}
-      <AnimatePresence>
-        {isModalOpen && createPortal(
-          <div 
-            className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto"
-            onClick={() => setIsModalOpen(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 relative my-8 text-slate-100"
-            >
-              <button onClick={() => setIsModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
-                <X className="h-5 w-5" />
-              </button>
-              <h2 className="text-lg font-extrabold text-white mb-1 flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-violet-400" /> Synthesize Executive Report
-              </h2>
-              <p className="text-xs text-slate-400 mb-6">
-                Senior Data Scientist decision briefing with 4-pass verification & multi-agent consensus.
-              </p>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                    Select Target Dataset
-                  </label>
-                  <select
-                    value={selectedDatasetId}
-                    onChange={(e) => {
-                      setSelectedDatasetId(e.target.value);
-                      const d = datasets.find(item => item.id === e.target.value);
-                      if (d) setReportTitle(`Senior Data Scientist Briefing: ${d.name.replace(/\.[^/.]+$/, "")}`);
-                    }}
-                    className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-medium text-slate-200 focus:outline-none focus:border-violet-500"
-                  >
-                    {datasets.map(d => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                    Report Title
-                  </label>
-                  <input
-                    type="text"
-                    value={reportTitle}
-                    onChange={(e) => setReportTitle(e.target.value)}
-                    className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-violet-500"
-                    placeholder="Enter briefing title..."
-                  />
-                </div>
-
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                      Report Archetype
-                    </label>
-                    <select
-                      value={reportArchetype}
-                      onChange={(e) => setReportArchetype(e.target.value)}
-                      className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-medium text-slate-200 focus:outline-none focus:border-violet-500"
-                    >
-                      {ARCHETYPES.map(a => (
-                        <option key={a} value={a}>{a}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                      Target Domain Focus
-                    </label>
-                    <select
-                      value={reportDomain}
-                      onChange={(e) => setReportDomain(e.target.value)}
-                      className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-medium text-slate-200 focus:outline-none focus:border-violet-500"
-                    >
-                      {DOMAINS.map(d => (
-                        <option key={d} value={d}>{d}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {isGenerating && generationStep && (
-                  <div className="space-y-2">
-                    <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 text-[10px] text-violet-300 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <Activity className="h-4 w-4 animate-spin text-violet-400 shrink-0" />
-                        <span className="font-mono">{generationStep}</span>
-                      </div>
-                      <span className="font-mono font-bold text-violet-400">{generationProgress}%</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${generationProgress}%` }}
-                        className="h-full bg-gradient-to-r from-violet-600 to-indigo-500 shadow-[0_0_10px_rgba(139,92,246,0.3)]"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div className="pt-2 flex justify-end gap-3">
-                  <Button variant="ghost" onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white text-xs">
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleGenerateReport}
-                    disabled={isGenerating || !selectedDatasetId}
-                    className="bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold"
-                  >
-                    {isGenerating ? <Activity className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
-                    {isGenerating ? "Synthesizing Briefing..." : "Generate Briefing"}
-                  </Button>
-                </div>
-              </div>
-            </motion.div>
-          </div>,
-          document.body
-        )}
-      </AnimatePresence>
+      {/* Synthesize Executive Report Modal */}
+      <SynthesizeReportModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        datasets={datasets}
+        onReportGenerated={(newReport) => {
+          updateReportsAndPersist(prev => [newReport, ...prev]);
+          setSelectedReportForView(newReport);
+        }}
+      />
 
       {/* Reports List */}
       {isLoading ? (
@@ -1576,7 +1547,11 @@ export default function ExecutiveReports() {
                       </button>
 
                       <Button
-                        onClick={(e) => { e.stopPropagation(); setIsShareDialogOpen(true); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSharedReportTitle(report.title || "Executive Briefing");
+                          setIsShareDialogOpen(true);
+                        }}
                         variant="outline"
                         size="sm"
                         className="bg-slate-800/80 border-slate-700 hover:bg-slate-700 text-slate-200 text-xs rounded-xl"
@@ -1603,11 +1578,11 @@ export default function ExecutiveReports() {
                       </Button>
 
                       <Button
-                        onClick={() => exportReportToPPT(report)}
+                        onClick={() => handleExportPPT(report)}
                         variant="outline"
                         size="sm"
                         className="bg-slate-800/80 border-slate-700 hover:bg-slate-700 text-slate-200 text-xs rounded-xl"
-                        title="Export Powerpoint Presentation"
+                        title="Export PowerPoint Presentation (.pptx)"
                       >
                         <Presentation className="h-3.5 w-3.5 text-amber-400" />
                       </Button>
@@ -1630,105 +1605,75 @@ export default function ExecutiveReports() {
         </motion.div>
       )}
 
-      {/* History Sidebar Panel */}
+      {/* Floating Comparison Bar when items are selected */}
       <AnimatePresence>
-        {isHistorySidebarOpen && createPortal(
-          <div 
-            className="fixed inset-0 z-[9999] flex justify-end bg-slate-950/80 backdrop-blur-md"
-            onClick={() => setIsHistorySidebarOpen(false)}
+        {compareReportIds.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 30 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] bg-slate-900/95 border border-violet-500/50 shadow-2xl backdrop-blur-xl px-5 py-3 rounded-2xl flex items-center gap-4 text-white"
           >
-            <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md h-full bg-slate-900 border-l border-slate-800 p-6 flex flex-col shadow-2xl text-slate-100"
-            >
-              <div className="flex items-center justify-between border-b border-slate-800 pb-4 shrink-0">
-                <div className="flex items-center gap-2">
-                  <History className="h-5 w-5 text-violet-400" />
-                  <h3 className="text-base font-bold text-white">Report Version History</h3>
-                </div>
-                <button onClick={() => setIsHistorySidebarOpen(false)} className="text-slate-400 hover:text-white">
-                  <X className="h-5 w-5" />
-                </button>
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-xl bg-violet-600/30 border border-violet-500/50 flex items-center justify-center text-violet-400">
+                <ArrowLeftRight className="h-4 w-4" />
               </div>
-
-              <div className="flex-1 overflow-y-auto py-4 space-y-3">
-                {reports.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-8">No historical versions generated yet.</p>
-                ) : (
-                  reports.map((rep) => {
-                    const isPinned = pinnedReportIds.includes(rep.id);
-                    const isSelected = compareReportIds.includes(rep.id);
-                    return (
-                      <div
-                        key={rep.id}
-                        className={`p-3.5 rounded-xl border transition-all ${
-                          isSelected ? "bg-violet-950/40 border-violet-500" : "bg-slate-950 border-slate-800 hover:border-slate-700"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className="text-xs font-bold text-white truncate">{rep.title}</h4>
-                          <button
-                            onClick={() => togglePinReport(rep.id)}
-                            className={`text-slate-400 hover:text-amber-400 ${isPinned ? "text-amber-400" : ""}`}
-                          >
-                            <Bookmark className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                        <p className="text-[10px] text-slate-400 mt-1">
-                          {new Date(rep.created_at).toLocaleString()} | {rep.format}
-                        </p>
-
-                        <div className="mt-3 flex items-center justify-between pt-2 border-t border-slate-800/60">
-                          <button
-                            onClick={() => toggleCompareReport(rep.id)}
-                            className="text-[11px] text-violet-400 hover:text-violet-300 font-semibold flex items-center gap-1"
-                          >
-                            <ArrowLeftRight className="h-3 w-3" />
-                            {isSelected ? "Remove from Compare" : "Select to Compare"}
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              setSelectedReportForView(rep);
-                              setIsHistorySidebarOpen(false);
-                            }}
-                            className="text-[11px] text-emerald-400 hover:text-emerald-300 font-semibold"
-                          >
-                            View Report
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
+              <div>
+                <p className="text-xs font-bold text-white leading-tight">
+                  {compareReportIds.length} of 2 Reports Selected
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  {compareReportIds.length === 1 ? "Select 1 more report or click Compare" : "Ready for side-by-side comparison"}
+                </p>
               </div>
+            </div>
 
-              {compareReportIds.length === 2 && (
-                <div className="pt-4 border-t border-slate-800 shrink-0">
-                  <Button
-                    onClick={() => {
-                      setIsHistorySidebarOpen(false);
-                      setIsCompareModalOpen(true);
-                    }}
-                    className="w-full bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-xl"
-                  >
-                    Compare 2 Selected Versions
-                  </Button>
-                </div>
-              )}
-            </motion.div>
-          </div>,
-          document.body
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => {
+                  if (compareReportIds.length === 1 && reports.length > 1) {
+                    const otherReport = reports.find(r => r.id !== compareReportIds[0]);
+                    if (otherReport) {
+                      setCompareReportIds([compareReportIds[0], otherReport.id]);
+                    }
+                  }
+                  setIsCompareModalOpen(true);
+                }}
+                className="bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold rounded-xl px-3.5 shadow-lg shadow-violet-900/30"
+              >
+                <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" />
+                Compare Now
+              </Button>
+              <button
+                onClick={() => setCompareReportIds([])}
+                className="text-xs text-slate-400 hover:text-white px-2 py-1 rounded-lg"
+              >
+                Clear
+              </button>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
+      {/* History Sidebar Panel */}
+      <ExecutiveReportHistorySidebar
+        isOpen={isHistorySidebarOpen}
+        onClose={() => setIsHistorySidebarOpen(false)}
+        reports={reports}
+        pinnedReportIds={pinnedReportIds}
+        compareReportIds={compareReportIds}
+        onTogglePin={togglePinReport}
+        onToggleCompare={toggleCompareReport}
+        onDeleteReport={handleDeleteReport}
+        onViewReport={(rep) => setSelectedReportForView(rep)}
+        onExportPDF={handleExportPDF}
+        onExportPPT={handleExportPPT}
+        onExportHTML={handleDownloadHTML}
+      />
+
       {/* Side-by-Side Version Comparison Modal */}
       <AnimatePresence>
-        {isCompareModalOpen && reportA && reportB && createPortal(
+        {isCompareModalOpen && reportA && reportB && typeof document !== "undefined" && document.body && createPortal(
           <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl overflow-y-auto">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -1827,6 +1772,7 @@ export default function ExecutiveReports() {
           <ExecutiveReportViewer
             report={selectedReportForView}
             onClose={() => setSelectedReportForView(null)}
+            onOpenHistory={() => setIsHistorySidebarOpen(true)}
             onDownloadHTML={handleDownloadHTML}
             onDownloadMD={handleDownloadMD}
             onDownloadPDF={handleExportPDF}
@@ -1838,7 +1784,7 @@ export default function ExecutiveReports() {
       <ShareDialog
         isOpen={isShareDialogOpen}
         onClose={() => setIsShareDialogOpen(false)}
-        title={selectedReportForView ? `Report: ${selectedReportForView.title}` : "Executive Briefing"}
+        title={sharedReportTitle || (selectedReportForView ? `Report: ${selectedReportForView.title}` : "Executive Briefing")}
       />
     </motion.div>
   );

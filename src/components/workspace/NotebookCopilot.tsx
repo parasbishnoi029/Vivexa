@@ -445,7 +445,7 @@ export default function NotebookCopilot({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === "undefined" || !document.body) return null;
 
   return createPortal(
     <AnimatePresence>
