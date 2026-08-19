@@ -11,7 +11,12 @@ export const organizationRouter = express.Router();
 // Router-level authentication & demo session resolution middleware
 organizationRouter.use(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
   // Public routes that don't strictly require authentication
-  if (req.path.startsWith('/invitations/validate/') || req.path.startsWith('/invitations/public-info/')) {
+  if (
+    req.path.startsWith('/invitations/validate') || 
+    req.path.startsWith('/invitations/public-info') ||
+    req.path.includes('/invitations/validate') ||
+    req.path.includes('/invitations/public-info')
+  ) {
     return next();
   }
 

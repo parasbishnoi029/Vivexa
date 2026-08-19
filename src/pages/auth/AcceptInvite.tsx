@@ -55,23 +55,38 @@ export default function AcceptInvite() {
 
   // Validate invitation on mount
   useEffect(() => {
+    let isMounted = true;
+
     async function validateToken() {
       if (!inviteId) {
-        setErrorMessage("No invitation token was provided. Please check the link sent to your email.");
-        setLoading(false);
+        if (isMounted) {
+          setErrorMessage("No invitation token was provided. Please check the link sent to your email.");
+          setLoading(false);
+        }
         return;
       }
 
       try {
-        setValidating(true);
+        if (isMounted) setValidating(true);
         // Persist token in case user needs to login or register first
         localStorage.setItem("pending_invite_id", inviteId);
         if (emailParam) {
           localStorage.setItem("pending_invite_email", emailParam);
         }
 
-        const res = await fetch(`/api/v1/organization/invitations/validate/${encodeURIComponent(inviteId)}`);
+        const sessionResult = await supabase.auth.getSession();
+        const token = sessionResult.data.session?.access_token;
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+
+        const res = await fetch(`/api/v1/organization/invitations/validate/${encodeURIComponent(inviteId)}`, {
+          headers
+        });
         const json = await res.json();
+
+        if (!isMounted) return;
 
         if (json.success && json.data) {
           setInvitation(json.data);
@@ -82,14 +97,22 @@ export default function AcceptInvite() {
         }
       } catch (err: any) {
         console.error("Error validating invitation:", err);
-        setErrorMessage("Failed to verify invitation. Please check your network connection and try again.");
+        if (isMounted) {
+          setErrorMessage("Failed to verify invitation. Please check your network connection and try again.");
+        }
       } finally {
-        setLoading(false);
-        setValidating(false);
+        if (isMounted) {
+          setLoading(false);
+          setValidating(false);
+        }
       }
     }
 
     validateToken();
+
+    return () => {
+      isMounted = false;
+    };
   }, [inviteId, emailParam]);
 
   // Handle invitation acceptance for logged-in user

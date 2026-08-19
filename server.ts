@@ -146,6 +146,21 @@ async function startServer() {
 
   // Hybrid Auth Middleware: Handles both Supabase Auth JWT and Vivexa API Keys (vx_live_ / vx_test_)
   const requireAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    // Whitelist public endpoints
+    const reqPath = req.path;
+    if (
+      reqPath.startsWith('/organization/invitations/validate') ||
+      reqPath.startsWith('/organization/invitations/public-info') ||
+      reqPath.includes('/invitations/validate') ||
+      reqPath.includes('/invitations/public-info') ||
+      reqPath.startsWith('/auth/') ||
+      reqPath === '/health' ||
+      reqPath === '/inspect-env' ||
+      reqPath === '/book-demo'
+    ) {
+      return next();
+    }
+
     const authHeader = req.headers.authorization;
     const apiKeyHeader = req.headers['x-api-key'] as string;
 
@@ -655,6 +670,9 @@ async function resolveRecoveryUrl(actionLink: string, publicOrigin: string): Pro
     }
   });
 
+  // Mount Organization Router (handles public invitation validation + authenticated workspace management)
+  apiRouter.use('/organization', organizationRouter);
+
   // Protected Routes
   apiRouter.use(requireAuth);
 
@@ -808,7 +826,6 @@ async function resolveRecoveryUrl(actionLink: string, publicOrigin: string): Pro
   // Mount Feature Routers
   apiRouter.use('/keys', apiKeysRouter);
   apiRouter.use('/gemini', aiAnalystRouter);
-  apiRouter.use('/organization', organizationRouter);
   apiRouter.use('/datasets', datasetsRouter);
   apiRouter.use('/admin', adminUsersRouter);
   apiRouter.use('/forecast', forecastRouter);
