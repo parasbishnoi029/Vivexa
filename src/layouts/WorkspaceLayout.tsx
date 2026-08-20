@@ -2,13 +2,14 @@ import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { 
   LayoutDashboard, FolderKanban, Settings, Bell, Search, Database,
   BarChart3, Bot, FileText, LayoutTemplate, Bookmark, Activity, ScrollText,
-  Shield, HelpCircle, MessageSquare, ChevronDown, Moon, Sun, Command, Users, CreditCard, Key,
+  Shield, HelpCircle, MessageSquare, ChevronDown, ChevronRight, Moon, Sun, Command, Users, CreditCard, Key,
   Network, Cable, TerminalSquare, Workflow, Blocks, ActivitySquare, BookOpen, Menu, X,
-  Boxes, Layers, Globe, Brain, Building2, User, Plus, Wifi, WifiOff, ShieldCheck
+  Boxes, Layers, Globe, Brain, Building2, User, Plus, Wifi, WifiOff, ShieldCheck,
+  Sparkles, LineChart, Cpu, Zap, SlidersHorizontal, ArrowRight, CornerDownLeft, Filter, ArrowUpRight
 } from "lucide-react";
 import { AppBackground } from "@/components/layout/AppBackground";
 import { motion, AnimatePresence } from "motion/react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { supabase } from "@/lib/supabase";
@@ -21,14 +22,117 @@ import QuotaLimitModal from "@/components/workspace/QuotaLimitModal";
 import { Logo } from "@/components/ui/Logo";
 import { useNotifications } from "@/hooks/useNotifications";
 
-const NavItem = ({ to, icon: Icon, children, disabled = false, onClick }: any) => {
+export interface NavSectionItem {
+  to: string;
+  label: string;
+  icon: any;
+  badge?: string;
+  badgeColor?: string;
+  description?: string;
+  disabled?: boolean;
+}
+
+export interface NavSection {
+  id: string;
+  title: string;
+  accentColor: string;
+  badgeBg: string;
+  items: NavSectionItem[];
+}
+
+export const WORKSPACE_NAV_SECTIONS: NavSection[] = [
+  {
+    id: "core",
+    title: "Core Operations",
+    accentColor: "text-indigo-400",
+    badgeBg: "bg-indigo-500/10 text-indigo-300 border-indigo-500/20",
+    items: [
+      { to: "/workspace", label: "Dashboard", icon: LayoutDashboard, description: "System KPIs & real-time telemetry" },
+      { to: "/workspace/projects", label: "Projects", icon: FolderKanban, description: "Enterprise analytical initiatives" },
+      { to: "/workspace/datasets", label: "Datasets", icon: Database, badge: "Live", badgeColor: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30", description: "Lakehouse ingest & data curation" },
+      { to: "/workspace/lakehouse", label: "Vivexa Lakehouse", icon: Network, badge: "Delta", badgeColor: "bg-cyan-500/20 text-cyan-300 border-cyan-500/30", description: "Zero-copy query federation" },
+    ]
+  },
+  {
+    id: "ai_intelligence",
+    title: "AI Intelligence",
+    accentColor: "text-purple-400",
+    badgeBg: "bg-purple-500/10 text-purple-300 border-purple-500/20",
+    items: [
+      { to: "/workspace/ai", label: "AI Analyst", icon: Bot, badge: "AutoML", badgeColor: "bg-purple-500/20 text-purple-300 border-purple-500/30", description: "Automated root-cause & data profiling" },
+      { to: "/workspace/ai/chat", label: "AI Chat", icon: MessageSquare, description: "Conversational assistant & data scientist agent" },
+      { to: "/workspace/agents", label: "AI Agents Cockpit", icon: Cpu, badge: "Autonomous", badgeColor: "bg-amber-500/20 text-amber-300 border-amber-500/30", description: "Multi-agent autonomous task orchestration" },
+      { to: "/workspace/search", label: "Search Analytics", icon: Search, description: "Semantic search query logs & latency meters" },
+    ]
+  },
+  {
+    id: "predictions_ml",
+    title: "Predictions & ML",
+    accentColor: "text-amber-400",
+    badgeBg: "bg-amber-500/10 text-amber-300 border-amber-500/20",
+    items: [
+      { to: "/workspace/predictions", label: "Predictions & ML", icon: Activity, description: "Supervised models, XGBoost & RandomForest" },
+      { to: "/workspace/forecasting", label: "Forecasting", icon: BarChart3, badge: "Prophet", badgeColor: "bg-amber-500/20 text-amber-300 border-amber-500/30", description: "Multi-horizon time-series trajectories" },
+      { to: "/workspace/recommendations", label: "Recommendations", icon: Bookmark, description: "Causal prescription & growth recommendations" },
+      { to: "/workspace/reports", label: "Executive Reports", icon: FileText, badge: "PPT/PDF", badgeColor: "bg-blue-500/20 text-blue-300 border-blue-500/30", description: "Boardroom slide decks & executive briefings" },
+      { to: "/workspace/models", label: "Saved Models", icon: Database, description: "Model registry, weights & deployment endpoints" },
+      { to: "/workspace/memory", label: "Project Memory", icon: ScrollText, description: "Long-term AI context & institutional domain rules" },
+    ]
+  },
+  {
+    id: "organisation",
+    title: "Organisation",
+    accentColor: "text-cyan-400",
+    badgeBg: "bg-cyan-500/10 text-cyan-300 border-cyan-500/20",
+    items: [
+      { to: "/workspace/global-search", label: "Global Search", icon: Search, description: "Universal indexing across tables, schemas & docs" },
+      { to: "/workspace/ontology", label: "Enterprise Ontology", icon: Boxes, badge: "Knowledge Graph", badgeColor: "bg-cyan-500/20 text-cyan-300 border-cyan-500/30", description: "Entity relationship graphs & business domain objects" },
+      { to: "/workspace/semantic", label: "Semantic Layer", icon: Layers, description: "Standardized metric definitions & semantic governance" },
+      { to: "/workspace/organization", label: "Organisation", icon: Users, description: "Team members, RBAC roles & seat allocations" },
+      { to: "/workspace/billing", label: "Billing & Usage", icon: CreditCard, description: "Tier management, compute quotas & usage telemetry" },
+      { to: "/workspace/apikeys", label: "API Keys", icon: Key, description: "Developer tokens, bearer credentials & webhook secrets" },
+    ]
+  },
+  {
+    id: "platform_ecosystem",
+    title: "Platform Ecosystem",
+    accentColor: "text-emerald-400",
+    badgeBg: "bg-emerald-500/10 text-emerald-300 border-emerald-500/20",
+    items: [
+      { to: "/workspace/connectors", label: "Data Connectors", icon: Cable, description: "PostgreSQL, Snowflake, BigQuery & S3 integrations" },
+      { to: "/workspace/notebooks", label: "Notebooks", icon: TerminalSquare, badge: "Python", badgeColor: "bg-pink-500/20 text-pink-300 border-pink-500/30", description: "Interactive Jupyter & pandas analytical sandbox" },
+      { to: "/workspace/dashboards", label: "Dashboards (BI)", icon: LayoutDashboard, description: "Self-service business intelligence canvas" },
+      { to: "/workspace/automations", label: "Automations", icon: Workflow, description: "Event-triggered ETL, scheduled jobs & webhooks" },
+      { to: "/workspace/plugins", label: "Plugins", icon: Blocks, description: "Custom community extensions & custom algorithms" },
+      { to: "/workspace/observability", label: "Observability", icon: ActivitySquare, description: "System audit logs, health telemetry & error rate" },
+      { to: "/workspace/quality", label: "Data Quality Sentinel", icon: ShieldCheck, description: "Automated schema validation & drift detection" },
+      { to: "/workspace/marketplace", label: "Marketplace", icon: Globe, description: "Pre-trained enterprise models & analytical blueprints" },
+      { to: "/workspace/sdk", label: "Intelligence SDK", icon: TerminalSquare, description: "REST & Python client SDK docs" },
+    ]
+  },
+  {
+    id: "help_resources",
+    title: "Help & Resources",
+    accentColor: "text-slate-400",
+    badgeBg: "bg-slate-800 text-slate-300 border-slate-700",
+    items: [
+      { to: "/workspace/help", label: "Help Centre", icon: HelpCircle, description: "FAQs, knowledgebase & enterprise support desk" },
+      { to: "/workspace/manual", label: "User Manual", icon: BookOpen, description: "Comprehensive platform reference guide" },
+      { to: "/workspace/notifications", label: "Notifications", icon: Bell, description: "Alert inbox, system pings & threshold alerts" },
+      { to: "/workspace/activity", label: "Activity", icon: Activity, description: "Real-time user & automated event logs" },
+      { to: "/workspace/changelog", label: "Changelog", icon: ScrollText, badge: "v2.8", badgeColor: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30", description: "Latest release notes & platform updates" },
+    ]
+  }
+];
+
+const NavItem = ({ to, icon: Icon, children, badge, badgeColor, disabled = false, onClick }: any) => {
   const location = useLocation();
-  const isActive = location.pathname === to;
+  const isActive = location.pathname === to || (to !== "/workspace" && location.pathname.startsWith(to + "/"));
 
   return (
     <Link 
       to={disabled ? "#" : to} 
-      className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-300 ${disabled ? 'cursor-not-allowed opacity-50' : ''} ${isActive ? 'text-white' : 'text-slate-400 hover:text-white'}`}
+      className={`group relative flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 ${disabled ? 'cursor-not-allowed opacity-50' : ''} ${isActive ? 'text-white' : 'text-slate-400 hover:text-white'}`}
       onClick={(e) => {
         if (disabled) {
           e.preventDefault();
@@ -40,15 +144,23 @@ const NavItem = ({ to, icon: Icon, children, disabled = false, onClick }: any) =
       {isActive && (
         <motion.div 
           layoutId="active-nav-bg"
-          className="absolute inset-0 rounded-xl bg-indigo-500/15 border border-indigo-500/30"
+          className="absolute inset-0 rounded-xl bg-indigo-500/15 border border-indigo-500/30 shadow-[0_0_20px_rgba(99,102,241,0.15)]"
           initial={false}
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
         />
       )}
-      <div className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-300 ${isActive ? 'bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.5)]' : 'bg-slate-800/50 group-hover:bg-slate-700/50 text-slate-400 group-hover:text-white'}`}>
-        <Icon className="h-4 w-4" />
+      <div className="flex items-center gap-2.5 min-w-0 relative z-10">
+        <div className={`flex h-7 w-7 items-center justify-center rounded-lg transition-all duration-200 shrink-0 ${isActive ? 'bg-indigo-500 text-white shadow-[0_0_12px_rgba(99,102,241,0.6)]' : 'bg-slate-800/60 group-hover:bg-slate-700/60 text-slate-400 group-hover:text-white'}`}>
+          <Icon className="h-3.5 w-3.5" />
+        </div>
+        <span className="truncate text-xs font-semibold">{children}</span>
       </div>
-      <span className="relative z-10">{children}</span>
+
+      {badge && (
+        <span className={`relative z-10 text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border ${badgeColor || 'bg-slate-800 text-slate-400 border-slate-700'} shrink-0 ml-1.5`}>
+          {badge}
+        </span>
+      )}
     </Link>
   );
 };
@@ -56,15 +168,117 @@ const NavItem = ({ to, icon: Icon, children, disabled = false, onClick }: any) =
 export default function WorkspaceLayout() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [commandPaletteSearch, setCommandPaletteSearch] = useState("");
+  const [commandPaletteCategory, setCommandPaletteCategory] = useState<string>("all");
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [sidebarFilter, setSidebarFilter] = useState("");
   const [userRole, setUserRole] = useState<string>('User');
   const [userPlan, setUserPlan] = useState<string>('Free');
   const [headerSearch, setHeaderSearch] = useState("");
   const [healthStatus, setHealthStatus] = useState<'online' | 'degraded' | 'offline'>('online');
   const [latency, setLatency] = useState<number | null>(null);
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  // Collapsible section state with persistence
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem("vivexa_nav_collapsed_v3");
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  });
+
+  const toggleSection = (sectionId: string) => {
+    setCollapsedSections(prev => {
+      const next = { ...prev, [sectionId]: !prev[sectionId] };
+      try {
+        localStorage.setItem("vivexa_nav_collapsed_v3", JSON.stringify(next));
+      } catch (e) {
+        // ignore
+      }
+      return next;
+    });
+  };
+
+  // Auto-expand section containing current active path
+  useEffect(() => {
+    const currentSection = WORKSPACE_NAV_SECTIONS.find(sec =>
+      sec.items.some(item => item.to === location.pathname || (item.to !== "/workspace" && location.pathname.startsWith(item.to + "/")))
+    );
+    if (currentSection && collapsedSections[currentSection.id]) {
+      setCollapsedSections(prev => {
+        const next = { ...prev, [currentSection.id]: false };
+        try {
+          localStorage.setItem("vivexa_nav_collapsed_v3", JSON.stringify(next));
+        } catch (e) {
+          // ignore
+        }
+        return next;
+      });
+    }
+  }, [location.pathname]);
+
+  // Determine current active breadcrumb info
+  const activeNavInfo = useMemo(() => {
+    for (const section of WORKSPACE_NAV_SECTIONS) {
+      for (const item of section.items) {
+        if (item.to === location.pathname || (item.to !== "/workspace" && location.pathname.startsWith(item.to + "/"))) {
+          return { section, item };
+        }
+      }
+    }
+    if (location.pathname.startsWith("/workspace/settings")) {
+      return { section: { title: "Settings" }, item: { label: "System Preferences", icon: Settings } };
+    }
+    return null;
+  }, [location.pathname]);
+
+  // Filtered nav items based on sidebarFilter
+  const filteredNavSections = useMemo(() => {
+    if (!sidebarFilter.trim()) return WORKSPACE_NAV_SECTIONS;
+    const q = sidebarFilter.toLowerCase().trim();
+    return WORKSPACE_NAV_SECTIONS.map(section => {
+      const matchingItems = section.items.filter(item => 
+        item.label.toLowerCase().includes(q) || 
+        (item.description && item.description.toLowerCase().includes(q)) ||
+        (item.badge && item.badge.toLowerCase().includes(q))
+      );
+      return { ...section, items: matchingItems };
+    }).filter(section => section.items.length > 0);
+  }, [sidebarFilter]);
+
+  // Command palette flat items
+  const commandPaletteItems = useMemo(() => {
+    const allItems: { section: NavSection; item: NavSectionItem }[] = [];
+    WORKSPACE_NAV_SECTIONS.forEach(section => {
+      section.items.forEach(item => {
+        allItems.push({ section, item });
+      });
+    });
+
+    return allItems.filter(({ section, item }) => {
+      if (commandPaletteCategory !== "all" && section.id !== commandPaletteCategory) {
+        return false;
+      }
+      if (!commandPaletteSearch.trim()) return true;
+      const q = commandPaletteSearch.toLowerCase().trim();
+      return (
+        item.label.toLowerCase().includes(q) ||
+        (item.description && item.description.toLowerCase().includes(q)) ||
+        section.title.toLowerCase().includes(q)
+      );
+    });
+  }, [commandPaletteSearch, commandPaletteCategory]);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [commandPaletteSearch, commandPaletteCategory]);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -138,23 +352,45 @@ export default function WorkspaceLayout() {
     clearAllRead
   } = useNotifications(15000);
 
+  // Global hotkey for Command Palette (Cmd+K or Ctrl+K)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        navigate("/workspace/search");
+        setIsCommandPaletteOpen(prev => !prev);
+      } else if (e.key === "Escape" && isCommandPaletteOpen) {
+        setIsCommandPaletteOpen(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [navigate]);
+  }, [isCommandPaletteOpen]);
+
+  // Command palette keyboard navigation (Up/Down/Enter)
+  const handleCommandKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev + 1) % (commandPaletteItems.length || 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev - 1 + (commandPaletteItems.length || 1)) % (commandPaletteItems.length || 1));
+    } else if (e.key === "Enter" && commandPaletteItems.length > 0) {
+      e.preventDefault();
+      const target = commandPaletteItems[selectedIndex];
+      if (target) {
+        navigate(target.item.to);
+        setIsCommandPaletteOpen(false);
+        setCommandPaletteSearch("");
+      }
+    }
+  };
 
   const handleHeaderSearchSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (headerSearch.trim()) {
       navigate(`/workspace/search?q=${encodeURIComponent(headerSearch.trim())}`);
     } else {
-      navigate("/workspace/search");
+      setIsCommandPaletteOpen(true);
     }
   };
 
@@ -327,73 +563,105 @@ export default function WorkspaceLayout() {
           >
             <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/5 to-transparent pointer-events-none" />
             
-            <div className="flex h-20 items-center px-6 relative z-10">
+            <div className="flex h-16 items-center px-4 relative z-10 border-b border-slate-800/60">
               <Link to="/workspace" className="flex items-center gap-3 w-full">
                 <Logo size="sm" />
               </Link>
             </div>
+
+            {/* Navigation Search / Filter Bar */}
+            <div className="p-3 pb-1 relative z-10">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Filter menus... (⌘K)"
+                  value={sidebarFilter}
+                  onChange={(e) => setSidebarFilter(e.target.value)}
+                  className="w-full h-8 pl-8 pr-7 text-xs bg-slate-950/60 border border-slate-800/80 rounded-xl text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all font-sans"
+                />
+                {sidebarFilter ? (
+                  <button
+                    onClick={() => setSidebarFilter("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setIsCommandPaletteOpen(true)}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-slate-500 bg-slate-800/80 px-1 py-0.5 rounded border border-slate-700/60 hover:text-slate-300"
+                    title="Open Command Palette (⌘K)"
+                  >
+                    ⌘K
+                  </button>
+                )}
+              </div>
+            </div>
             
-            <div className="flex-1 overflow-y-auto py-4 scrollbar-hide relative z-10">
-              <nav className="space-y-1 px-3">
-                <NavItem to="/workspace" icon={LayoutDashboard}>Dashboard</NavItem>
-                <NavItem to="/workspace/projects" icon={FolderKanban}>Projects</NavItem>
-                <NavItem to="/workspace/datasets" icon={Database}>Datasets</NavItem>
-                <NavItem to="/workspace/lakehouse" icon={Network}>Vivexa Lakehouse</NavItem>
-              </nav>
+            <div className="flex-1 overflow-y-auto py-2 scrollbar-hide relative z-10 space-y-4 px-2">
+              {filteredNavSections.length === 0 ? (
+                <div className="text-center py-8 px-3">
+                  <Search className="h-6 w-6 text-slate-600 mx-auto mb-2 opacity-50" />
+                  <p className="text-xs font-semibold text-slate-400">No matching items</p>
+                  <p className="text-[10px] text-slate-600 mt-1">Try a different keyword or</p>
+                  <button
+                    onClick={() => setSidebarFilter("")}
+                    className="mt-2 text-xs text-indigo-400 hover:underline font-semibold"
+                  >
+                    Clear filter
+                  </button>
+                </div>
+              ) : (
+                filteredNavSections.map((section) => {
+                  const isCollapsed = !sidebarFilter && !!collapsedSections[section.id];
+                  const hasActiveItem = section.items.some(
+                    item => item.to === location.pathname || (item.to !== "/workspace" && location.pathname.startsWith(item.to + "/"))
+                  );
 
-              <div className="mt-6 relative z-10">
-                <div className="px-6 text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-2 opacity-80">AI Intelligence</div>
-                <nav className="space-y-1 px-3">
-                  <NavItem to="/workspace/ai" icon={Bot}>AI Analyst</NavItem>
-                  <NavItem to="/workspace/ai/chat" icon={MessageSquare}>AI Chat</NavItem>
-                  <NavItem to="/workspace/agents" icon={Network}>AI Agents Cockpit</NavItem>
-                  <NavItem to="/workspace/search" icon={Search}>Search Analytics</NavItem>
-                  <NavItem to="/workspace/predictions" icon={Activity}>Predictions & ML</NavItem>
-                  <NavItem to="/workspace/forecasting" icon={BarChart3}>Forecasting</NavItem>
-                  <NavItem to="/workspace/recommendations" icon={Bookmark}>Recommendations</NavItem>
-                  <NavItem to="/workspace/reports" icon={FileText}>Executive Reports</NavItem>
-                  <NavItem to="/workspace/models" icon={Database}>Saved Models</NavItem>
-                  <NavItem to="/workspace/memory" icon={ScrollText}>Project Memory</NavItem>
-                </nav>
-              </div>
+                  return (
+                    <div key={section.id} className="relative">
+                      {/* Section Header */}
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(section.id)}
+                        className={`w-full flex items-center justify-between px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-colors group cursor-pointer ${
+                          hasActiveItem ? 'text-indigo-300' : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          {section.title}
+                          <span className="text-[9px] font-mono font-normal opacity-60 text-slate-500 lowercase">
+                            ({section.items.length})
+                          </span>
+                        </span>
+                        <ChevronDown
+                          className={`h-3.5 w-3.5 text-slate-500 group-hover:text-slate-300 transition-transform duration-200 ${
+                            isCollapsed ? '-rotate-90' : ''
+                          }`}
+                        />
+                      </button>
 
-              <div className="mt-6 relative z-10">
-                <div className="px-6 text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-2 opacity-80">Organisation</div>
-                <nav className="space-y-1 px-3">
-                  <NavItem to="/workspace/global-search" icon={Search}>Global Search</NavItem>
-                  <NavItem to="/workspace/ontology" icon={Boxes}>Enterprise Ontology</NavItem>
-                  <NavItem to="/workspace/semantic" icon={Layers}>Semantic Layer</NavItem>
-                  <NavItem to="/workspace/organization" icon={Users}>Organisation</NavItem>
-                  <NavItem to="/workspace/billing" icon={CreditCard}>Billing & Usage</NavItem>
-                  <NavItem to="/workspace/apikeys" icon={Key}>API Keys</NavItem>
-                </nav>
-              </div>
-
-              <div className="mt-6 relative z-10">
-                <div className="px-6 text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-2 opacity-80">Platform Ecosystem</div>
-                <nav className="space-y-1 px-3">
-                  <NavItem to="/workspace/connectors" icon={Cable}>Data Connectors</NavItem>
-                  <NavItem to="/workspace/notebooks" icon={TerminalSquare}>Notebooks</NavItem>
-                  <NavItem to="/workspace/dashboards" icon={LayoutDashboard}>Dashboards (BI)</NavItem>
-                  <NavItem to="/workspace/automations" icon={Workflow}>Automations</NavItem>
-                  <NavItem to="/workspace/plugins" icon={Blocks}>Plugins</NavItem>
-                  <NavItem to="/workspace/observability" icon={ActivitySquare}>Observability</NavItem>
-                  <NavItem to="/workspace/quality" icon={ShieldCheck}>Data Quality Sentinel</NavItem>
-                  <NavItem to="/workspace/marketplace" icon={Globe}>Marketplace</NavItem>
-                  <NavItem to="/workspace/sdk" icon={TerminalSquare}>Intelligence SDK</NavItem>
-                </nav>
-              </div>
-              
-              <div className="mt-6 relative z-10">
-                <div className="px-6 text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-2 opacity-80">Help & Resources</div>
-                <nav className="space-y-1 px-3">
-                  <NavItem to="/workspace/help" icon={HelpCircle}>Help Centre</NavItem>
-                  <NavItem to="/workspace/manual" icon={BookOpen}>User Manual</NavItem>
-                  <NavItem to="/workspace/notifications" icon={Bell}>Notifications</NavItem>
-                  <NavItem to="/workspace/activity" icon={Activity}>Activity</NavItem>
-                  <NavItem to="/workspace/changelog" icon={ScrollText}>Changelog</NavItem>
-                </nav>
-              </div>
+                      {/* Section Items */}
+                      {!isCollapsed && (
+                        <nav className="space-y-0.5 mt-1">
+                          {section.items.map((item) => (
+                            <NavItem
+                              key={item.to}
+                              to={item.to}
+                              icon={item.icon}
+                              badge={item.badge}
+                              badgeColor={item.badgeColor}
+                            >
+                              {item.label}
+                            </NavItem>
+                          ))}
+                        </nav>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
 
             <div className="p-4 relative z-10 space-y-3">
@@ -503,66 +771,29 @@ export default function WorkspaceLayout() {
                   </button>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto py-4 scrollbar-hide relative z-10">
-                  <nav className="space-y-1 px-1">
-                    <NavItem to="/workspace" icon={LayoutDashboard} onClick={() => setIsMobileSidebarOpen(false)}>Dashboard</NavItem>
-                    <NavItem to="/workspace/projects" icon={FolderKanban} onClick={() => setIsMobileSidebarOpen(false)}>Projects</NavItem>
-                    <NavItem to="/workspace/datasets" icon={Database} onClick={() => setIsMobileSidebarOpen(false)}>Datasets</NavItem>
-                    <NavItem to="/workspace/lakehouse" icon={Network} onClick={() => setIsMobileSidebarOpen(false)}>Vivexa Lakehouse</NavItem>
-                  </nav>
-
-                  <div className="mt-6 relative z-10">
-                    <div className="px-3 text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-2 opacity-80">AI Intelligence</div>
-                    <nav className="space-y-1 px-1">
-                      <NavItem to="/workspace/ai" icon={Bot} onClick={() => setIsMobileSidebarOpen(false)}>AI Analyst</NavItem>
-                      <NavItem to="/workspace/ai/chat" icon={MessageSquare} onClick={() => setIsMobileSidebarOpen(false)}>AI Chat</NavItem>
-                      <NavItem to="/workspace/agents" icon={Network} onClick={() => setIsMobileSidebarOpen(false)}>AI Agents Cockpit</NavItem>
-                      <NavItem to="/workspace/search" icon={Search} onClick={() => setIsMobileSidebarOpen(false)}>Search Analytics</NavItem>
-                      <NavItem to="/workspace/predictions" icon={Activity} onClick={() => setIsMobileSidebarOpen(false)}>Predictions & ML</NavItem>
-                      <NavItem to="/workspace/forecasting" icon={BarChart3} onClick={() => setIsMobileSidebarOpen(false)}>Forecasting</NavItem>
-                      <NavItem to="/workspace/recommendations" icon={Bookmark} onClick={() => setIsMobileSidebarOpen(false)}>Recommendations</NavItem>
-                      <NavItem to="/workspace/reports" icon={FileText} onClick={() => setIsMobileSidebarOpen(false)}>Executive Reports</NavItem>
-                      <NavItem to="/workspace/models" icon={Database} onClick={() => setIsMobileSidebarOpen(false)}>Saved Models</NavItem>
-                      <NavItem to="/workspace/memory" icon={ScrollText} onClick={() => setIsMobileSidebarOpen(false)}>Project Memory</NavItem>
-                    </nav>
-                  </div>
-
-                  <div className="mt-6 relative z-10">
-                    <div className="px-3 text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-2 opacity-80">Organisation</div>
-                    <nav className="space-y-1 px-1">
-                      <NavItem to="/workspace/global-search" icon={Search} onClick={() => setIsMobileSidebarOpen(false)}>Global Search</NavItem>
-                      <NavItem to="/workspace/ontology" icon={Boxes} onClick={() => setIsMobileSidebarOpen(false)}>Enterprise Ontology</NavItem>
-                      <NavItem to="/workspace/semantic" icon={Layers} onClick={() => setIsMobileSidebarOpen(false)}>Semantic Layer</NavItem>
-                      <NavItem to="/workspace/organization" icon={Users} onClick={() => setIsMobileSidebarOpen(false)}>Organisation</NavItem>
-                      <NavItem to="/workspace/billing" icon={CreditCard} onClick={() => setIsMobileSidebarOpen(false)}>Billing & Usage</NavItem>
-                      <NavItem to="/workspace/apikeys" icon={Key} onClick={() => setIsMobileSidebarOpen(false)}>API Keys</NavItem>
-                    </nav>
-                  </div>
-
-                  <div className="mt-6 relative z-10">
-                    <div className="px-3 text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-2 opacity-80">Platform Ecosystem</div>
-                    <nav className="space-y-1 px-1">
-                      <NavItem to="/workspace/connectors" icon={Cable} onClick={() => setIsMobileSidebarOpen(false)}>Data Connectors</NavItem>
-                      <NavItem to="/workspace/notebooks" icon={TerminalSquare} onClick={() => setIsMobileSidebarOpen(false)}>Notebooks</NavItem>
-                      <NavItem to="/workspace/dashboards" icon={LayoutDashboard} onClick={() => setIsMobileSidebarOpen(false)}>Dashboards (BI)</NavItem>
-                      <NavItem to="/workspace/automations" icon={Workflow} onClick={() => setIsMobileSidebarOpen(false)}>Automations</NavItem>
-                      <NavItem to="/workspace/plugins" icon={Blocks} onClick={() => setIsMobileSidebarOpen(false)}>Plugins</NavItem>
-                      <NavItem to="/workspace/observability" icon={ActivitySquare} onClick={() => setIsMobileSidebarOpen(false)}>Observability</NavItem>
-                      <NavItem to="/workspace/marketplace" icon={Globe} onClick={() => setIsMobileSidebarOpen(false)}>Marketplace</NavItem>
-                      <NavItem to="/workspace/sdk" icon={TerminalSquare} onClick={() => setIsMobileSidebarOpen(false)}>Intelligence SDK</NavItem>
-                    </nav>
-                  </div>
-                  
-                  <div className="mt-6 relative z-10">
-                    <div className="px-3 text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-2 opacity-80">Help & Resources</div>
-                    <nav className="space-y-1 px-1">
-                      <NavItem to="/workspace/help" icon={HelpCircle} onClick={() => setIsMobileSidebarOpen(false)}>Help Centre</NavItem>
-                      <NavItem to="/workspace/manual" icon={BookOpen} onClick={() => setIsMobileSidebarOpen(false)}>User Manual</NavItem>
-                      <NavItem to="/workspace/notifications" icon={Bell} onClick={() => setIsMobileSidebarOpen(false)}>Notifications</NavItem>
-                      <NavItem to="/workspace/activity" icon={Activity} onClick={() => setIsMobileSidebarOpen(false)}>Activity</NavItem>
-                      <NavItem to="/workspace/changelog" icon={ScrollText} onClick={() => setIsMobileSidebarOpen(false)}>Changelog</NavItem>
-                    </nav>
-                  </div>
+                <div className="flex-1 overflow-y-auto py-3 scrollbar-hide relative z-10 space-y-4 px-2">
+                  {WORKSPACE_NAV_SECTIONS.map((section) => (
+                    <div key={section.id} className="relative">
+                      <div className="px-2 py-1 text-[11px] font-bold text-indigo-400 uppercase tracking-wider opacity-90 flex items-center justify-between">
+                        <span>{section.title}</span>
+                        <span className="text-[9px] font-mono opacity-50 lowercase">({section.items.length})</span>
+                      </div>
+                      <nav className="space-y-0.5 mt-1">
+                        {section.items.map((item) => (
+                          <NavItem
+                            key={item.to}
+                            to={item.to}
+                            icon={item.icon}
+                            badge={item.badge}
+                            badgeColor={item.badgeColor}
+                            onClick={() => setIsMobileSidebarOpen(false)}
+                          >
+                            {item.label}
+                          </NavItem>
+                        ))}
+                      </nav>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="p-2 relative z-10 mt-auto">
@@ -694,6 +925,17 @@ export default function WorkspaceLayout() {
                   )}
                 </AnimatePresence>
               </div>
+
+              {/* Breadcrumb Context Indicator (Desktop) */}
+              {activeNavInfo && (
+                <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/40 border border-slate-800/40 text-xs font-mono">
+                  <span className="text-slate-500">{activeNavInfo.section.title}</span>
+                  <span className="text-slate-700">/</span>
+                  <span className="text-indigo-400 font-bold flex items-center gap-1.5">
+                    {activeNavInfo.item.label}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-5 flex-1 justify-end">
@@ -866,6 +1108,158 @@ export default function WorkspaceLayout() {
                     </button>
                   </div>
                 </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Global Command Palette (⌘K) Modal */}
+        <AnimatePresence>
+          {isCommandPaletteOpen && (
+            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-start justify-center pt-20 px-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: -10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: -10 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                className="w-full max-w-2xl rounded-2xl bg-slate-900 border border-slate-700/80 shadow-2xl shadow-indigo-950/40 overflow-hidden flex flex-col max-h-[80vh]"
+              >
+                {/* Search Input Bar */}
+                <div className="flex items-center px-4 py-3.5 border-b border-slate-800 bg-slate-950/40 gap-3">
+                  <Search className="h-5 w-5 text-indigo-400 shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Search apps, modules, analytics, and tools..."
+                    value={commandPaletteSearch}
+                    onChange={(e) => setCommandPaletteSearch(e.target.value)}
+                    onKeyDown={handleCommandKeyDown}
+                    className="w-full bg-transparent text-sm text-white placeholder:text-slate-500 outline-none font-sans"
+                    autoFocus
+                  />
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[10px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+                      ESC
+                    </span>
+                    <button
+                      onClick={() => setIsCommandPaletteOpen(false)}
+                      className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filter Category Chips */}
+                <div className="flex items-center gap-1.5 px-4 py-2 border-b border-slate-800/80 bg-slate-900/60 overflow-x-auto scrollbar-hide text-xs">
+                  <button
+                    onClick={() => setCommandPaletteCategory("all")}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-colors ${
+                      commandPaletteCategory === "all"
+                        ? "bg-indigo-600 text-white"
+                        : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                    }`}
+                  >
+                    All Modules
+                  </button>
+                  {WORKSPACE_NAV_SECTIONS.map((sec) => (
+                    <button
+                      key={sec.id}
+                      onClick={() => setCommandPaletteCategory(sec.id)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-colors ${
+                        commandPaletteCategory === sec.id
+                          ? "bg-indigo-600 text-white"
+                          : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                      }`}
+                    >
+                      {sec.title}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Results List */}
+                <div className="flex-1 overflow-y-auto p-2 space-y-1 max-h-[400px]">
+                  {commandPaletteItems.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Search className="h-8 w-8 text-slate-600 mx-auto mb-2 opacity-60" />
+                      <p className="text-sm font-semibold text-slate-300">No destinations found</p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Try searching for &apos;Executive Reports&apos;, &apos;AI Chat&apos;, or &apos;Lakehouse&apos;
+                      </p>
+                    </div>
+                  ) : (
+                    commandPaletteItems.map(({ section, item }, index) => {
+                      const Icon = item.icon;
+                      const isSelected = index === selectedIndex;
+                      return (
+                        <div
+                          key={item.to}
+                          onClick={() => {
+                            navigate(item.to);
+                            setIsCommandPaletteOpen(false);
+                            setCommandPaletteSearch("");
+                          }}
+                          onMouseEnter={() => setSelectedIndex(index)}
+                          className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer transition-all ${
+                            isSelected
+                              ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                              : "hover:bg-slate-800/80 text-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              className={`p-2 rounded-lg shrink-0 ${
+                                isSelected ? "bg-white/20 text-white" : "bg-slate-800 text-indigo-400 border border-slate-700/60"
+                              }`}
+                            >
+                              <Icon className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-sm font-bold truncate ${isSelected ? 'text-white' : 'text-slate-200'}`}>
+                                  {item.label}
+                                </span>
+                                {item.badge && (
+                                  <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border ${
+                                    isSelected ? 'bg-white/20 text-white border-white/30' : (item.badgeColor || 'bg-slate-800 text-slate-400 border-slate-700')
+                                  }`}>
+                                    {item.badge}
+                                  </span>
+                                )}
+                              </div>
+                              {item.description && (
+                                <p className={`text-[11px] truncate ${isSelected ? 'text-indigo-100' : 'text-slate-500'}`}>
+                                  {item.description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 ml-2">
+                            <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${
+                              isSelected ? 'bg-white/20 text-indigo-100' : 'bg-slate-800 text-slate-500'
+                            }`}>
+                              {section.title}
+                            </span>
+                            <ArrowUpRight className={`h-4 w-4 ${isSelected ? 'text-white' : 'text-slate-600'}`} />
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Footer hints */}
+                <div className="px-4 py-2.5 border-t border-slate-800 bg-slate-950/40 flex items-center justify-between text-[10px] font-mono text-slate-500">
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1">
+                      <kbd className="bg-slate-800 px-1 py-0.5 rounded border border-slate-700">↑</kbd>
+                      <kbd className="bg-slate-800 px-1 py-0.5 rounded border border-slate-700">↓</kbd> to navigate
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <kbd className="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">ENTER</kbd> to open
+                    </span>
+                  </div>
+                  <span>{commandPaletteItems.length} destinations</span>
+                </div>
               </motion.div>
             </div>
           )}

@@ -150,20 +150,26 @@ function formatProfileContext(profile: any): string {
   const columnsSummary = (profile.columns || []).map((c: any) => {
     let details = `• ${c.name} (${c.type}): ${c.nullCount || 0} missing (${c.nullPercentage || 0}%), ${c.uniqueCount || 0} unique values.`;
     if (c.numericStats) {
-      details += `\n  - Math Stats: Min=${c.numericStats.min}, Max=${c.numericStats.max}, Mean=${c.numericStats.mean}, Median=${c.numericStats.median}, Std=${c.numericStats.std}, Skewness=${c.numericStats.skewness}, Outliers=${c.numericStats.outlierCount} (${c.numericStats.outlierPercentage}%)`;
+      details += `\n  - Math Stats: Min=${c.numericStats.min}, Max=${c.numericStats.max}, Mean=${c.numericStats.mean}, Median=${c.numericStats.median}, Std=${c.numericStats.std}, Skewness=${c.numericStats.skewness}, Kurtosis=${c.numericStats.kurtosis || 'N/A'}, Outliers=${c.numericStats.outlierCount} (${c.numericStats.outlierPercentage}%), 95% CI Bounds=[${c.numericStats.ciLower95?.toFixed(2) || 'N/A'}, ${c.numericStats.ciUpper95?.toFixed(2) || 'N/A'}], MAD=${c.numericStats.mad?.toFixed(2) || 'N/A'}`;
     }
     if (c.categoricalStats) {
       const topCats = (c.categoricalStats.topCategories || []).slice(0, 5).map((cat: any) => `'${cat.value}': ${cat.count} (${cat.percentage}%)`).join(', ');
-      details += `\n  - Distribution: Mode='${c.categoricalStats.mode}', TopCategories=[${topCats || 'N/A'}]`;
+      details += `\n  - Distribution: Mode='${c.categoricalStats.mode}', TopCategories=[${topCats || 'N/A'}], Entropy=${c.categoricalStats.entropy?.toFixed(3) || 'N/A'}, GiniImpurity=${c.categoricalStats.giniImpurity?.toFixed(3) || 'N/A'}`;
     }
     return details;
   }).join('\n');
 
   const topCorrelations = (profile.correlations || []).slice(0, 10).map((corr: any) => 
-    `• ${corr.col1} ↔ ${corr.col2}: Pearson r = ${corr.correlation}`
+    `• ${corr.col1} ↔ ${corr.col2}: Pearson r = ${corr.correlation}, Spearman r = ${corr.spearmanCorrelation || corr.correlation}, Strength = ${corr.strength || 'N/A'}`
   ).join('\n');
 
   const sampleRows = (profile.rawSampleRows || []).slice(0, 5);
+
+  // Extract statistical diagnostics and outlier breakdown
+  const outlierSummary = (profile.columns || [])
+    .filter((c: any) => c.numericStats && c.numericStats.outlierCount > 0)
+    .map((c: any) => `• ${c.name}: ${c.numericStats.outlierCount} outliers (${c.numericStats.outlierPercentage}%), Z-score deviations detected. Range: [${c.numericStats.min}, ${c.numericStats.max}] vs IQR: [${c.numericStats.q25}, ${c.numericStats.q75}]`)
+    .join('\n');
 
   return `
 COMPUTED DATASET STATISTICAL PROFILE:
@@ -173,14 +179,19 @@ COMPUTED DATASET STATISTICAL PROFILE:
 - Health Score: ${profile.scores?.healthScore || 90}/100
 - Completeness Score: ${profile.scores?.completenessScore || 90}/100
 - Consistency Score: ${profile.scores?.consistencyScore || 90}/100
+- ML Readiness Score: ${profile.scores?.mlReadinessScore || 90}/100
+- Business Readiness Score: ${profile.scores?.businessReadinessScore || 90}/100
 - Risk Level: ${profile.scores?.riskLevel || 'Low'}
 - Duplicate Rows: ${profile.duplicateRowsCount || 0} (${profile.duplicateRowsPercentage || 0}%)
 
 EXACT COMPUTED COLUMN PROFILES & CALCULATED STATISTIC METRICS:
 ${columnsSummary || 'None available'}
 
-CALCULATED PEARSON CORRELATIONS:
+CALCULATED PEARSON & SPEARMAN CORRELATIONS:
 ${topCorrelations || 'No numeric column correlation pair computed.'}
+
+DETECTED STATISTICAL ANOMALIES & OUTLIERS:
+${outlierSummary || 'Zero critical outliers detected.'}
 
 SAMPLE RECORDS (FIRST 5 ROWS):
 ${JSON.stringify(sampleRows, null, 2)}

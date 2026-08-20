@@ -1,10 +1,13 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import {
   Presentation, Layout, Sparkles, Check, CheckCircle2,
   FileText, TrendingUp, Cpu, ShieldAlert, Sliders, Download,
   Layers, Palette, BarChart3, AlertTriangle, ArrowRight,
   PieChart, GitFork, Target, ShieldCheck, AlertOctagon,
-  Award, Clock, CheckSquare, Square, Eye, Zap, Filter
+  Award, Clock, CheckSquare, Square, Eye, Zap, Filter,
+  Upload, Image as ImageIcon, Trash2, Type, Building2, ChevronDown,
+  Compass, Lightbulb
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +30,103 @@ export interface SlideLayoutConfiguratorProps {
   onExportComplete?: () => void;
   className?: string;
 }
+
+export interface ThemePresetOption {
+  id: string;
+  name: string;
+  brandColor: string;
+  fontFace: string;
+  theme: "emerald" | "dark" | "indigo" | "light" | "crimson" | "cyberpunk";
+  tag: string;
+  description: string;
+}
+
+export const THEME_PRESETS: ThemePresetOption[] = [
+  {
+    id: "executive_gold",
+    name: "Executive Navy & Gold",
+    brandColor: "#F59E0B",
+    fontFace: "Calibri",
+    theme: "dark",
+    tag: "Boardroom",
+    description: "Midnight slate background with warm gold & amber accents paired with clean Calibri display type."
+  },
+  {
+    id: "corporate_indigo",
+    name: "Corporate Indigo & Slate",
+    brandColor: "#6366F1",
+    fontFace: "Segoe UI",
+    theme: "indigo",
+    tag: "Enterprise",
+    description: "Deep indigo canvas with electric purple highlights and crisp Segoe UI enterprise typography."
+  },
+  {
+    id: "esg_emerald",
+    name: "ESG Forest & Emerald",
+    brandColor: "#10B981",
+    fontFace: "Georgia",
+    theme: "emerald",
+    tag: "Sustainability",
+    description: "Earthy dark emerald palette paired with authoritative Georgia serif headings."
+  },
+  {
+    id: "modern_crimson",
+    name: "Modern Crimson & Ruby",
+    brandColor: "#F43F5E",
+    fontFace: "Helvetica",
+    theme: "crimson",
+    tag: "High-Impact",
+    description: "Striking ruby crimson accents with precision Helvetica headers for high-contrast executive briefings."
+  },
+  {
+    id: "cyberpunk_neon",
+    name: "Cyberpunk Cyan & Neon",
+    brandColor: "#06B6D4",
+    fontFace: "Trebuchet MS",
+    theme: "cyberpunk",
+    tag: "Deep Tech",
+    description: "Ultra-dark terminal with vivid cyan telemetry highlights and modern Trebuchet MS geometry."
+  },
+  {
+    id: "crisp_minimal",
+    name: "Crisp Minimalist Paper",
+    brandColor: "#2563EB",
+    fontFace: "Arial",
+    theme: "light",
+    tag: "Editorial",
+    description: "High-contrast clean white paper theme with cobalt blue branding and versatile Arial type."
+  },
+  {
+    id: "editorial_times",
+    name: "Financial Times Editorial",
+    brandColor: "#D97706",
+    fontFace: "Times New Roman",
+    theme: "light",
+    tag: "Institutional",
+    description: "Light institutional styling with warm ochre accents and classical Times New Roman typography."
+  },
+  {
+    id: "luxury_garamond",
+    name: "Boardroom Luxury Serif",
+    brandColor: "#B45309",
+    fontFace: "Garamond",
+    theme: "dark",
+    tag: "C-Level M&A",
+    description: "Refined dark slate with deep bronze accents and prestigious Garamond executive headings."
+  }
+];
+
+export const FONT_STYLE_OPTIONS = [
+  { id: "Calibri", label: "Calibri (Modern Executive)" },
+  { id: "Segoe UI", label: "Segoe UI (Corporate Fluent)" },
+  { id: "Arial", label: "Arial (Clean Geometric)" },
+  { id: "Helvetica", label: "Helvetica (High-Precision Swiss)" },
+  { id: "Georgia", label: "Georgia (Authoritative Editorial)" },
+  { id: "Times New Roman", label: "Times New Roman (Institutional Serif)" },
+  { id: "Garamond", label: "Garamond (Luxury Heritage)" },
+  { id: "Trebuchet MS", label: "Trebuchet MS (Tech Forward)" },
+  { id: "Verdana", label: "Verdana (Ultra Legible)" }
+];
 
 export interface SlideDefinition {
   id: string;
@@ -330,7 +430,28 @@ export function SlideLayoutConfigurator({
   className = ""
 }: SlideLayoutConfiguratorProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<SlideLayoutTemplate>("Executive Summary");
-  const [selectedTheme, setSelectedTheme] = useState<"emerald" | "dark" | "indigo" | "light" | "crimson" | "cyberpunk">("emerald");
+  const [selectedPresetId, setSelectedPresetId] = useState<string>("executive_gold");
+  const [selectedTheme, setSelectedTheme] = useState<"emerald" | "dark" | "indigo" | "light" | "crimson" | "cyberpunk">("dark");
+  const [customBrandColor, setCustomBrandColor] = useState<string>("#F59E0B");
+  const [titleFontStyle, setTitleFontStyle] = useState<string>("Calibri");
+  const [customProjectTitle, setCustomProjectTitle] = useState<string>("");
+  const [customCompanyName, setCustomCompanyName] = useState<string>("");
+  const [companyLogoData, setCompanyLogoData] = useState<string>(() => {
+    try {
+      return localStorage.getItem("vivexa_custom_ppt_logo") || "";
+    } catch {
+      return "";
+    }
+  });
+  const [logoFileName, setLogoFileName] = useState<string>(() => {
+    try {
+      return localStorage.getItem("vivexa_custom_ppt_logo_name") || "";
+    } catch {
+      return "";
+    }
+  });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [selectedSlideIds, setSelectedSlideIds] = useState<string[]>(
     TEMPLATE_OPTIONS[0].slideIds
   );
@@ -345,6 +466,62 @@ export function SlideLayoutConfigurator({
     if (activeCategoryFilter === "All") return ALL_AVAILABLE_SLIDES;
     return ALL_AVAILABLE_SLIDES.filter(s => s.category === activeCategoryFilter);
   }, [activeCategoryFilter]);
+
+  // Handle Theme Preset change
+  const handleThemePresetChange = (presetId: string) => {
+    setSelectedPresetId(presetId);
+    const preset = THEME_PRESETS.find(p => p.id === presetId);
+    if (preset) {
+      setCustomBrandColor(preset.brandColor);
+      setTitleFontStyle(preset.fontFace);
+      setSelectedTheme(preset.theme);
+      toast.info(`Theme Preset Applied: '${preset.name}' (Brand Color: ${preset.brandColor}, Font: ${preset.fontFace})`);
+    }
+  };
+
+  // Handle Logo Upload
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select a valid image file (PNG, JPG, SVG, WebP).");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Logo file exceeds 5MB size limit.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      if (dataUrl) {
+        setCompanyLogoData(dataUrl);
+        setLogoFileName(file.name);
+        try {
+          localStorage.setItem("vivexa_custom_ppt_logo", dataUrl);
+          localStorage.setItem("vivexa_custom_ppt_logo_name", file.name);
+        } catch (err) {
+          console.warn("Could not save logo to localStorage", err);
+        }
+        toast.success(`Company logo '${file.name}' loaded & stored.`);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveLogo = () => {
+    setCompanyLogoData("");
+    setLogoFileName("");
+    try {
+      localStorage.removeItem("vivexa_custom_ppt_logo");
+      localStorage.removeItem("vivexa_custom_ppt_logo_name");
+    } catch {}
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    toast.info("Company logo removed.");
+  };
 
   // Handle template selection
   const handleSelectTemplate = (template: TemplateOption) => {
@@ -394,12 +571,18 @@ export function SlideLayoutConfigurator({
     try {
       const options: PptExportOptions = {
         theme: selectedTheme,
+        customProjectTitle: customProjectTitle.trim() || undefined,
+        customBrandColor: customBrandColor.trim() || undefined,
+        customCompanyName: customCompanyName.trim() || undefined,
+        logoDataUrl: companyLogoData || undefined,
+        titleFontFace: titleFontStyle,
         deckType: selectedSlideIds.length >= 13 ? "comprehensive" : "custom",
         selectedSlideLayouts: selectedSlideIds,
         includeCharts: true,
         includeAnomalies: includeBadges,
         includeRoadmap: true,
-        includeBootstrapCI: true
+        includeBootstrapCI: true,
+        companyName: customCompanyName.trim() || undefined
       };
 
       await exportReportToPPT(report, options);
@@ -466,11 +649,14 @@ export function SlideLayoutConfigurator({
             const Icon = opt.icon;
 
             return (
-              <div
+              <motion.div
                 key={opt.id}
+                layout
                 role="radio"
                 aria-checked={isSelected}
                 tabIndex={0}
+                whileHover={{ y: -3, transition: { duration: 0.2 } }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => handleSelectTemplate(opt)}
                 onKeyDown={(e) => {
                   if (e.key === " " || e.key === "Enter") {
@@ -478,13 +664,22 @@ export function SlideLayoutConfigurator({
                     handleSelectTemplate(opt);
                   }
                 }}
-                className={`group relative p-3.5 rounded-xl border transition-all cursor-pointer select-none flex flex-col justify-between ${
+                className={`group relative p-3.5 rounded-xl border transition-all cursor-pointer select-none flex flex-col justify-between overflow-hidden ${
                   isSelected
                     ? "bg-slate-800/95 border-amber-500 shadow-xl shadow-amber-500/10 ring-2 ring-amber-500/50"
                     : "bg-slate-950/70 border-slate-800/90 hover:border-slate-700 hover:bg-slate-900/70"
                 }`}
               >
-                <div>
+                {/* Active Template Sliding Glow Background */}
+                {isSelected && (
+                  <motion.div
+                    layoutId="active-template-glow"
+                    className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-transparent to-indigo-500/10 pointer-events-none"
+                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                  />
+                )}
+
+                <div className="relative z-10">
                   {/* Card Title & Radio Pill Header */}
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2 min-w-0">
@@ -497,7 +692,13 @@ export function SlideLayoutConfigurator({
                     <div className={`h-4 w-4 rounded-full border flex items-center justify-center shrink-0 transition-all ${
                       isSelected ? "border-amber-400 bg-amber-500" : "border-slate-700 bg-slate-900"
                     }`}>
-                      {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-slate-950" />}
+                      {isSelected && (
+                        <motion.div
+                          layoutId="active-template-dot"
+                          className="h-1.5 w-1.5 rounded-full bg-slate-950"
+                          transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                        />
+                      )}
                     </div>
                   </div>
 
@@ -512,7 +713,7 @@ export function SlideLayoutConfigurator({
                 </div>
 
                 {/* Footer Pill */}
-                <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between relative z-10">
                   <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">
                     {opt.badge}
                   </span>
@@ -520,10 +721,131 @@ export function SlideLayoutConfigurator({
                     {opt.slideCount} Slides
                   </span>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
         </div>
+
+        {/* Animated Active Template Blueprint Pipeline */}
+        <AnimatePresence mode="wait">
+          {(() => {
+            const currentTemplate = TEMPLATE_OPTIONS.find(t => t.id === selectedTemplate) || {
+              id: "Custom Bespoke",
+              title: "Custom Bespoke Slide Deck",
+              badge: "Custom Deck",
+              description: `User-curated deck featuring ${selectedSlideIds.length} tailor-selected slide layouts.`,
+              slideCount: selectedSlideIds.length,
+              slideIds: selectedSlideIds,
+              icon: Sliders,
+              highlights: ["Custom Configuration", `${selectedSlideIds.length} Slides`, "Granular Tailoring"],
+              color: "from-amber-600 to-indigo-600",
+              wireframeType: "comprehensive"
+            };
+
+            const Icon = currentTemplate.icon;
+            const currentSlides = ALL_AVAILABLE_SLIDES.filter(s => selectedSlideIds.includes(s.id));
+
+            return (
+              <motion.div
+                key={selectedTemplate}
+                initial={{ opacity: 0, y: 10, scale: 0.99 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.99 }}
+                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                className="p-4 bg-slate-950/85 rounded-xl border border-amber-500/30 space-y-3 shadow-lg shadow-amber-500/5 relative overflow-hidden"
+              >
+                {/* Background ambient gradient flare */}
+                <div className="absolute -right-16 -top-16 w-48 h-48 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`p-1.5 rounded-lg bg-gradient-to-r ${currentTemplate.color} text-white shrink-0 shadow-md`}>
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-xs font-bold text-white tracking-wide">
+                          Active Structure: <span className="text-amber-400">{currentTemplate.title}</span>
+                        </h4>
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          {currentTemplate.badge}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        {currentTemplate.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-900 border border-slate-800 text-[10px] font-mono text-slate-300">
+                      <Layers className="h-3 w-3 text-indigo-400" />
+                      <span>{currentSlides.length} Sequenced Slides</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sequenced Interactive Slide Pipeline Flow */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[10px] text-slate-400">
+                    <span className="uppercase font-bold tracking-wider text-slate-300 flex items-center gap-1">
+                      <Compass className="h-3 w-3 text-amber-400" />
+                      Sequenced Slide Pipeline Flow
+                    </span>
+                    <span className="font-mono text-amber-400">
+                      16:9 Presentation Blueprint
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin scrollbar-thumb-slate-800">
+                    {currentSlides.map((slide, idx) => {
+                      const SlideIcon = slide.icon;
+                      return (
+                        <React.Fragment key={slide.id}>
+                          <motion.div
+                            initial={{ opacity: 0, x: -8, scale: 0.95 }}
+                            animate={{ opacity: 1, x: 0, scale: 1 }}
+                            transition={{ duration: 0.25, delay: idx * 0.03 }}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800/90 text-slate-200 shrink-0 hover:border-slate-700 transition-colors shadow-sm"
+                          >
+                            <span className="h-4 w-4 rounded-full bg-slate-950 border border-slate-700 flex items-center justify-center text-[9px] font-mono font-bold text-amber-400">
+                              {idx + 1}
+                            </span>
+                            <SlideIcon className="h-3 w-3 text-indigo-400" />
+                            <span className="text-[11px] font-medium whitespace-nowrap">{slide.title}</span>
+                          </motion.div>
+
+                          {idx < currentSlides.length - 1 && (
+                            <ArrowRight className="h-3 w-3 text-slate-600 shrink-0" />
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Template Key Focus Highlights */}
+                {currentTemplate.highlights && currentTemplate.highlights.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap pt-1">
+                    <span className="text-[10px] font-bold text-slate-400">Core Blueprint Focus:</span>
+                    {currentTemplate.highlights.map((highlight, hIdx) => (
+                      <motion.span
+                        key={highlight}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.15 + hIdx * 0.05 }}
+                        className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-900 border border-slate-800 text-slate-300 flex items-center gap-1"
+                      >
+                        <CheckCircle2 className="h-2.5 w-2.5 text-emerald-400" />
+                        {highlight}
+                      </motion.span>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            );
+          })()}
+        </AnimatePresence>
       </div>
 
       {/* Slide Count Range Slider & Granular Customizer */}
@@ -587,76 +909,340 @@ export function SlideLayoutConfigurator({
         </div>
 
         {/* Individual Slide Layout Pickers (Toggleable) */}
-        {showSlidePicker && (
-          <div className="pt-3 border-t border-slate-800/80 space-y-3">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <span className="text-xs font-bold text-slate-300">Individual Slide Layout Selection:</span>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {["All", "Executive", "Analytics", "Causal", "Infrastructure", "Governance"].map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setActiveCategoryFilter(cat)}
-                    className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${
-                      activeCategoryFilter === cat
-                        ? "bg-indigo-600 text-white border-indigo-500"
-                        : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
-                    }`}
-                  >
-                    {cat}
-                  </button>
+        <AnimatePresence>
+          {showSlidePicker && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25 }}
+              className="pt-3 border-t border-slate-800/80 space-y-3 overflow-hidden"
+            >
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-xs font-bold text-slate-300">Individual Slide Layout Selection:</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {["All", "Executive", "Analytics", "Causal", "Infrastructure", "Governance"].map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setActiveCategoryFilter(cat)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${
+                        activeCategoryFilter === cat
+                          ? "bg-indigo-600 text-white border-indigo-500"
+                          : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
+                {filteredSlides.map((slide) => {
+                  const isSelected = selectedSlideIds.includes(slide.id);
+                  const Icon = slide.icon;
+
+                  return (
+                    <motion.div
+                      key={slide.id}
+                      layout
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
+                      onClick={() => handleToggleSlide(slide.id)}
+                      className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-start justify-between gap-2 select-none ${
+                        isSelected
+                          ? "bg-slate-900/90 border-indigo-500/60 shadow-md shadow-indigo-500/10"
+                          : "bg-slate-950/40 border-slate-800/60 opacity-60 hover:opacity-100 hover:border-slate-700"
+                      }`}
+                    >
+                      <div className="flex items-start gap-2 min-w-0">
+                        <div className="mt-0.5 text-indigo-400 shrink-0">
+                          {isSelected ? (
+                            <CheckSquare className="h-4 w-4 text-amber-400" />
+                          ) : (
+                            <Square className="h-4 w-4 text-slate-600" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <Icon className="h-3 w-3 text-indigo-400 shrink-0" />
+                            <span className="text-xs font-bold text-white truncate">{slide.num}. {slide.title}</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{slide.desc}</p>
+                        </div>
+                      </div>
+
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border shrink-0 ${slide.badgeColor}`}>
+                        {slide.category}
+                      </span>
+                    </motion.div>
+                  );
+                })}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Theme Presets & Auto-Populator */}
+      <div className="p-4 bg-slate-950/85 rounded-xl border border-indigo-900/40 space-y-3 shadow-inner">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <label className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+              Theme Preset & Typography Auto-Populator
+            </label>
+            <p className="text-[11px] text-slate-400">
+              Select an enterprise style preset to instantly configure brand colors, typography font families, and palette styling.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono text-slate-400">Active Preset:</span>
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-indigo-950/80 text-indigo-300 border border-indigo-700/60">
+              {THEME_PRESETS.find(p => p.id === selectedPresetId)?.name || "Custom Bespoke"}
+            </span>
+          </div>
+        </div>
+
+        {/* Preset Selector Dropdown */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+          {THEME_PRESETS.map((preset) => {
+            const isSelected = selectedPresetId === preset.id;
+            return (
+              <motion.button
+                key={preset.id}
+                type="button"
+                layout
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => handleThemePresetChange(preset.id)}
+                className={`p-2.5 rounded-xl border text-left transition-all relative select-none ${
+                  isSelected
+                    ? "bg-slate-900 border-amber-400 shadow-md shadow-amber-500/10 ring-1 ring-amber-400/60"
+                    : "bg-slate-950/60 border-slate-800/90 hover:border-slate-700 hover:bg-slate-900/50"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1.5 mb-1">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span
+                      className="h-3 w-3 rounded-full border border-slate-700 shrink-0"
+                      style={{ backgroundColor: preset.brandColor }}
+                    />
+                    <span className="text-xs font-bold text-white truncate">{preset.name}</span>
+                  </div>
+                  <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-slate-800 text-amber-300 shrink-0">
+                    {preset.tag}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1">
+                  <span>Font: <strong className="text-slate-300">{preset.fontFace}</strong></span>
+                  <span className="font-mono text-slate-400 uppercase">{preset.brandColor}</span>
+                </div>
+              </motion.button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Custom Branding & Corporate Identity Section */}
+      <div className="p-4 bg-slate-950/80 rounded-xl border border-slate-800/90 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-slate-800/80">
+          <label className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+            <Building2 className="h-3.5 w-3.5 text-amber-400" />
+            Custom Corporate Branding & Header Identity
+          </label>
+          <span className="text-[10px] text-slate-400">
+            Injected dynamically into Slide 1 Cover, Presentation Headers, and Footer Disclaimers
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          {/* Logo Upload Placeholder & Dropzone (4 cols) */}
+          <div className="lg:col-span-4 flex flex-col justify-between p-3 rounded-xl bg-slate-900/90 border border-slate-800/90 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold text-slate-200 flex items-center gap-1">
+                <ImageIcon className="h-3 w-3 text-cyan-400" />
+                Company Logo Asset
+              </label>
+              {companyLogoData && (
+                <button
+                  type="button"
+                  onClick={handleRemoveLogo}
+                  className="text-[10px] text-rose-400 hover:text-rose-300 flex items-center gap-1 hover:underline"
+                >
+                  <Trash2 className="h-2.5 w-2.5" /> Remove
+                </button>
+              )}
+            </div>
+
+            {/* Hidden File Input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png, image/jpeg, image/svg+xml, image/webp"
+              onChange={handleLogoFileChange}
+              className="hidden"
+              id="company-logo-upload-input"
+            />
+
+            {/* Dropzone / Preview Area */}
+            {companyLogoData ? (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="relative group p-3 rounded-lg bg-slate-950 border border-emerald-500/40 hover:border-emerald-400 flex items-center gap-3 cursor-pointer transition-all"
+              >
+                <div className="h-12 w-16 rounded bg-slate-900 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0 p-1">
+                  <img
+                    src={companyLogoData}
+                    alt="Company Logo Preview"
+                    className="max-h-full max-w-full object-contain"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1 text-emerald-400 text-xs font-bold">
+                    <CheckCircle2 className="h-3 w-3" /> Logo Stored
+                  </div>
+                  <p className="text-[10px] text-slate-300 truncate">{logoFileName || "custom_logo.png"}</p>
+                  <p className="text-[9px] text-slate-500">Click to change asset</p>
+                </div>
+              </div>
+            ) : (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="p-3 rounded-lg bg-slate-950/70 border-2 border-dashed border-slate-700/80 hover:border-amber-400/80 hover:bg-slate-950 flex flex-col items-center justify-center text-center cursor-pointer transition-all group"
+              >
+                <Upload className="h-5 w-5 text-slate-400 group-hover:text-amber-400 mb-1 transition-colors" />
+                <span className="text-[11px] font-bold text-slate-300 group-hover:text-white">
+                  Upload Company Logo
+                </span>
+                <span className="text-[9px] text-slate-500 mt-0.5">
+                  PNG, JPG, SVG or WebP (Max 5MB)
+                </span>
+              </div>
+            )}
+
+            <p className="text-[9px] text-slate-500 leading-tight">
+              Logo is injected at 16:9 aspect ratio into slide headers & cover page.
+            </p>
+          </div>
+
+          {/* Text & Color Branding Fields (8 cols) */}
+          <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Project-Specific Title */}
+            <div className="space-y-1 sm:col-span-2">
+              <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1">
+                <FileText className="h-3 w-3 text-amber-400" />
+                Project-Specific Deck Title (Override)
+              </label>
+              <input
+                type="text"
+                placeholder={report?.title || "e.g. Q3 Strategic Data Lakehouse Briefing & ROI Roadmap"}
+                value={customProjectTitle}
+                onChange={(e) => setCustomProjectTitle(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400 transition-colors"
+                id="input-custom-project-title"
+              />
+            </div>
+
+            {/* Organization / Company Name */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1">
+                <Building2 className="h-3 w-3 text-cyan-400" />
+                Company / Organization Name
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Acme Enterprise AI"
+                value={customCompanyName}
+                onChange={(e) => setCustomCompanyName(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400 transition-colors"
+                id="input-custom-company-name"
+              />
+            </div>
+
+            {/* Title Font Style Selector */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1">
+                <Type className="h-3 w-3 text-violet-400" />
+                Title Font Style
+              </label>
+              <select
+                value={titleFontStyle}
+                onChange={(e) => setTitleFontStyle(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 transition-colors cursor-pointer"
+                id="select-title-font-style"
+              >
+                {FONT_STYLE_OPTIONS.map((f) => (
+                  <option key={f.id} value={f.id} className="bg-slate-900 text-white">
+                    {f.label}
+                  </option>
                 ))}
+              </select>
+            </div>
+
+            {/* Brand Accent Color Picker */}
+            <div className="space-y-1 sm:col-span-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1">
+                  <Palette className="h-3 w-3 text-rose-400" />
+                  Brand Accent Hex Color
+                </label>
+                <span className="font-mono text-[10px] text-amber-400 font-bold uppercase">{customBrandColor}</span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                <input
+                  type="color"
+                  value={customBrandColor}
+                  onChange={(e) => setCustomBrandColor(e.target.value)}
+                  className="h-8 w-10 rounded border border-slate-700 bg-slate-900 cursor-pointer p-0.5 shrink-0"
+                  id="input-custom-brand-color-wheel"
+                />
+                <input
+                  type="text"
+                  value={customBrandColor}
+                  onChange={(e) => setCustomBrandColor(e.target.value)}
+                  placeholder="#F59E0B"
+                  className="w-28 bg-slate-900 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-amber-400 transition-colors"
+                  id="input-custom-brand-color-hex"
+                />
+                <div className="flex items-center gap-1.5">
+                  {[
+                    { color: "#F59E0B", name: "Amber Gold" },
+                    { color: "#10B981", name: "ESG Emerald" },
+                    { color: "#6366F1", name: "Indigo Slate" },
+                    { color: "#F43F5E", name: "Ruby Crimson" },
+                    { color: "#06B6D4", name: "Cyan Tech" },
+                    { color: "#8B5CF6", name: "Electric Violet" }
+                  ].map((swatch) => (
+                    <button
+                      key={swatch.color}
+                      type="button"
+                      onClick={() => setCustomBrandColor(swatch.color)}
+                      style={{ backgroundColor: swatch.color }}
+                      className={`h-5 w-5 rounded-full border transition-transform hover:scale-110 shrink-0 ${
+                        customBrandColor.toUpperCase() === swatch.color.toUpperCase()
+                          ? "ring-2 ring-white border-transparent"
+                          : "border-slate-700"
+                      }`}
+                      title={`Select ${swatch.name} (${swatch.color})`}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
-              {filteredSlides.map((slide) => {
-                const isSelected = selectedSlideIds.includes(slide.id);
-                const Icon = slide.icon;
-
-                return (
-                  <div
-                    key={slide.id}
-                    onClick={() => handleToggleSlide(slide.id)}
-                    className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-start justify-between gap-2 select-none ${
-                      isSelected
-                        ? "bg-slate-900/90 border-indigo-500/60 shadow-md shadow-indigo-500/10"
-                        : "bg-slate-950/40 border-slate-800/60 opacity-60 hover:opacity-100 hover:border-slate-700"
-                    }`}
-                  >
-                    <div className="flex items-start gap-2 min-w-0">
-                      <div className="mt-0.5 text-indigo-400 shrink-0">
-                        {isSelected ? (
-                          <CheckSquare className="h-4 w-4 text-amber-400" />
-                        ) : (
-                          <Square className="h-4 w-4 text-slate-600" />
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <Icon className="h-3 w-3 text-indigo-400 shrink-0" />
-                          <span className="text-xs font-bold text-white truncate">{slide.num}. {slide.title}</span>
-                        </div>
-                        <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{slide.desc}</p>
-                      </div>
-                    </div>
-
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border shrink-0 ${slide.badgeColor}`}>
-                      {slide.category}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Visual Themes & Design Styles (6 Theme Palettes) */}
       <div className="space-y-2">
         <label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
           <Palette className="h-3.5 w-3.5 text-violet-400" />
-          Choose Visual Theme & Design Palette (6 Options)
+          Base Visual Theme & Background Palette (6 Options)
         </label>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
