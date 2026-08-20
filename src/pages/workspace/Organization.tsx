@@ -19,6 +19,10 @@ import { toast } from "sonner";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/lib/supabase";
+import EnterpriseSSOSettings from "@/components/workspace/EnterpriseSSOSettings";
+import { OrgChartVisualizer } from "@/components/workspace/OrgChartVisualizer";
+import { TeamDivisionManager } from "@/components/workspace/TeamDivisionManager";
+import { CustomRolesDesigner } from "@/components/workspace/CustomRolesDesigner";
 
 export const DEPARTMENT_OPTIONS = [
   'Organisational Development & Renewal',
@@ -85,10 +89,12 @@ export type ComplianceCheck = {
   detail: string;
 };
 
+export type OrganizationTab = 'members' | 'orgchart' | 'teams' | 'custom_roles' | 'invitations' | 'rbac' | 'analytics' | 'security' | 'activity' | 'compliance';
+
 export default function Organization() {
   const { session, user } = useAuthStore();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<'members' | 'invitations' | 'rbac' | 'analytics' | 'security' | 'activity' | 'compliance'>('members');
+  const [activeTab, setActiveTab] = useState<OrganizationTab>('members');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   
   // Filters
@@ -897,6 +903,21 @@ export default function Organization() {
           </Button>
 
           <Button
+            onClick={() => {
+              const link = `${window.location.origin}/auth/join?workspace_id=${workspace?.id || 'main'}&inviter=${encodeURIComponent(user?.email || 'admin')}`;
+              navigator.clipboard.writeText(link);
+              toast.success("Workspace Invite Link Copied", {
+                description: "Share this link with team members to onboard them directly into this workspace."
+              });
+            }}
+            variant="outline"
+            className="h-11 px-4 bg-slate-950/80 border-slate-800 hover:bg-slate-800 text-slate-300 font-bold text-xs rounded-xl flex items-center gap-2 cursor-pointer"
+          >
+            <Share2 className="h-4 w-4 text-cyan-400" />
+            Copy Invite Link
+          </Button>
+
+          <Button
             id="add-talent-main-btn"
             onClick={() => setShowInviteModal(true)}
             className="h-11 px-5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2 cursor-pointer"
@@ -1069,6 +1090,36 @@ export default function Organization() {
             }`}
           >
             <Users className="h-4 w-4" /> Team Members ({members.length})
+          </button>
+
+          <button
+            id="tab-orgchart-btn"
+            onClick={() => setActiveTab('orgchart')}
+            className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'orgchart' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+            }`}
+          >
+            <Building2 className="h-4 w-4" /> Org Hierarchy Tree
+          </button>
+
+          <button
+            id="tab-teams-btn"
+            onClick={() => setActiveTab('teams')}
+            className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'teams' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+            }`}
+          >
+            <Layers className="h-4 w-4" /> Squads & Teams
+          </button>
+
+          <button
+            id="tab-custom-roles-btn"
+            onClick={() => setActiveTab('custom_roles')}
+            className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'custom_roles' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+            }`}
+          >
+            <Sliders className="h-4 w-4" /> Custom Roles & Matrix
           </button>
 
           <button
@@ -1580,6 +1631,40 @@ export default function Organization() {
           </motion.div>
         )}
 
+        {/* TAB: ORG HIERARCHY TREE */}
+        {activeTab === 'orgchart' && (
+          <motion.div key="tab-orgchart" variants={itemVariants} initial="hidden" animate="show" exit="hidden" className="space-y-6">
+            <OrgChartVisualizer
+              members={members}
+              workspaceName={workspace?.name || "Enterprise Workspace"}
+              onEditMember={(m) => {
+                setEditingMember(m);
+                setEditRole(m.role);
+                setEditDept(m.department || 'Organisational Development & Renewal');
+              }}
+            />
+          </motion.div>
+        )}
+
+        {/* TAB: SQUADS & TEAMS */}
+        {activeTab === 'teams' && (
+          <motion.div key="tab-teams" variants={itemVariants} initial="hidden" animate="show" exit="hidden" className="space-y-6">
+            <TeamDivisionManager
+              members={members}
+              workspaceName={workspace?.name || "Enterprise Workspace"}
+            />
+          </motion.div>
+        )}
+
+        {/* TAB: CUSTOM ROLES DESIGNER */}
+        {activeTab === 'custom_roles' && (
+          <motion.div key="tab-custom-roles" variants={itemVariants} initial="hidden" animate="show" exit="hidden" className="space-y-6">
+            <CustomRolesDesigner
+              members={members}
+            />
+          </motion.div>
+        )}
+
         {/* TAB 2: PENDING INVITATIONS */}
         {activeTab === 'invitations' && (
           <motion.div key="tab-invitations" variants={itemVariants} initial="hidden" animate="show" exit="hidden" className="space-y-6">
@@ -1867,6 +1952,8 @@ export default function Organization() {
         {/* TAB 5: SECURITY, SSO & GOVERNANCE */}
         {activeTab === 'security' && (
           <motion.div key="tab-security" variants={itemVariants} initial="hidden" animate="show" exit="hidden" className="space-y-6">
+            <EnterpriseSSOSettings tenantId={workspace?.id || "default_tenant"} />
+
             <Card className="bg-slate-900/40 border-slate-800/80 backdrop-blur-xl shadow-xl">
               <CardHeader className="border-b border-slate-800/60 pb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

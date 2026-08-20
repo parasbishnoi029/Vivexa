@@ -5,7 +5,7 @@ import {
   Presentation, Download, X, Sparkles, Check, CheckCircle2,
   Layers, BarChart3, PieChart, ShieldCheck, AlertOctagon, TrendingUp,
   Award, Sliders, Palette, FileText, ArrowRight, Eye, Activity, CheckSquare, Square,
-  GitFork, Target, Briefcase, FileBarChart2
+  GitFork, Target, Briefcase, FileBarChart2, Cpu
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { exportReportToPPT, PptExportOptions } from "@/lib/pptExporter";
@@ -29,8 +29,8 @@ export interface SlideLayoutItem {
 }
 
 export function PptExportModal({ isOpen, onClose, report }: PptExportModalProps) {
-  const [selectedTheme, setSelectedTheme] = useState<"dark" | "indigo" | "light" | "emerald">("dark");
-  const [activePreset, setActivePreset] = useState<"custom" | "exec_boardroom" | "trend_analysis" | "causal_insight" | "risk_governance" | "comprehensive">("comprehensive");
+  const [selectedTheme, setSelectedTheme] = useState<"dark" | "indigo" | "light" | "emerald" | "crimson" | "cyberpunk">("dark");
+  const [activePreset, setActivePreset] = useState<"custom" | "exec_boardroom" | "trend_analysis" | "causal_insight" | "risk_governance" | "comprehensive" | "ml_systems" | "deep_statistical">("comprehensive");
   const [presenterName, setPresenterName] = useState("Senior Data Scientist & Executive AI Architect");
   const [companyName, setCompanyName] = useState("Vivexa Enterprise AI");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -50,7 +50,9 @@ export function PptExportModal({ isOpen, onClose, report }: PptExportModalProps)
     { id: "ml_matrix", num: 10, title: "Algorithmic ML Production Readiness", desc: "Suitability percentages, target benchmark metrics, and sub-15ms inference latencies", category: "Analytics", icon: Layers, badge: "ML Matrix", badgeColor: "bg-blue-500/10 text-blue-300 border-blue-500/20" },
     { id: "action_roadmap", num: 11, title: "Strategic Action Roadmap & ROI Table", desc: "Prioritized corporate roadmap with execution timelines, priority badges, and expected ROI", category: "Executive", icon: TrendingUp, badge: "ROI Roadmap", badgeColor: "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" },
     { id: "multi_agent", num: 12, title: "Multi-Agent Consensus & Sign-Off", desc: "4 AI Specialist Auditor certifications & SOC2 enterprise governance sign-offs", category: "Governance", icon: Award, badge: "4 Sign-Offs", badgeColor: "bg-teal-500/10 text-teal-300 border-teal-500/20" },
-    { id: "closing_governance", num: 13, title: "Board Advisory Governance & Legal", desc: "Institutional confidentiality notice, audit disclaimers, and official contact channels", category: "Governance", icon: CheckCircle2, badge: "Governance", badgeColor: "bg-slate-500/10 text-slate-300 border-slate-500/20" }
+    { id: "compute_optimization", num: 13, title: "Compute Efficiency & Workload Optimization", desc: "Cloud pushdown execution, memory saturation metrics, and container cost optimization", category: "Analytics", icon: Cpu, badge: "Infrastructure", badgeColor: "bg-sky-500/10 text-sky-300 border-sky-500/20" },
+    { id: "collinearity_matrix", num: 14, title: "Feature Collinearity & VIF Diagnostics", desc: "Pearson r cross-correlations, Variance Inflation Factors (VIF), and dimensionality advice", category: "Causal", icon: Sliders, badge: "VIF Matrix", badgeColor: "bg-pink-500/10 text-pink-300 border-pink-500/20" },
+    { id: "closing_governance", num: 15, title: "Board Advisory Governance & Legal", desc: "Institutional confidentiality notice, audit disclaimers, and official contact channels", category: "Governance", icon: CheckCircle2, badge: "Governance", badgeColor: "bg-slate-500/10 text-slate-300 border-slate-500/20" }
   ];
 
   const [selectedLayouts, setSelectedLayouts] = useState<string[]>(allSlideLayouts.map(s => s.id));
@@ -74,42 +76,56 @@ export function PptExportModal({ isOpen, onClose, report }: PptExportModalProps)
   const layoutPresets = [
     {
       id: "comprehensive" as const,
-      name: "Master Comprehensive Deck",
-      desc: "Full 13-slide institutional suite with all charts, audits, and roadmaps.",
+      name: "Master Comprehensive Suite (15 Slides)",
+      desc: "Full 15-slide institutional suite with all charts, VIF diagnostics, infrastructure, audits, and roadmaps.",
       icon: Briefcase,
       slideIds: allSlideLayouts.map(s => s.id)
     },
     {
       id: "exec_boardroom" as const,
-      name: "Executive Summary & Boardroom",
+      name: "Executive Summary & Boardroom (7 Slides)",
       desc: "Streamlined 7-slide briefing focused on C-suite KPIs, takeaways, and strategic ROI.",
       icon: FileBarChart2,
       slideIds: ["cover", "exec_summary", "kpi_scorecard", "deep_insights", "action_roadmap", "multi_agent", "closing_governance"]
     },
     {
       id: "trend_analysis" as const,
-      name: "Trend Analysis & Statistical Rigor",
-      desc: "Data-heavy 8-slide deck highlighting 95% Bootstrap CI, trend variance, and ML signals.",
+      name: "Trend Analysis & Statistical Rigor (9 Slides)",
+      desc: "Data-heavy 9-slide deck highlighting 95% Bootstrap CI, trend variance, and ML signals.",
       icon: BarChart3,
-      slideIds: ["cover", "exec_summary", "kpi_scorecard", "trend_analysis", "data_quality", "ml_matrix", "action_roadmap", "closing_governance"]
+      slideIds: ["cover", "exec_summary", "kpi_scorecard", "trend_analysis", "data_quality", "collinearity_matrix", "ml_matrix", "action_roadmap", "closing_governance"]
     },
     {
       id: "causal_insight" as const,
-      name: "Causal Insight & Deep Root-Cause",
-      desc: "Causal inference 8-slide deck focusing on driver weights, confounding variables, and treatments.",
+      name: "Causal Insight & Deep Root-Cause (9 Slides)",
+      desc: "Causal inference 9-slide deck focusing on driver weights, confounding variables, and treatments.",
       icon: Target,
-      slideIds: ["cover", "exec_summary", "causal_insight", "causal_root_cause", "deep_insights", "action_roadmap", "multi_agent", "closing_governance"]
+      slideIds: ["cover", "exec_summary", "causal_insight", "causal_root_cause", "collinearity_matrix", "deep_insights", "action_roadmap", "multi_agent", "closing_governance"]
     },
     {
       id: "risk_governance" as const,
-      name: "Risk, Data Quality & Governance",
+      name: "Risk, Data Quality & Governance (8 Slides)",
       desc: "Compliance 8-slide deck for auditors featuring Z-score anomalies, data health, and sign-offs.",
       icon: ShieldCheck,
       slideIds: ["cover", "exec_summary", "kpi_scorecard", "data_quality", "anomaly_audit", "deep_insights", "multi_agent", "closing_governance"]
+    },
+    {
+      id: "ml_systems" as const,
+      name: "ML Systems & Cloud Compute (8 Slides)",
+      desc: "Engineering deck focusing on model inference latencies, pushdown execution, and compute cost optimization.",
+      icon: Cpu,
+      slideIds: ["cover", "exec_summary", "kpi_scorecard", "ml_matrix", "compute_optimization", "action_roadmap", "multi_agent", "closing_governance"]
+    },
+    {
+      id: "deep_statistical" as const,
+      name: "Deep Statistical & Empirical Audit (12 Slides)",
+      desc: "12-slide deep dive with parametric control charts, VIF matrix, bootstrap distributions, and anomalies.",
+      icon: Activity,
+      slideIds: ["cover", "exec_summary", "kpi_scorecard", "trend_analysis", "causal_insight", "data_quality", "anomaly_audit", "collinearity_matrix", "ml_matrix", "compute_optimization", "action_roadmap", "closing_governance"]
     }
   ];
 
-  const handleSelectPreset = (presetId: "comprehensive" | "exec_boardroom" | "trend_analysis" | "causal_insight" | "risk_governance") => {
+  const handleSelectPreset = (presetId: "comprehensive" | "exec_boardroom" | "trend_analysis" | "causal_insight" | "risk_governance" | "ml_systems" | "deep_statistical") => {
     setActivePreset(presetId);
     const preset = layoutPresets.find(p => p.id === presetId);
     if (preset) {
@@ -168,6 +184,20 @@ export function PptExportModal({ isOpen, onClose, report }: PptExportModalProps)
       sub: "Forest green & gold luxury tone",
       bgClass: "bg-[#061A14] border-emerald-500/40 text-emerald-100",
       accent: "bg-emerald-600"
+    },
+    {
+      id: "crimson" as const,
+      name: "Crimson Boardroom",
+      sub: "Ruby slate & amber executive tone",
+      bgClass: "bg-[#18080C] border-rose-500/40 text-rose-100",
+      accent: "bg-rose-600"
+    },
+    {
+      id: "cyberpunk" as const,
+      name: "Cyberpunk Tech",
+      sub: "Deep dark with cyan & magenta telemetry",
+      bgClass: "bg-[#05050D] border-cyan-500/40 text-cyan-100",
+      accent: "bg-cyan-500"
     }
   ];
 

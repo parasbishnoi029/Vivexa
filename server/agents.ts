@@ -109,3 +109,100 @@ agentsRouter.post('/execute', enforceAiQuotaMiddleware, async (req: express.Requ
     return res.status(500).json(successResponse(null, { error: err.message }));
   }
 });
+
+// ==========================================
+// AGENT ASYNC JOB QUEUE & SSE STREAMING APIS
+// ==========================================
+
+import { AgentJobQueueService } from "./services/AgentJobQueueService";
+
+// 4. GET /api/v1/agents/jobs - List user's asynchronous jobs
+agentsRouter.get('/jobs', (req: express.Request, res: express.Response) => {
+  try {
+    const user = (req as any).user || { id: "demo-user" };
+    const jobs = AgentJobQueueService.listJobs(user.id);
+    return res.json(successResponse({ jobs, total: jobs.length }));
+  } catch (err: any) {
+    return res.status(500).json(successResponse(null, { error: err.message }));
+  }
+});
+
+// 5. POST /api/v1/agents/jobs/submit - Submit multi-step long-running job
+agentsRouter.post('/jobs/submit', enforceAiQuotaMiddleware, (req: express.Request, res: express.Response) => {
+  try {
+    const user = (req as any).user || { id: "demo-user" };
+    const { agentId, agentName, datasetName, directive, priority } = req.body;
+
+    if (!directive) {
+      return res.status(400).json(successResponse(null, { error: "Directive prompt is required." }));
+    }
+
+    const job = AgentJobQueueService.submitJob({
+      userId: user.id,
+      agentId: agentId || "agent-lead-orchestrator",
+      agentName: agentName || "Enterprise Orchestration Cluster",
+      datasetName: datasetName || "Enterprise Lakehouse Delta Store",
+      directive,
+      priority: priority || "NORMAL"
+    });
+
+    return res.json(successResponse({ job, message: `Job ${job.id} queued successfully in priority queue '${job.priority}'.` }));
+  } catch (err: any) {
+    return res.status(500).json(successResponse(null, { error: err.message }));
+  }
+});
+
+// 6. GET /api/v1/agents/jobs/:id - Get job details
+agentsRouter.get('/jobs/:id', (req: express.Request, res: express.Response) => {
+  try {
+    const job = AgentJobQueueService.getJob(req.params.id);
+    if (!job) {
+      return res.status(404).json(successResponse(null, { error: "Job not found" }));
+    }
+    return res.json(successResponse({ job }));
+  } catch (err: any) {
+    return res.status(500).json(successResponse(null, { error: err.message }));
+  }
+});
+
+// 7. POST /api/v1/agents/jobs/:id/cancel - Abort / cancel job
+agentsRouter.post('/jobs/:id/cancel', (req: express.Request, res: express.Response) => {
+  try {
+    const cancelled = AgentJobQueueService.cancelJob(req.params.id);
+    return res.json(successResponse({ success: cancelled, jobId: req.params.id }));
+  } catch (err: any) {
+    return res.status(500).json(successResponse(null, { error: err.message }));
+  }
+});
+
+// 8. GET /api/v1/agents/jobs/:id/stream - Server-Sent Events (SSE) live progress stream
+agentsRouter.get('/jobs/:id/stream', (req: express.Request, res: express.Response) => {
+  const jobId = req.params.id;
+  const initialJob = AgentJobQueueService.getJob(jobId);
+
+  if (!initialJob) {
+    return res.status(404).json({ error: "Job not found" });
+  }
+
+  // Set SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  // Send initial state immediately
+  res.write(`data: ${JSON.stringify(initialJob)}\n\n`);
+
+  // Subscribe to real-time updates
+  const unsubscribe = AgentJobQueueService.subscribeToJob(jobId, (updatedJob) => {
+    res.write(`data: ${JSON.stringify(updatedJob)}\n\n`);
+    if (updatedJob.status === "COMPLETED" || updatedJob.status === "FAILED" || updatedJob.status === "CANCELLED") {
+      res.end();
+    }
+  });
+
+  req.on('close', () => {
+    unsubscribe();
+  });
+});
+

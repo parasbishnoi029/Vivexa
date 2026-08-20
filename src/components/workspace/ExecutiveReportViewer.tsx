@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -20,6 +20,7 @@ import { exportReportToPPT } from "@/lib/pptExporter";
 import { exportReportToPDF } from "@/lib/pdfExporter";
 import { AnomalousSpikesAndDropsModule } from "./AnomalousSpikesAndDropsModule";
 import { PptExportModal } from "./PptExportModal";
+import { StatisticalDiagnosticService } from "@/services/StatisticalDiagnosticService";
 import { toast } from "sonner";
 
 interface ExecutiveReportViewerProps {
@@ -215,6 +216,24 @@ export default function ExecutiveReportViewer({
   const topFeatureRatio = ((topFeature.importance / totalFeatureWeight) * 100).toFixed(1);
 
   const rawDeep = parsedContent.deep_insights || {};
+
+  // Run Statistical Diagnostic Scan on time-series or metric data
+  const diagnosticScanResult = useMemo(() => {
+    const rawAnomalies = parsedContent.time_series_anomaly_data || parsedContent.timeSeriesData || [
+      { period: "Day 1 (08:00)", timestamp: "2026-08-10 08:00 UTC", value: 98, metric: "Ingest Velocity" },
+      { period: "Day 2 (12:00)", timestamp: "2026-08-11 12:00 UTC", value: 106, metric: "Ingest Velocity" },
+      { period: "Day 3 (16:00)", timestamp: "2026-08-12 16:00 UTC", value: 104, metric: "Ingest Velocity" },
+      { period: "Day 4 (Spike ▲)", timestamp: "2026-08-13 14:30 UTC", value: 186, metric: "Ingest Velocity" },
+      { period: "Day 5 (10:00)", timestamp: "2026-08-14 10:00 UTC", value: 108, metric: "Ingest Velocity" },
+      { period: "Day 6 (Drop ▼)", timestamp: "2026-08-15 04:15 UTC", value: 24, metric: "Ingest Velocity" },
+      { period: "Day 7 (18:00)", timestamp: "2026-08-16 18:00 UTC", value: 102, metric: "Ingest Velocity" },
+      { period: "Day 8 (Spike ▲)", timestamp: "2026-08-17 19:45 UTC", value: 168, metric: "Ingest Velocity" },
+      { period: "Day 9 (14:00)", timestamp: "2026-08-18 14:00 UTC", value: 112, metric: "Ingest Velocity" },
+      { period: "Day 10 (Drop ▼)", timestamp: "2026-08-19 02:20 UTC", value: 42, metric: "Ingest Velocity" },
+      { period: "Day 11 (Now)", timestamp: "2026-08-19 22:00 UTC", value: 116, metric: "Ingest Velocity" },
+    ];
+    return StatisticalDiagnosticService.scanTimeSeries(rawAnomalies, 2.5);
+  }, [parsedContent]);
 
   const deepInsightsData = {
     findings: rawDeep.findings && rawDeep.findings.length > 0 ? rawDeep.findings : [
@@ -662,16 +681,21 @@ export default function ExecutiveReportViewer({
                   </div>
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="text-sm font-bold text-white">Anomalous Spikes & Drops Module</h4>
+                      <h4 className="text-sm font-bold text-white">Statistical Diagnostic Quality Monitor</h4>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center gap-1">
-                        <TrendingUp className="h-3 w-3" /> Outliers Flagged
+                        <TrendingUp className="h-3 w-3" /> {diagnosticScanResult.spikeCount} Spikes
                       </span>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
-                        <Zap className="h-3 w-3" /> Peak +4.82σ Surge
+                        <Zap className="h-3 w-3" /> {diagnosticScanResult.dropCount} Drops
                       </span>
+                      {diagnosticScanResult.criticalCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white border border-rose-400">
+                          {diagnosticScanResult.criticalCount} Critical
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-slate-300 mt-0.5">
-                      Parametric Z-score scan flagged isolated spikes in transaction velocity and zero-drop latency gaps with actionable data scientist remediations.
+                      {diagnosticScanResult.summaryText}
                     </p>
                   </div>
                 </div>
@@ -684,6 +708,55 @@ export default function ExecutiveReportViewer({
                   <Eye className="h-3.5 w-3.5" /> View Anomaly Studio
                 </Button>
               </Card>
+
+              {/* Injected Visual Diagnostic Warning Badges */}
+              {diagnosticScanResult.hasAnomalies && (
+                <div className="p-4 bg-slate-950/80 border border-rose-500/30 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                      <AlertTriangle className="h-4 w-4 text-amber-400" />
+                      Detected Statistical Outlier Events ({diagnosticScanResult.anomalies.length})
+                    </span>
+                    <span className="text-[11px] font-mono text-slate-400">
+                      Mean: {diagnosticScanResult.mean} | StdDev: ±{diagnosticScanResult.standardDeviation}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    {diagnosticScanResult.anomalies.map((anom) => (
+                      <div
+                        key={anom.id}
+                        className={`p-3 rounded-xl border flex flex-col justify-between space-y-1.5 ${
+                          anom.type === "Spike"
+                            ? "bg-rose-950/30 border-rose-500/40"
+                            : "bg-amber-950/30 border-amber-500/40"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                            anom.type === "Spike"
+                              ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                              : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                          }`}>
+                            {anom.type === "Spike" ? "Spike Detected" : "Drop Detected"}
+                          </span>
+                          <span className="text-xs font-mono font-bold text-slate-200">
+                            {anom.timestamp} (Z={anom.zScore > 0 ? `+${anom.zScore}σ` : `${anom.zScore}σ`})
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-slate-300 leading-snug font-normal">
+                          {anom.explanation}
+                        </p>
+
+                        <div className="text-[11px] text-emerald-400/90 font-medium pt-1 border-t border-slate-800/80">
+                          <strong>Remediation:</strong> {anom.remediation}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* 4 In-Depth Executive Takeaways Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -19,6 +19,7 @@ import { ShareDialog } from "@/components/ShareDialog";
 import { RagSearchDialog } from "@/components/RagSearchDialog";
 import { CollabHeaderPresence } from "@/components/CollabHeaderPresence";
 import { duckdbEngine, DuckDBQueryResult, DuckDBTableInfo } from "@/lib/duckdbEngine";
+import DistributedPushdownStudio from "@/components/workspace/DistributedPushdownStudio";
 
 interface AssetColumn {
   name: string;
@@ -358,7 +359,7 @@ export default function Lakehouse() {
     };
     fetchAssets();
   }, []);
-  const [activeTab, setActiveTab] = useState<"catalog" | "duckdb_wasm" | "lineage" | "storage" | "governance" | "medallion" | "history">("catalog");
+  const [activeTab, setActiveTab] = useState<"catalog" | "duckdb_wasm" | "pushdown" | "lineage" | "storage" | "governance" | "medallion" | "history">("duckdb_wasm");
   const [catalogSubTab, setCatalogSubTab] = useState<"schema" | "quality" | "governance" | "query" | "ai_insights">("schema");
 
   
@@ -988,6 +989,7 @@ export default function Lakehouse() {
               <div className="flex items-center gap-8 mt-8 border-t border-slate-800/40 pt-4 overflow-x-auto no-scrollbar">
                 {[
                   { id: 'duckdb_wasm', label: 'DuckDB WASM Engine', icon: Cpu, badge: 'Vectorized' },
+                  { id: 'pushdown', label: 'Distributed Pushdown', icon: Boxes, badge: 'Zero RAM' },
                   { id: 'catalog', label: 'Schema Explorer', icon: Table },
                   { id: 'history', label: 'Delta Time Travel', icon: Clock },
                   { id: 'medallion', label: 'Medallion Stage', icon: Box },
@@ -1022,6 +1024,19 @@ export default function Lakehouse() {
             {/* Tab Content */}
             <div className="flex-1 overflow-y-auto p-8 no-scrollbar">
               <AnimatePresence mode="wait">
+                {/* Major Tab: Distributed Pushdown (Lakehouse Layer) */}
+                {activeTab === 'pushdown' && (
+                  <motion.div
+                    key="pushdown"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="space-y-6"
+                  >
+                    <DistributedPushdownStudio selectedAsset={selectedAsset} />
+                  </motion.div>
+                )}
+
                 {/* Major Tab: DuckDB WASM Engine */}
                 {activeTab === 'duckdb_wasm' && (
                   <motion.div 

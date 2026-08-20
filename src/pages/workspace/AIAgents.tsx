@@ -24,6 +24,7 @@ import { parseDatasetFile } from "@/lib/datasetParser";
 import { profileDataset } from "@/lib/dataEngine";
 import { checkAndConsumeQuota, triggerLimitModal } from "@/lib/limits";
 import { AIOptimizationPanel } from "@/components/AIOptimizationPanel";
+import { AgentJobOrchestratorView } from "@/components/workspace/AgentJobOrchestratorView";
 
 // =========================================================================
 // INTERFACE DEFINITIONS
@@ -84,7 +85,7 @@ const DEVOPS_CAPABILITIES = capabilities.filter(c => c.category === "devops");
 
 export default function AIAgents() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<"mnc_suite" | "agents" | "optimization">("mnc_suite");
+  const [activeTab, setActiveTab] = useState<"mnc_suite" | "agents" | "optimization" | "jobs">("mnc_suite");
   const [selectedCapabilityId, setSelectedCapabilityId] = useState<string | null>(null);
 
   // 11 Core Agents State
@@ -284,6 +285,18 @@ export default function AIAgents() {
             }`}
           >
             <Zap className="h-3.5 w-3.5 mr-2 text-emerald-300" /> Cost & Accuracy Engine
+          </Button>
+          <Button
+            onClick={() => {
+              setSelectedCapabilityId(null);
+              setActiveTab("jobs");
+            }}
+            variant={activeTab === "jobs" ? "default" : "ghost"}
+            className={`rounded-lg h-9 px-4 font-bold text-xs ${
+              activeTab === "jobs" ? "bg-purple-600 text-white" : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <Workflow className="h-3.5 w-3.5 mr-2 text-purple-300" /> Async Job Orchestration
           </Button>
         </div>
       </div>
@@ -628,7 +641,7 @@ export default function AIAgents() {
               })}
             </div>
           </motion.div>
-        ) : (
+        ) : activeTab === "optimization" ? (
           <motion.div
             key="optimization-tab"
             initial={{ opacity: 0, y: 15 }}
@@ -636,6 +649,15 @@ export default function AIAgents() {
             exit={{ opacity: 0, y: -15 }}
           >
             <AIOptimizationPanel />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="jobs-tab"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+          >
+            <AgentJobOrchestratorView />
           </motion.div>
         )}
       </AnimatePresence>

@@ -23,6 +23,11 @@ import { exportReportToPDF } from "@/lib/pdfExporter";
 import { exportReportToPPT } from "@/lib/pptExporter";
 import { SynthesizeReportModal } from "@/components/workspace/SynthesizeReportModal";
 import { ExecutiveReportHistorySidebar } from "@/components/workspace/ExecutiveReportHistorySidebar";
+import { PptExportModal } from "@/components/workspace/PptExportModal";
+import { TimelineAnomalyScrubber } from "@/components/workspace/TimelineAnomalyScrubber";
+import { AnomalyTimelineScrubber } from "@/components/workspace/AnomalyTimelineScrubber";
+import { SlideLayoutConfigurator } from "@/components/workspace/SlideLayoutConfigurator";
+import { StatisticalDiagnosticService } from "@/services/StatisticalDiagnosticService";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, LineChart, Line, Legend
@@ -361,6 +366,9 @@ export default function ExecutiveReports() {
   const [compareReportIds, setCompareReportIds] = useState<string[]>([]);
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
   const [sharedReportTitle, setSharedReportTitle] = useState("Executive Briefing");
+  const [selectedReportForPpt, setSelectedReportForPpt] = useState<any>(null);
+  const [isPptModalOpen, setIsPptModalOpen] = useState(false);
+  const [isSlideStudioOpen, setIsSlideStudioOpen] = useState(false);
 
   const safeJsonParse = (content: any) => {
     if (!content) return {};
@@ -717,24 +725,27 @@ export default function ExecutiveReports() {
   };
 
   const handleExportPDF = (report: any) => {
+    const toastId = toast.loading("Synthesizing enterprise PDF report document...");
     try {
       exportReportToPDF(report);
-      toast.success("Synthesizing enterprise PDF report document...");
+      setTimeout(() => {
+        toast.success("Enterprise PDF report document prepared successfully!", { id: toastId });
+      }, 700);
     } catch (err) {
       console.error("PDF Export failed:", err);
-      toast.error("Failed to generate PDF document.");
+      toast.error("Failed to generate PDF document.", { id: toastId });
     }
   };
 
-  const handleExportPPT = async (report: any) => {
-    try {
-      toast.info("Generating 16:9 Widescreen PowerPoint Presentation Deck (.pptx)...");
-      await exportReportToPPT(report);
-      toast.success("PowerPoint presentation (.pptx) downloaded successfully!");
-    } catch (err) {
-      console.error("PPT Export failed:", err);
-      toast.error("Failed to generate PowerPoint deck.");
+  const handleExportPPT = (report?: any) => {
+    const targetReport = report || (reports.length > 0 ? reports[0] : null);
+    if (!targetReport) {
+      toast.info("No report selected. Synthesize an executive briefing first.");
+      return;
     }
+    toast.loading("Opening slide layout configuration studio for PowerPoint export...", { duration: 1200 });
+    setSelectedReportForPpt(targetReport);
+    setIsPptModalOpen(true);
   };
 
   const handleDownloadHTML = (report: any) => {
@@ -931,6 +942,36 @@ export default function ExecutiveReports() {
           >
             <Download className="h-4 w-4 mr-2 text-violet-400" /> Export PDF
           </Button>
+
+          <Button
+            onClick={() => setIsSlideStudioOpen(!isSlideStudioOpen)}
+            variant="outline"
+            className={`text-xs font-bold rounded-xl transition-all ${
+              isSlideStudioOpen
+                ? "bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-md shadow-amber-500/10"
+                : "bg-slate-800/80 border-slate-700 hover:bg-slate-700 text-slate-200"
+            }`}
+            title="Toggle Visual Slide Layout Configurator Studio"
+          >
+            <Presentation className="h-4 w-4 mr-2 text-amber-400" />
+            {isSlideStudioOpen ? "Hide Slide Studio" : "Slide Studio"}
+          </Button>
+
+          <Button
+            onClick={() => {
+              if (reports.length > 0) {
+                handleExportPPT(reports[0]);
+              } else {
+                toast.info("No reports available to export. Synthesize a briefing first.");
+              }
+            }}
+            variant="outline"
+            className="bg-slate-800/80 border-slate-700 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl"
+            title="Configure and export 16:9 PowerPoint Deck"
+          >
+            <Download className="h-4 w-4 mr-2 text-amber-400" /> Quick PPT (.pptx)
+          </Button>
+
           <Button
             onClick={() => setIsHistorySidebarOpen(true)}
             variant="outline"
@@ -1144,6 +1185,32 @@ export default function ExecutiveReports() {
             </ResponsiveContainer>
           </div>
         </Card>
+      </motion.div>
+
+      {/* Interactive Timeline Anomaly Scrubber Studio */}
+      <motion.div variants={itemVariants}>
+        <AnomalyTimelineScrubber
+          datasetName={datasets.length > 0 ? datasets[0].name : "Enterprise Tabular Partition"}
+          onInjectIntoReport={(scanResult) => {
+            if (reports.length > 0) {
+              const active = reports[0];
+              setSelectedReportForView(active);
+              toast.success(`Injected ${scanResult.anomalies.length} statistical anomaly badges into active briefing.`);
+            } else {
+              toast.info("Synthesize an executive report to attach diagnostic anomaly markers.");
+            }
+          }}
+        />
+      </motion.div>
+
+      {/* Slide Layout Configurator for PowerPoint Export */}
+      <motion.div variants={itemVariants}>
+        <SlideLayoutConfigurator
+          report={reports.length > 0 ? reports[0] : null}
+          onExportComplete={() => {
+            toast.success("PowerPoint presentation export pipeline finished.");
+          }}
+        />
       </motion.div>
 
       {/* Deep Insights & Statistical Trend Engine Card */}
@@ -1390,6 +1457,26 @@ export default function ExecutiveReports() {
           )}
         </Card>
       </motion.div>
+
+      {/* Slide Layout Configurator & Visual Studio Section */}
+      <AnimatePresence>
+        {isSlideStudioOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, y: -10 }}
+            animate={{ opacity: 1, height: "auto", y: 0 }}
+            exit={{ opacity: 0, height: 0, y: -10 }}
+            transition={{ duration: 0.3 }}
+            className="overflow-hidden"
+          >
+            <SlideLayoutConfigurator
+              report={reports.length > 0 ? reports[0] : null}
+              onExportComplete={() => {
+                toast.success("PowerPoint presentation generated from Slide Studio!");
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Search & Filter Bar */}
       <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900/40 p-3 rounded-xl border border-slate-800">
@@ -1780,6 +1867,18 @@ export default function ExecutiveReports() {
           />
         )}
       </AnimatePresence>
+
+      {/* PowerPoint Layout Selector Modal */}
+      {isPptModalOpen && selectedReportForPpt && (
+        <PptExportModal
+          isOpen={isPptModalOpen}
+          onClose={() => {
+            setIsPptModalOpen(false);
+            setSelectedReportForPpt(null);
+          }}
+          report={selectedReportForPpt}
+        />
+      )}
 
       <ShareDialog
         isOpen={isShareDialogOpen}

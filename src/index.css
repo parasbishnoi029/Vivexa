@@ -190,11 +190,30 @@
     box-shadow: none !important;
     border-radius: 8px !important;
     margin-bottom: 12px !important;
+    color: #0f172a !important;
   }
 
-  /* Tables: clean pagination & repeating headers */
+  /* Grid reflow for print: prevent wide 5/6 column clipping */
+  .grid {
+    display: grid !important;
+  }
+  .grid-cols-5,
+  .grid-cols-6,
+  .lg\:grid-cols-5,
+  .lg\:grid-cols-6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 8pt !important;
+  }
+  .grid-cols-4,
+  .lg\:grid-cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8pt !important;
+  }
+
+  /* Tables: clean pagination, repeating headers, and zero-cutoff layout */
   table {
     width: 100% !important;
+    max-width: 100% !important;
     border-collapse: collapse !important;
     table-layout: auto !important;
     page-break-inside: auto !important;
@@ -205,19 +224,27 @@
 
   thead {
     display: table-header-group !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   tfoot {
     display: table-footer-group !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   tbody {
     display: table-row-group !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
   }
 
   tr {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+    page-break-after: auto !important;
+    break-after: auto !important;
     border-bottom: 1px solid #e2e8f0 !important;
   }
 
@@ -231,6 +258,7 @@
     text-align: left !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+    white-space: nowrap !important;
   }
 
   td {
@@ -251,9 +279,16 @@
   svg {
     max-width: 100% !important;
     width: 100% !important;
+    max-height: 260px !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     overflow: visible !important;
+  }
+
+  .recharts-legend-wrapper {
+    position: static !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   /* Text & Heading Hierarchy */
@@ -291,7 +326,9 @@
   textarea,
   .no-print,
   .ai-copilot-drawer,
-  .quick-actions-bar {
+  .quick-actions-bar,
+  .fixed,
+  .fixed.bottom-6 {
     display: none !important;
   }
 

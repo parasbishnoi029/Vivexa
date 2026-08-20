@@ -226,6 +226,78 @@ enterpriseRouter.post("/sso/config", (req, res) => {
   }
 });
 
+// GET /api/v1/enterprise/sso/saml/metadata.xml - Download SP SAML 2.0 XML Metadata
+enterpriseRouter.get("/sso/saml/metadata.xml", (req, res) => {
+  try {
+    const tenantId = (req.query.tenantId as string) || "default_tenant";
+    const xml = EnterpriseSSOService.generateSPMetadataXml(tenantId);
+    res.setHeader("Content-Type", "application/xml");
+    res.setHeader("Content-Disposition", `attachment; filename="vivexa-sp-saml-metadata-${tenantId}.xml"`);
+    res.send(xml);
+  } catch (err: any) {
+    res.status(500).send(`Error generating SAML metadata: ${err.message}`);
+  }
+});
+
+// POST /api/v1/enterprise/sso/saml/initiate - Generate signed AuthRequest URL
+enterpriseRouter.post("/sso/saml/initiate", (req, res) => {
+  try {
+    const { tenantId, relayState } = req.body;
+    const authRequest = EnterpriseSSOService.generateSAMLAuthRequest(tenantId || "default_tenant", relayState || "/workspace");
+    res.json(successResponse(authRequest));
+  } catch (err: any) {
+    res.status(500).json(successResponse(null, { error: err.message }));
+  }
+});
+
+// POST /api/v1/enterprise/sso/saml/acs - Assertion Consumer Service (SAML Response Processor)
+enterpriseRouter.post("/sso/saml/acs", (req, res) => {
+  try {
+    const samlResponse = req.body.SAMLResponse || req.body.samlResponse || req.body.assertion;
+    const tenantId = req.body.tenantId || req.body.RelayState || "default_tenant";
+    
+    if (!samlResponse) {
+      return res.status(400).json(successResponse(null, { error: "SAMLResponse payload is required" }));
+    }
+
+    const assertionResult = EnterpriseSSOService.processSAMLResponse(samlResponse, tenantId);
+    if (!assertionResult.valid) {
+      return res.status(401).json(successResponse(null, { error: assertionResult.error || "SAML Assertion validation failed" }));
+    }
+
+    // Return authenticated session profile with JWT mock
+    res.json(successResponse({
+      user: {
+        email: assertionResult.email,
+        name: `${assertionResult.firstName} ${assertionResult.lastName}`,
+        role: assertionResult.role,
+        tenantId: assertionResult.tenantId,
+        groups: assertionResult.groups,
+        authType: "SAML_2.0_FEDERATED"
+      },
+      session: {
+        sessionIndex: assertionResult.sessionIndex,
+        expiresAt: assertionResult.expiresAt,
+        token: `vx_saml_jwt_${Buffer.from(JSON.stringify(assertionResult)).toString("base64url")}`
+      },
+      message: `Successfully authenticated via ${assertionResult.idpIssuer} (SAML 2.0)`
+    }));
+  } catch (err: any) {
+    res.status(500).json(successResponse(null, { error: err.message }));
+  }
+});
+
+// POST /api/v1/enterprise/sso/saml/test-assertion - Dry run test of IdP claims
+enterpriseRouter.post("/sso/saml/test-assertion", (req, res) => {
+  try {
+    const { samplePayload, tenantId } = req.body;
+    const result = EnterpriseSSOService.processSAMLResponse(samplePayload || "PHNhbWw6QXNzZXJ0aW9uPg==", tenantId || "default_tenant");
+    res.json(successResponse({ assertionResult: result, parsedClaims: result.attributes }));
+  } catch (err: any) {
+    res.status(500).json(successResponse(null, { error: err.message }));
+  }
+});
+
 // GET /api/v1/enterprise/sso/policies - List Column and Row Level Security policies
 enterpriseRouter.get("/sso/policies", (req, res) => {
   try {

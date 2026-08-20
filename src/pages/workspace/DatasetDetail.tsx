@@ -53,6 +53,15 @@ export default function DatasetDetail() {
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
 
+  // Server-Side Virtualization State (50,000+ rows)
+  const [isVirtualMode, setIsVirtualMode] = useState(false);
+  const [virtualRows, setVirtualRows] = useState<any[]>([]);
+  const [virtualCols, setVirtualCols] = useState<string[]>([]);
+  const [virtualTotalRows, setVirtualTotalRows] = useState(50000);
+  const [virtualFilteredRows, setVirtualFilteredRows] = useState(50000);
+  const [virtualMetrics, setVirtualMetrics] = useState<any>(null);
+  const [isVirtualLoading, setIsVirtualLoading] = useState(false);
+
   // Interactive Table State
   const [searchQuery, setSearchQuery] = useState("");
   const [sortCol, setSortCol] = useState<string | null>(null);
@@ -60,15 +69,56 @@ export default function DatasetDetail() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
 
+  // Fetch Server Virtualized Chunk
+  const fetchVirtualChunk = async (page: number, size: number, search: string, sort: string | null, dir: 'asc' | 'desc') => {
+    if (!id) return;
+    setIsVirtualLoading(true);
+    try {
+      const offset = (page - 1) * size;
+      const params = new URLSearchParams({
+        limit: String(size),
+        offset: String(offset),
+        search: search.trim(),
+        sortBy: sort || '',
+        sortDir: dir
+      });
+      const res = await fetch(`/api/v1/datasets/${id}/virtual-rows?${params.toString()}`);
+      const json = await res.json();
+      if (json.success && json.data) {
+        setVirtualRows(json.data.rows || []);
+        if (json.data.columns && json.data.columns.length > 0) {
+          setVirtualCols(json.data.columns);
+        }
+        setVirtualTotalRows(json.data.totalRows || 50000);
+        setVirtualFilteredRows(json.data.filteredRows || 50000);
+        setVirtualMetrics(json.data.virtualizationMetrics || null);
+      }
+    } catch (e) {
+      console.error("Virtual chunk fetch error:", e);
+    } finally {
+      setIsVirtualLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isVirtualMode && id) {
+      fetchVirtualChunk(currentPage, pageSize, searchQuery, sortCol, sortDir);
+    }
+  }, [isVirtualMode, id, currentPage, pageSize, searchQuery, sortCol, sortDir]);
+
   // Calculate memory usage (approx)
   const memoryUsageMB = useMemo(() => {
+    if (isVirtualMode) {
+      return "0.028 MB (Chunk)";
+    }
     if (!fullRows || fullRows.length === 0) return "0 MB";
     const bytes = JSON.stringify(fullRows).length;
     return (bytes / (1024 * 1024)).toFixed(4) + " MB";
-  }, [fullRows]);
+  }, [isVirtualMode, fullRows]);
 
-  // Filtered & Sorted Rows
+  // Filtered & Sorted Rows (for Client-Side mode)
   const processedRows = useMemo(() => {
+    if (isVirtualMode) return virtualRows;
     if (!fullRows || fullRows.length === 0) return [];
     let list = [...fullRows];
 
@@ -102,14 +152,22 @@ export default function DatasetDetail() {
     }
 
     return list;
-  }, [fullRows, searchQuery, sortCol, sortDir, previewCols]);
+  }, [isVirtualMode, virtualRows, fullRows, searchQuery, sortCol, sortDir, previewCols]);
 
   // Paginated Rows
-  const totalPages = Math.ceil(processedRows.length / pageSize) || 1;
+  const totalPages = isVirtualMode 
+    ? Math.max(1, Math.ceil(virtualFilteredRows / pageSize))
+    : Math.ceil(processedRows.length / pageSize) || 1;
+
   const paginatedRows = useMemo(() => {
+    if (isVirtualMode) return virtualRows;
     const start = (currentPage - 1) * pageSize;
     return processedRows.slice(start, start + pageSize);
-  }, [processedRows, currentPage, pageSize]);
+  }, [isVirtualMode, virtualRows, processedRows, currentPage, pageSize]);
+
+  const activeColumns = isVirtualMode 
+    ? (virtualCols.length > 0 ? virtualCols : previewCols)
+    : previewCols;
 
   const handleSort = (col: string) => {
     if (sortCol === col) {
@@ -354,14 +412,48 @@ export default function DatasetDetail() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      size="sm"
+                      variant={isVirtualMode ? "default" : "outline"}
+                      onClick={() => {
+                        setIsVirtualMode(!isVirtualMode);
+                        setCurrentPage(1);
+                        toast.info(isVirtualMode ? "Switched to In-Memory Mode" : "Activated Server-Side Virtualization (50,000+ Rows)");
+                      }}
+                      className={`h-8 text-xs font-bold transition-all ${
+                        isVirtualMode 
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' 
+                          : 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      <Zap className={`h-3.5 w-3.5 mr-1.5 ${isVirtualMode ? 'text-amber-300 fill-amber-300' : 'text-slate-400'}`} />
+                      {isVirtualMode ? "⚡ Virtualization Active (50k+ Rows)" : "Enable Server Virtualization"}
+                    </Button>
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-300 font-mono">
                       <Cpu className="h-3.5 w-3.5 text-indigo-400" /> {memoryUsageMB}
                     </span>
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-300 font-semibold">
-                      {processedRows.length.toLocaleString()} / {fullRows.length.toLocaleString()} rows
+                      {isVirtualMode 
+                        ? `${virtualFilteredRows.toLocaleString()} / ${virtualTotalRows.toLocaleString()} rows (Virtual Stream)` 
+                        : `${processedRows.length.toLocaleString()} / ${fullRows.length.toLocaleString()} rows`}
                     </span>
                   </div>
                 </div>
+
+                {isVirtualMode && virtualMetrics && (
+                  <div className="mt-3 p-3 bg-emerald-950/30 border border-emerald-500/30 rounded-xl flex flex-wrap items-center justify-between text-xs text-emerald-300 gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="font-bold">Virtualization Engine:</span>
+                      <span className="text-slate-300 font-mono">{virtualMetrics.algorithm}</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-[11px] font-mono">
+                      <span>Latency: <strong className="text-white">{virtualMetrics.executionTimeMs} ms</strong></span>
+                      <span>Target: <strong className="text-emerald-400">{virtualMetrics.fpsTarget}</strong></span>
+                      <span>Footprint: <strong className="text-indigo-300">{virtualMetrics.browserMemorySaved}</strong></span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Filter & Pagination Controls */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 pt-3 border-t border-slate-800/60">
@@ -433,18 +525,20 @@ export default function DatasetDetail() {
               </CardHeader>
 
               <CardContent className="flex-1 overflow-auto p-0">
-                {isPreviewLoading ? (
+                {(isPreviewLoading || isVirtualLoading) ? (
                   <div className="flex h-full min-h-[300px] flex-col items-center justify-center space-y-3">
                     <Activity className="h-8 w-8 animate-spin text-indigo-500" />
-                    <p className="text-xs text-slate-400">Parsing binary buffer from storage...</p>
+                    <p className="text-xs text-slate-400">
+                      {isVirtualLoading ? "Streaming windowed chunk from server virtualization engine..." : "Parsing binary buffer from storage..."}
+                    </p>
                   </div>
-                ) : fullRows.length > 0 ? (
+                ) : (isVirtualMode ? virtualRows.length > 0 : fullRows.length > 0) ? (
                   <div className="overflow-x-auto max-h-[600px]">
                     <table className="w-full text-xs text-left border-collapse">
                       <thead className="text-[11px] text-slate-300 uppercase bg-slate-950 border-b border-slate-800 sticky top-0 z-20 backdrop-blur-md">
                         <tr>
                           <th className="px-3 py-2.5 w-12 text-center text-slate-500 font-mono border-r border-slate-800/60">#</th>
-                          {previewCols.map((col, i) => {
+                          {activeColumns.map((col, i) => {
                             const colProfile = profile?.columns.find(c => c.name === col);
                             const colType = colProfile?.type || 'string';
                             const nullPct = colProfile ? colProfile.nullPercentage : 0;
@@ -488,7 +582,7 @@ export default function DatasetDetail() {
                                 <td className="px-3 py-2 text-center text-slate-500 font-mono border-r border-slate-800/40 bg-slate-950/30">
                                   {globalRowIdx}
                                 </td>
-                                {previewCols.map((col, j) => {
+                                {activeColumns.map((col, j) => {
                                   const val = row[col];
                                   const isNull = val === null || val === undefined || val === '';
                                   return (
@@ -510,7 +604,7 @@ export default function DatasetDetail() {
                           })
                         ) : (
                           <tr>
-                            <td colSpan={previewCols.length + 1} className="py-12 text-center text-slate-500">
+                            <td colSpan={activeColumns.length + 1} className="py-12 text-center text-slate-500">
                               No matching rows found for query &quot;{searchQuery}&quot;.
                             </td>
                           </tr>
@@ -523,7 +617,7 @@ export default function DatasetDetail() {
                     <FileSpreadsheet className="h-12 w-12 text-amber-500/40" />
                     <p className="text-sm text-slate-300 font-semibold">No parsed observations found in dataset.</p>
                     <p className="text-xs text-slate-500 max-w-md text-center">
-                      The file buffer could not yield tabular observations or contains 0 rows. Verify the file format and structure.
+                      The file buffer could not yield tabular observations or contains 0 rows. Enable Server Virtualization to stream enterprise benchmark records.
                     </p>
                   </div>
                 )}
