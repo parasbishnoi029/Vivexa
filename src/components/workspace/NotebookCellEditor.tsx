@@ -10,6 +10,19 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Cell } from "@/stores/workspaceStore";
 import Markdown from "react-markdown";
+import CodeMirror from "@uiw/react-codemirror";
+import { sql } from "@codemirror/lang-sql";
+import { python } from "@codemirror/lang-python";
+import { markdown } from "@codemirror/lang-markdown";
+import { oneDark } from "@codemirror/theme-one-dark";
+import * as Y from "yjs";
+import { yCollab } from "y-codemirror.next";
+import { WebrtcProvider } from "y-webrtc";
+import {
+  createLSPLinter,
+  createLSPHoverTooltip,
+  createLSPAutocomplete,
+} from "./codemirrorLspExtension";
 
 interface NotebookCellEditorProps {
   cell: Cell;
@@ -76,6 +89,38 @@ const NotebookCellEditorComponent: React.FC<NotebookCellEditorProps> = ({
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Yjs CRDT binding setup
+  const [yCollabExtension, setYCollabExtension] = useState<any>(null);
+
+  useEffect(() => {
+    // Isolated Yjs document for this specific cell's CRDT
+    const ydoc = new Y.Doc();
+    const ytext = ydoc.getText(cell.id);
+    
+    // Seed initial content if empty
+    if (ytext.toString() === "") {
+      ytext.insert(0, cell.code);
+    }
+
+    const provider = new WebrtcProvider(`vivexa-cell-${cell.id}`, ydoc, {
+      signaling: ["wss://signaling.yjs.dev"]
+    });
+
+    const userColor = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444"][Math.floor(Math.random() * 4)];
+    provider.awareness.setLocalStateField("user", {
+      name: "Anonymous Pilot",
+      color: userColor,
+      colorLight: userColor + "33"
+    });
+
+    setYCollabExtension(yCollab(ytext, provider.awareness));
+
+    return () => {
+      provider.destroy();
+      ydoc.destroy();
+    };
+  }, [cell.id]);
 
   // Line numbers memoized calculation
   const lineCount = useMemo(() => {
@@ -631,28 +676,31 @@ const NotebookCellEditorComponent: React.FC<NotebookCellEditorProps> = ({
               </span>
             </div>
           ) : (
-            <div className="relative flex rounded-xl border border-slate-800/90 bg-slate-950/90 overflow-hidden focus-within:border-indigo-500/50 focus-within:ring-1 focus-within:ring-indigo-500/20 shadow-inner transition-all">
-              {/* Line Numbers Gutter */}
-              <div className="py-3 px-2 bg-slate-950/80 border-r border-slate-850/80 select-none text-right font-mono text-[11px] text-slate-600 w-10 shrink-0 leading-relaxed">
-                {Array.from({ length: lineCount }).map((_, i) => (
-                  <div key={i} className="hover:text-slate-400 transition-colors">
-                    {i + 1}
-                  </div>
-                ))}
-              </div>
-
-              {/* Textarea */}
-              <textarea
-                ref={textareaRef}
+            <div className="relative rounded-xl border border-slate-800/90 bg-slate-950/90 overflow-hidden focus-within:border-indigo-500/50 focus-within:ring-1 focus-within:ring-indigo-500/20 shadow-inner transition-all w-full min-h-[80px]">
+              <CodeMirror
                 value={cell.code}
-                data-cell-id={cell.id}
-                onFocus={onFocus}
-                onBlur={onBlur}
-                onKeyDown={handleKeyDown}
-                onChange={(e) => onUpdateCode(e.target.value)}
-                rows={Math.max(3, lineCount)}
-                spellCheck={false}
-                className="w-full bg-transparent p-3 font-mono text-[13px] text-slate-200 focus:outline-none resize-y leading-relaxed antialiased selection:bg-indigo-500/30"
+                theme={oneDark}
+                extensions={[
+                  cell.type === "sql" ? sql() : cell.type === "python" ? python() : markdown(),
+                  createLSPLinter(cell.type),
+                  createLSPHoverTooltip(cell.type),
+                  createLSPAutocomplete(cell.type),
+                  ...(yCollabExtension ? [yCollabExtension] : []),
+                ]}
+                onChange={(val) => onUpdateCode(val)}
+                onKeyDown={(e) => {
+                  // Re-use our existing shortcut logic via the original DOM event wrapper
+                  handleKeyDown(e as any);
+                }}
+                basicSetup={{
+                  lineNumbers: true,
+                  foldGutter: true,
+                  dropCursor: true,
+                  allowMultipleSelections: true,
+                  indentOnInput: true,
+                  highlightActiveLine: true,
+                }}
+                className="text-[13px] font-mono w-full h-full"
                 placeholder={
                   cell.type === "markdown"
                     ? "## Section Header\nExplain findings and insights..."

@@ -116,14 +116,16 @@ export class AdaptiveQueryRouter {
     if (!shouldUsePushdown) {
       // Route to In-Browser Vectorized DuckDB WASM (Zero Cloud Cost, Sub-15ms Latency)
       try {
-        if (datasetRows && Array.isArray(datasetRows) && datasetRows.length > 0) {
-          const tableName = profile.name || "dataset";
-          await duckdbEngine.registerTableFromJson(tableName, datasetRows);
-          await duckdbEngine.registerTableFromJson("df", datasetRows);
-          await duckdbEngine.registerTableFromJson("dataset", datasetRows);
-        }
+        // Enterprise Feature: Use Dedicated WebWorker for out-of-process execution
+        const { executeInDedicatedWorker } = await import("../workers/dedicatedComputeWorker");
+        const workerRes = await executeInDedicatedWorker({ type: "sql", code: cleanSql, dataSample: datasetRows, tableName: profile.name });
 
-        const wasmResult = await duckdbEngine.query(cleanSql);
+        if (!workerRes.success || !workerRes.result) {
+            throw new Error(workerRes.error || "WebWorker Execution Failed");
+        }
+        
+        const wasmResult = workerRes.result.data as { columns: string[], rows: any[], rowCount: number, scannedRows: number };
+        
         const execTime = Number((performance.now() - startTime).toFixed(2));
         const estimatedCreditsSaved = Number(((rowCount / 100000) * 0.04).toFixed(4));
 
@@ -239,6 +241,29 @@ export class AdaptiveQueryRouter {
     profile: DatasetProfile
   ): Promise<{ columns: string[]; rows: Record<string, any>[]; scannedRows?: number }> {
     try {
+      // Enterprise Feature: Zero-Copy Binary WebSocket Streaming via Apache Arrow Flight
+      const { ArrowFlightWebSocketClient } = await import("./arrowFlightClient");
+      const useArrowFlight = true; // Feature flag
+
+      if (useArrowFlight) {
+        try {
+          const client = new ArrowFlightWebSocketClient();
+          const rows: any[] = [];
+          
+          await client.streamQueryBatches(sql, (batchRows, metrics) => {
+            rows.push(...batchRows);
+          });
+          
+          if (rows.length > 0) {
+             const columns = Object.keys(rows[0]);
+             return { columns, rows, scannedRows: rows.length };
+          }
+        } catch (arrowErr) {
+          console.warn("Arrow Flight WebSocket failed, falling back to HTTP JSON:", arrowErr);
+        }
+      }
+
+      // Fallback: Standard HTTP JSON fetch
       const response = await fetch("/api/v1/enterprise/sql/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -262,6 +287,7 @@ export class AdaptiveQueryRouter {
     }
 
     // Fallback: local execution via DuckDB engine
+    const { duckdbEngine } = await import("./duckdbEngine");
     const fallback = await duckdbEngine.query(sql);
     return { columns: fallback.columns, rows: fallback.rows, scannedRows: fallback.scannedRows };
   }

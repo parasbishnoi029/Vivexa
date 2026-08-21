@@ -27,9 +27,11 @@ class DuckDBEngineService {
   private initPromise: Promise<boolean> | null = null;
   private registeredTables: Map<string, DuckDBTableInfo> = new Map();
   private inMemoryFallbackData: Map<string, Record<string, any>[]> = new Map();
+  private opfsSupported: boolean = false;
+  private opfsBytesUsed: number = 0;
 
   /**
-   * Initializes the DuckDB WASM Engine using web workers and SIMD/EH bundles.
+   * Initializes the DuckDB WASM Engine using web workers and SIMD/EH bundles with OPFS persistence.
    */
   public async init(): Promise<boolean> {
     if (this.isReady) return true;
@@ -38,6 +40,11 @@ class DuckDBEngineService {
     this.initPromise = (async () => {
       this.isInitializing = true;
       try {
+        // Check OPFS availability
+        if (typeof window !== "undefined" && "storage" in navigator && "getDirectory" in navigator.storage) {
+          this.opfsSupported = true;
+        }
+
         // Select optimal bundle for the client's browser environment
         const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles();
         const bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES);
@@ -61,7 +68,11 @@ class DuckDBEngineService {
         this.conn = await this.db.connect();
         this.isReady = true;
         this.isInitializing = false;
-        console.log("⚡ [Vivexa Lakehouse] DuckDB WASM Vectorized Engine initialized successfully.");
+        
+        // Restore tables from OPFS persistent storage
+        await this.restoreTablesFromOpfs();
+
+        console.log("⚡ [Vivexa Lakehouse] DuckDB WASM Vectorized Engine initialized with OPFS persistence.");
         return true;
       } catch (err) {
         console.warn("DuckDB WASM worker initialization failed (using high-speed embedded fallback engine):", err);
@@ -72,6 +83,71 @@ class DuckDBEngineService {
     })();
 
     return this.initPromise;
+  }
+
+  /**
+   * Persists a dataset string to browser's Origin Private File System (OPFS)
+   */
+  public async persistToOpfs(filename: string, content: string): Promise<boolean> {
+    if (!this.opfsSupported) return false;
+    try {
+      const root = await navigator.storage.getDirectory();
+      const vivexaDir = await root.getDirectoryHandle("vivexa_tables", { create: true });
+      const fileHandle = await vivexaDir.getFileHandle(filename, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(content);
+      await writable.close();
+      this.opfsBytesUsed += content.length;
+      return true;
+    } catch (err) {
+      console.warn("OPFS write error:", err);
+      return false;
+    }
+  }
+
+  /**
+   * Restores tables stored in OPFS during previous sessions
+   */
+  private async restoreTablesFromOpfs(): Promise<void> {
+    if (!this.opfsSupported || !this.db || !this.conn) return;
+    try {
+      const root = await navigator.storage.getDirectory();
+      const vivexaDir = await root.getDirectoryHandle("vivexa_tables", { create: true });
+      
+      // Iterate handles in OPFS
+      for await (const entry of (vivexaDir as any).values()) {
+        if (entry.kind === "file") {
+          const file = await entry.getFile();
+          const text = await file.text();
+          const tableName = entry.name.replace(/\.(json|csv)$/, "");
+          
+          if (entry.name.endsWith(".json")) {
+            const data = JSON.parse(text);
+            await this.registerTableFromJson(tableName, data);
+          } else if (entry.name.endsWith(".csv")) {
+            await this.registerTableFromCsv(tableName, text);
+          }
+          this.opfsBytesUsed += file.size;
+        }
+      }
+    } catch (err) {
+      console.warn("OPFS restoration skipped:", err);
+    }
+  }
+
+  /**
+   * Gets stats on OPFS persistent storage usage
+   */
+  public async getOpfsStorageStats(): Promise<{ supported: boolean; bytesUsed: number; formattedSize: string }> {
+    if (!this.opfsSupported) {
+      return { supported: false, bytesUsed: 0, formattedSize: "Disabled" };
+    }
+    const sizeMb = (this.opfsBytesUsed / (1024 * 1024)).toFixed(2);
+    return {
+      supported: true,
+      bytesUsed: this.opfsBytesUsed,
+      formattedSize: `${sizeMb} MB Persistent OPFS Disk`,
+    };
   }
 
   public getStatus(): { isReady: boolean; isInitializing: boolean; tableCount: number } {
@@ -136,6 +212,7 @@ class DuckDBEngineService {
         const fileName = `${cleanName}.json`;
         await this.db.registerFileText(fileName, jsonStr);
         await this.conn.query(`CREATE OR REPLACE TABLE ${cleanName} AS SELECT * FROM read_json_auto('${fileName}');`);
+        this.persistToOpfs(fileName, jsonStr).catch(() => {});
       }
     } catch (e) {
       console.warn(`DuckDB WASM table creation for ${cleanName} will execute via fallback engine:`, e);
@@ -174,6 +251,7 @@ class DuckDBEngineService {
         const fileName = `${cleanName}.csv`;
         await this.db.registerFileText(fileName, csvContent);
         await this.conn.query(`CREATE OR REPLACE TABLE ${cleanName} AS SELECT * FROM read_csv_auto('${fileName}');`);
+        this.persistToOpfs(fileName, csvContent).catch(() => {});
       }
     } catch (e) {
       console.warn(`DuckDB WASM CSV registration for ${cleanName} fallback:`, e);

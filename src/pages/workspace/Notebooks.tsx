@@ -11,7 +11,7 @@ import {
   Table as TableIcon, BarChart3, PieChart as PieIcon, LineChart as LineIcon,
   Sliders, Eye, EyeOff, FileText, FileSpreadsheet, Layers, Sparkle,
   ArrowRight, Bot, Wrench, ArrowLeft, Shield, Lock, Activity, Presentation,
-  Replace, SlidersHorizontal, Share2, Printer, Keyboard
+  Replace, SlidersHorizontal, Share2, Printer, Keyboard, Brain
 } from "lucide-react";
 import { pyodideSandbox, PYODIDE_SANDBOX_POLICY, PyodideExecutionResult } from "@/lib/pyodideSandbox";
 import NotebookCopilot from "@/components/workspace/NotebookCopilot";
@@ -32,11 +32,20 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useAuthStore } from "@/stores/authStore";
 import { useWorkspaceStore, Notebook, Cell, VariableInfo } from "@/stores/workspaceStore";
+import { useNotebookModalStore } from "@/stores/notebookModalStore";
+import { NotebookModalsProvider } from "@/components/workspace/NotebookModalsProvider";
 import { useCollaborationStore } from "@/stores/collaborationStore";
 import { CollaborativeToolbar } from "@/components/workspace/CollaborativeToolbar";
 import { CollaborativeCursorOverlay } from "@/components/workspace/CollaborativeCursorOverlay";
 import { CRDTTimeTravelModal } from "@/components/workspace/CRDTTimeTravelModal";
 import { MicroVMPodManagerModal } from "@/components/workspace/MicroVMPodManagerModal";
+import { HybridExecutionGatewayModal, ExecutionEngineType } from "@/components/workspace/HybridExecutionGatewayModal";
+import { NotebookReactiveDAGModal } from "@/components/workspace/NotebookReactiveDAGModal";
+import { EnterpriseGovernanceModal } from "@/components/workspace/EnterpriseGovernanceModal";
+import { NotebookCodeDoctorDrawer } from "@/components/workspace/NotebookCodeDoctorDrawer";
+import { CollaborativeCRDTStudio } from "@/components/workspace/CollaborativeCRDTStudio";
+import { SIEMForwarderModal } from "@/components/workspace/SIEMForwarderModal";
+import { SemanticMemoryRAGModal } from "@/components/workspace/SemanticMemoryRAGModal";
 import { AdaptiveQueryRouter } from "@/lib/adaptiveQueryRouter";
 import { supabase } from "@/lib/supabase";
 import { checkAndConsumeQuota, triggerLimitModal } from "@/lib/limits";
@@ -344,6 +353,17 @@ export default function Notebooks() {
   const [showTimeTravelModal, setShowTimeTravelModal] = useState(false);
   const [showMicroVMModal, setShowMicroVMModal] = useState(false);
   const [cellRuntimes, setCellRuntimes] = useState<Record<string, "wasm" | "microvm">>({});
+
+  // Enterprise Pillar Modal States
+  const [showHybridComputeModal, setShowHybridComputeModal] = useState(false);
+  const [hybridComputeEngine, setHybridComputeEngine] = useState<ExecutionEngineType>("wasm");
+  const [showReactiveDAGModal, setShowReactiveDAGModal] = useState(false);
+  const [showEnterpriseGovernanceModal, setShowEnterpriseGovernanceModal] = useState(false);
+  const [showSIEMModal, setShowSIEMModal] = useState(false);
+  const [showSemanticRAGModal, setShowSemanticRAGModal] = useState(false);
+  const [showCRDTStudioModal, setShowCRDTStudioModal] = useState(false);
+  const [showCodeDoctorDrawer, setShowCodeDoctorDrawer] = useState(false);
+  const [codeDoctorTargetCell, setCodeDoctorTargetCell] = useState<{ id: string; code: string; error: string } | null>(null);
 
   // Edit Mode state for Markdown cells (cellId -> boolean)
   const [markdownEditModes, setMarkdownEditModes] = useState<Record<string, boolean>>({});
@@ -1268,7 +1288,23 @@ export default function Notebooks() {
       // Pyodide Isolated WASM Python Sandboxing Execution
       try {
         const datasetRows = (selectedDataset as any)?.sample_rows || (selectedDataset as any)?.preview_data || undefined;
-        const pyResult: PyodideExecutionResult = await pyodideSandbox.execute(cellId, cell.code, datasetRows);
+        
+        let pyResult: any;
+        if (hybridComputeEngine === "wasm" || !cellRuntimes[cellId]) {
+            // Enterprise Feature: Use Dedicated WebWorker for out-of-process execution
+            const { executeInDedicatedWorker } = await import("@/workers/dedicatedComputeWorker");
+            const workerRes = await executeInDedicatedWorker({ type: "python", code: cell.code, dataSample: datasetRows });
+            
+            pyResult = {
+                securityBlocked: !workerRes.success && workerRes.error?.includes("system"),
+                error: workerRes.error,
+                stdout: workerRes.result?.stdout || "",
+                stderr: workerRes.error || "",
+                result: workerRes.result?.data || null
+            };
+        } else {
+            pyResult = await pyodideSandbox.execute(cellId, cell.code, datasetRows);
+        }
         
         const endTime = performance.now();
         const execTime = ((endTime - startTime) / 1000).toFixed(2);
@@ -2379,6 +2415,52 @@ export default function Notebooks() {
               </Button>
             )}
             <Button
+              onClick={() => setShowHybridComputeModal(true)}
+              variant="outline"
+              className="bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 text-xs h-9 rounded-xl flex items-center gap-1.5 font-mono shadow-sm"
+              title="Configure Adaptive Execution Engine (Local WASM vs Cloud Warehouse)"
+            >
+              <Cpu className="h-3.5 w-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">Engine:</span>
+              <span className="uppercase font-bold text-emerald-400">{hybridComputeEngine === "wasm" ? "WASM Edge" : hybridComputeEngine === "container" ? "Container" : "DWH Pushdown"}</span>
+            </Button>
+            <Button
+              onClick={() => setShowReactiveDAGModal(true)}
+              variant="outline"
+              className="bg-purple-500/10 border-purple-500/30 text-purple-300 hover:bg-purple-500/20 text-xs h-9 rounded-xl flex items-center gap-1.5 font-mono shadow-sm"
+              title="Inspect AST Variable Lineage and Cascade Reactive Run"
+            >
+              <Layers className="h-3.5 w-3.5 text-purple-400" />
+              <span className="hidden md:inline">Reactive DAG</span>
+            </Button>
+            <Button
+              onClick={() => setShowSemanticRAGModal(true)}
+              variant="outline"
+              className="bg-indigo-500/10 border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20 text-xs h-9 rounded-xl flex items-center gap-1.5 font-mono shadow-sm"
+              title="Organizational Query Memory & Semantic Vector RAG"
+            >
+              <Brain className="h-3.5 w-3.5 text-indigo-400" />
+              <span className="hidden xl:inline">Semantic RAG</span>
+            </Button>
+            <Button
+              onClick={() => setShowEnterpriseGovernanceModal(true)}
+              variant="outline"
+              className="bg-emerald-950/40 border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/40 text-xs h-9 rounded-xl flex items-center gap-1.5 font-mono shadow-sm"
+              title="Enterprise PII Masking, Zero-Retention, and SOC2 Audit Logs"
+            >
+              <Shield className="h-3.5 w-3.5 text-emerald-400" />
+              <span className="hidden lg:inline">Governance</span>
+            </Button>
+            <Button
+              onClick={() => setShowCRDTStudioModal(true)}
+              variant="outline"
+              className="bg-blue-500/10 border-blue-500/30 text-blue-300 hover:bg-blue-500/20 text-xs h-9 rounded-xl flex items-center gap-1.5 font-mono shadow-sm"
+              title="Real-Time Yjs CRDT Collaboration & Git-Native .vivexa.md Export"
+            >
+              <Share2 className="h-3.5 w-3.5 text-blue-400" />
+              <span className="hidden lg:inline">Collab & Git</span>
+            </Button>
+            <Button
               onClick={() => setCopilotOpen(true)}
               className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs h-9 rounded-xl shadow-lg shadow-indigo-900/30 border border-indigo-400/30 relative"
             >
@@ -2734,11 +2816,25 @@ export default function Notebooks() {
                                   <Copy className="h-3.5 w-3.5 mr-1" /> Copy Error
                                 </Button>
                                 <Button
+                                  onClick={() => {
+                                    setCodeDoctorTargetCell({
+                                      id: cell.id,
+                                      code: cell.code,
+                                      error: cell.output?.error?.traceback || cell.output?.error?.message || "ExecutionException"
+                                    });
+                                    setShowCodeDoctorDrawer(true);
+                                  }}
+                                  size="sm"
+                                  className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow-md"
+                                >
+                                  <Sparkles className="h-3.5 w-3.5 mr-1.5 text-rose-200" /> Self-Healing Doctor
+                                </Button>
+                                <Button
                                   onClick={() => { setTargetCellId(cell.id); setCopilotOpen(true); }}
                                   size="sm"
                                   className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-md"
                                 >
-                                  <Bot className="h-3.5 w-3.5 mr-1.5 text-indigo-200" /> Copilot Error Doctor
+                                  <Bot className="h-3.5 w-3.5 mr-1.5 text-indigo-200" /> Copilot Prompt
                                 </Button>
                                 <Button
                                   onClick={() => handleAiAutoFix(cell.id, cell.output?.error?.message || "unknown")}
@@ -3164,45 +3260,19 @@ export default function Notebooks() {
         sessionToken={session?.access_token}
       />
 
-      <CRDTTimeTravelModal
-        isOpen={showTimeTravelModal}
-        onClose={() => setShowTimeTravelModal(false)}
-        docId={`notebook-${activeNb.id}`}
-        onRollback={(restoredState) => {
-          if (restoredState && restoredState.cells) {
-            updateNotebooksWithUndo(notebooks.map(nb => nb.id === activeNbId ? { ...nb, cells: restoredState.cells } : nb));
-            toast.success("Successfully rolled back notebook state from CRDT Write-Ahead Log!");
-          }
-        }}
-      />
-
-      <MicroVMPodManagerModal
-        isOpen={showMicroVMModal}
-        onClose={() => setShowMicroVMModal(false)}
-      />
-
-      {/* DATA SCIENCE RECIPES DRAWER */}
-      <NotebookSnippetsDrawer
-        isOpen={showSnippetsDrawer}
-        onClose={() => setShowSnippetsDrawer(false)}
-        onInjectSnippet={(code, type) => {
-          if (activeFocusedCellId) {
-            injectSnippet(activeFocusedCellId, code);
-          } else {
-            addCell(type, code);
-          }
-        }}
-        onAddSnippetAsCell={(code, type) => {
-          addCell(type, code);
-        }}
-      />
-
-      {/* KERNEL VARIABLE INSPECTOR MODAL */}
-      <NotebookVariableInspectorModal
-        isOpen={showVariableInspectorModal}
-        onClose={() => setShowVariableInspectorModal(false)}
-        variables={kernelVariables}
+      <NotebookModalsProvider
+        activeNbId={activeNb.id}
+        cells={activeNb.cells}
         selectedDataset={selectedDataset}
+        kernelVariables={kernelVariables}
+        activeFocusedCellId={activeFocusedCellId}
+        hybridComputeEngine={hybridComputeEngine}
+        setHybridComputeEngine={setHybridComputeEngine}
+        updateCellCode={updateCellCode}
+        updateCellType={updateCellType}
+        executeCell={executeCell}
+        updateNotebooksWithUndo={updateNotebooksWithUndo}
+        notebooks={notebooks}
       />
     </div>
   );
