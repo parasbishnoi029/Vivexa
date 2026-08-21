@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { User, Settings, CreditCard, HelpCircle, LogOut, ChevronDown, Activity, HardDrive, FolderKanban } from "lucide-react";
+import { User, Settings, CreditCard, HelpCircle, LogOut, ChevronDown, Activity, HardDrive, FolderKanban, Sun, Moon, Laptop } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuthStore } from "@/stores/authStore";
+import { useTheme } from "@/providers/ThemeProvider";
 import { supabase } from "@/lib/supabase";
 
 export function ProfileDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const { user, signOut } = useAuthStore();
+  const { theme, setTheme, systemTheme } = useTheme();
   
   const [profileData, setProfileData] = useState<{
     full_name: string;
@@ -141,6 +143,58 @@ export function ProfileDropdown() {
                 <Link to="#" onClick={(e) => { e.preventDefault(); setIsOpen(false); }} className="flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-lg transition-colors">
                   <HelpCircle className="h-4 w-4 text-slate-400" /> Help
                 </Link>
+                
+                {/* Theme Selector */}
+                <div className="pt-2 pb-1 px-3">
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5 font-medium">
+                    <span>Theme Mode</span>
+                    <span className="text-[10px] text-indigo-400 font-mono capitalize">
+                      {theme === 'system' ? `Auto (${systemTheme})` : theme}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 p-1 bg-slate-950/60 rounded-lg border border-slate-800/80">
+                    <button
+                      type="button"
+                      title="Auto-sync with OS"
+                      onClick={() => setTheme("system")}
+                      className={`flex items-center justify-center gap-1 py-1 rounded text-[10px] font-semibold transition-all cursor-pointer ${
+                        theme === "system"
+                          ? "bg-indigo-600 text-white shadow-sm"
+                          : "text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      <Laptop className="h-3 w-3" />
+                      <span>Auto</span>
+                    </button>
+                    <button
+                      type="button"
+                      title="Dark Mode Override"
+                      onClick={() => setTheme("dark")}
+                      className={`flex items-center justify-center gap-1 py-1 rounded text-[10px] font-semibold transition-all cursor-pointer ${
+                        theme === "dark"
+                          ? "bg-indigo-600 text-white shadow-sm"
+                          : "text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      <Moon className="h-3 w-3" />
+                      <span>Dark</span>
+                    </button>
+                    <button
+                      type="button"
+                      title="Light Mode Override"
+                      onClick={() => setTheme("light")}
+                      className={`flex items-center justify-center gap-1 py-1 rounded text-[10px] font-semibold transition-all cursor-pointer ${
+                        theme === "light"
+                          ? "bg-indigo-600 text-white shadow-sm"
+                          : "text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      <Sun className="h-3 w-3" />
+                      <span>Light</span>
+                    </button>
+                  </div>
+                </div>
+
                 <div className="h-px bg-slate-800/60 my-1 mx-2" />
                 <button 
                   onClick={async () => {

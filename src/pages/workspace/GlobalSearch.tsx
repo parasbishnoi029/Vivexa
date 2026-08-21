@@ -5,7 +5,7 @@ import {
   Search, Database, FolderKanban, MessageSquare, FileText, Loader2, Filter,
   Settings, Key, CreditCard, Shield, Users, Sparkles, Cpu, LineChart,
   TerminalSquare, Workflow, Blocks, ActivitySquare, BookOpen, Layers, Zap, ExternalLink,
-  Lock, ShieldCheck, ShieldAlert
+  Lock, ShieldCheck, ShieldAlert, Compass, BarChart3, LayoutDashboard
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
@@ -31,6 +31,8 @@ const COMMAND_ACTIONS: SearchHit[] = [
 ];
 
 const ALL_SYSTEM_FEATURES: SearchHit[] = [
+  { title: "All Features Directory", subtitle: "Comprehensive catalog of all 35+ enterprise analytical tools", type: "Navigation", link: "/workspace/all", icon: Compass, color: "text-indigo-400", bg: "bg-indigo-500/10 border-indigo-500/20" },
+  { title: "BI Dashboards & Canvas Studio", subtitle: "Interactive business intelligence canvas, custom widgets & charts", type: "Navigation", link: "/workspace/dashboards", icon: LayoutDashboard, color: "text-cyan-400", bg: "bg-cyan-500/10 border-cyan-500/20" },
   { title: "AI Analyst Studio", subtitle: "Decision intelligence & automated profiling", type: "Navigation", link: "/workspace/ai", icon: Sparkles, color: "text-indigo-400", bg: "bg-indigo-500/10 border-indigo-500/20" },
   { title: "AI Interactive Chat", subtitle: "Conversational dataset queries & data scientist agent", type: "Navigation", link: "/workspace/ai/chat", icon: MessageSquare, color: "text-purple-400", bg: "bg-purple-500/10 border-purple-500/20" },
   { title: "Predictive Models & ML", subtitle: "RandomForest, XGBoost & Churn prediction studio", type: "Navigation", link: "/workspace/predictions", icon: Cpu, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" },

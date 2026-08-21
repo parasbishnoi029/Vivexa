@@ -94,7 +94,15 @@ async function startServer() {
 
   const app = express();
   app.set('trust proxy', 1);
-  app.use(compression());
+  // High-performance gzip/deflate compression for all text, json, and js assets
+  app.use(compression({
+    level: 6,
+    threshold: 512, // Compress anything larger than 512 bytes
+    filter: (req, res) => {
+      if (req.headers['x-no-compression']) return false;
+      return compression.filter(req, res);
+    }
+  }));
   const PORT = 3000;
   const httpServer = http.createServer(app);
   
@@ -859,9 +867,27 @@ async function resolveRecoveryUrl(actionLink: string, publicOrigin: string): Pro
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath, { maxAge: '1y', etag: true, immutable: true }));
+    // Long-term immutable caching for versioned bundles and assets (1 year)
+    app.use('/assets', express.static(path.join(distPath, 'assets'), {
+      maxAge: '1y',
+      immutable: true,
+      etag: true,
+      lastModified: true
+    }));
+    // Standard static serving for root assets (favicon, manifest, robots, sitemap)
+    app.use(express.static(distPath, { 
+      maxAge: '1h', 
+      etag: true,
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        }
+      }
+    }));
     app.get('*', (req, res) => {
-      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

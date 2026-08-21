@@ -8,13 +8,13 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-2xl border border-slate-800/60 bg-slate-900/40 backdrop-blur-xl text-slate-50 shadow-2xl overflow-hidden relative group transition-all duration-500 hover:border-indigo-500/50",
+      "rounded-2xl border border-slate-800/70 bg-slate-900/40 backdrop-blur-xl text-slate-50 shadow-xl overflow-hidden relative group transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_14px_34px_-10px_rgba(0,0,0,0.65),0_0_20px_-5px_rgba(99,102,241,0.12)] hover:border-slate-700/80",
       className
     )}
     {...props}
   >
-    <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-    <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent opacity-50 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+    <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/[0.04] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+    <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent opacity-30 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
     <div className="relative z-10">{children}</div>
   </div>
 ))

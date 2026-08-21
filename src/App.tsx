@@ -113,6 +113,7 @@ const UserManual = lazyWithRetry(() => import("./pages/workspace/UserManual"));
 const HelpCenter = lazyWithRetry(() => import("./pages/workspace/HelpCenter"));
 const DeveloperSDK = lazyWithRetry(() => import("./pages/workspace/DeveloperSDK"));
 const DecisionIntelligence = lazyWithRetry(() => import("./pages/workspace/DecisionIntelligence"));
+const AllFeatures = lazyWithRetry(() => import("./pages/workspace/AllFeatures"));
 
 // Reusable high-fidelity skeleton screen loaders
 
@@ -296,6 +297,14 @@ const router = createBrowserRouter([
     ]
   },
   {
+    path: "/all",
+    element: <Navigate to="/workspace/all" replace />,
+  },
+  {
+    path: "/features",
+    element: <Navigate to="/workspace/all" replace />,
+  },
+  {
     path: "/login",
     element: <Suspense fallback={<PageLoader />}><Login /></Suspense>,
   },
@@ -435,6 +444,14 @@ const router = createBrowserRouter([
       {
         path: "dashboards",
         element: <Suspense fallback={<PageLoader />}><DashboardsBuilder /></Suspense>,
+      },
+      {
+        path: "all",
+        element: <Suspense fallback={<PageLoader />}><AllFeatures /></Suspense>,
+      },
+      {
+        path: "features",
+        element: <Suspense fallback={<PageLoader />}><AllFeatures /></Suspense>,
       },
       {
         path: "automations",

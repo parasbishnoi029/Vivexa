@@ -29,6 +29,14 @@ export interface Notebook {
   updatedAt: string;
 }
 
+export interface PinnedItem {
+  id: string;
+  title: string;
+  type: "project" | "dataset" | "report" | "kpi";
+  path: string;
+  pinnedAt: string;
+}
+
 export interface VariableInfo {
   type: string;
   summary: string;
@@ -41,6 +49,9 @@ interface WorkspaceState {
   selectedDataset: any | null;
   datasetProfile: any | null;
   activeDatasetRows: any[];
+  
+  // Pinned Items
+  pinnedItems: PinnedItem[];
   
   // Notebooks
   notebooks: Notebook[];
@@ -55,6 +66,10 @@ interface WorkspaceState {
   setSelectedDataset: (dataset: any | null) => void;
   setDatasetProfile: (profile: any | null) => void;
   setActiveDatasetRows: (rows: any[]) => void;
+  
+  pinItem: (item: PinnedItem) => void;
+  unpinItem: (id: string) => void;
+  togglePinItem: (item: PinnedItem) => void;
   
   setNotebooks: (notebooks: Notebook[] | ((prev: Notebook[]) => Notebook[])) => void;
   setActiveNbId: (id: string) => void;
@@ -73,6 +88,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       selectedDataset: null,
       datasetProfile: null,
       activeDatasetRows: [],
+      pinnedItems: [],
       
       notebooks: DEFAULT_NOTEBOOKS,
       activeNbId: DEFAULT_NOTEBOOKS[0]?.id || "nb-1",
@@ -92,6 +108,21 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       setDatasetProfile: (profile) => set({ datasetProfile: profile }),
       setActiveDatasetRows: (rows) => set({ activeDatasetRows: rows }),
 
+      pinItem: (item) => set((state) => {
+        if (state.pinnedItems.some(p => p.id === item.id)) return state;
+        return { pinnedItems: [item, ...state.pinnedItems] };
+      }),
+      unpinItem: (id) => set((state) => ({
+        pinnedItems: state.pinnedItems.filter(p => p.id !== id)
+      })),
+      togglePinItem: (item) => set((state) => {
+        const exists = state.pinnedItems.some(p => p.id === item.id);
+        if (exists) {
+          return { pinnedItems: state.pinnedItems.filter(p => p.id !== item.id) };
+        }
+        return { pinnedItems: [item, ...state.pinnedItems] };
+      }),
+
       setNotebooks: (notebooksUpdate) => set((state) => {
         const updated = typeof notebooksUpdate === "function" ? notebooksUpdate(state.notebooks) : notebooksUpdate;
         return { notebooks: updated };
@@ -106,6 +137,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         selectedWorkspaceId: state.selectedWorkspaceId,
         selectedProjectId: state.selectedProjectId,
         selectedDatasetId: state.selectedDatasetId,
+        pinnedItems: state.pinnedItems,
         notebooks: state.notebooks,
         activeNbId: state.activeNbId,
       }), // Persist notebooks and IDs

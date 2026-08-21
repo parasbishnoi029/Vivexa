@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, Fragment } from "react";
 import { useNavigate } from "react-router-dom";
 import Markdown from "react-markdown";
 import { motion, AnimatePresence } from "motion/react";
@@ -10,10 +10,18 @@ import {
   BookOpen, History, ArrowDown, ChevronRight, Ban, Edit2, CopyPlus,
   Table as TableIcon, BarChart3, PieChart as PieIcon, LineChart as LineIcon,
   Sliders, Eye, EyeOff, FileText, FileSpreadsheet, Layers, Sparkle,
-  ArrowRight, Bot, Wrench, ArrowLeft, Shield, Lock, Activity
+  ArrowRight, Bot, Wrench, ArrowLeft, Shield, Lock, Activity, Presentation,
+  Replace, SlidersHorizontal, Share2, Printer, Keyboard
 } from "lucide-react";
 import { pyodideSandbox, PYODIDE_SANDBOX_POLICY, PyodideExecutionResult } from "@/lib/pyodideSandbox";
 import NotebookCopilot from "@/components/workspace/NotebookCopilot";
+import { NotebookFindReplaceBar } from "@/components/workspace/NotebookFindReplaceBar";
+import { NotebookSnippetsDrawer } from "@/components/workspace/NotebookSnippetsDrawer";
+import { NotebookVariableInspectorModal } from "@/components/workspace/NotebookVariableInspectorModal";
+import { NotebookPresentationView } from "@/components/workspace/NotebookPresentationView";
+import { NotebookTableOutput } from "@/components/workspace/NotebookTableOutput";
+import { NotebookCellEditor } from "@/components/workspace/NotebookCellEditor";
+import { NotebookShortcutsModal } from "@/components/workspace/NotebookShortcutsModal";
 import {
   LineChart, Line, BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell as RechartsCell,
   XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, Legend
@@ -293,6 +301,20 @@ export default function Notebooks() {
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const [customPackageName, setCustomPackageName] = useState("");
   const [installingPackage, setInstallingPackage] = useState(false);
+
+  // Upgraded Feature States
+  const [isPresentationMode, setIsPresentationMode] = useState(false);
+  const [showFindReplace, setShowFindReplace] = useState(false);
+  const [showSnippetsDrawer, setShowSnippetsDrawer] = useState(false);
+  const [showVariableInspectorModal, setShowVariableInspectorModal] = useState(false);
+  const [activeFocusedCellId, setActiveFocusedCellId] = useState<string | null>(null);
+
+  // Jupyter Notebook Mode & Keyboard Shortcuts State
+  const [notebookMode, setNotebookMode] = useState<"command" | "edit">("command");
+  const [ctrlMChordActive, setCtrlMChordActive] = useState(false);
+  const [copiedCell, setCopiedCell] = useState<Cell | null>(null);
+  const lastKeyPressRef = useRef<{ key: string; time: number }>({ key: "", time: 0 });
+  const ctrlMTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Modals & Panels
   const [copilotOpen, setCopilotOpen] = useState(false);
@@ -533,25 +555,6 @@ export default function Notebooks() {
     toast.success(`Restored notebook back to version: "${snap.name}"`);
   };
 
-  // Keyboard events listener
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Shift+Enter to run active focused cell
-      if (e.key === "Enter" && e.shiftKey) {
-        const activeElement = document.activeElement;
-        if (activeElement && activeElement.tagName === "TEXTAREA") {
-          const cellId = activeElement.getAttribute("data-cell-id");
-          if (cellId) {
-            e.preventDefault();
-            executeCell(cellId);
-          }
-        }
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [notebooks, activeNbId, selectedDatasetId]);
-
   // Code modification trigger
   const updateCellCode = (cellId: string, code: string) => {
     setNotebooks(prev => prev.map(nb => {
@@ -571,6 +574,564 @@ export default function Notebooks() {
         cells: nb.cells.map(c => c.id === cellId ? { ...c, type } : c)
       };
     }));
+  };
+
+  // Insert cell at arbitrary index in the notebook
+  const insertCellAt = (index: number, type: "python" | "sql" | "markdown", initialCode: string = "") => {
+    const newCell: Cell = {
+      id: `c-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      type,
+      code: initialCode || (type === "markdown" ? "## Analysis Findings\n" : type === "sql" ? "SELECT * FROM dataset LIMIT 10;" : "# Write Python data analysis code\n"),
+    };
+    const updatedCells = [...activeNb.cells];
+    updatedCells.splice(index, 0, newCell);
+    updateNotebooksWithUndo(
+      notebooks.map(nb => nb.id === activeNbId ? { ...nb, cells: updatedCells } : nb)
+    );
+    toast.success(`Inserted new ${type.toUpperCase()} cell!`);
+  };
+
+  // ----------------------------------------------------
+  // JUPYTER SHORTCUTS ENGINE & HELPERS
+  // ----------------------------------------------------
+
+  const focusCellInDOM = (cellId: string, enterEditMode: boolean = false) => {
+    setActiveFocusedCellId(cellId);
+    focusCell(cellId);
+
+    if (enterEditMode) {
+      setNotebookMode("edit");
+      setTimeout(() => {
+        const textarea = document.querySelector(`textarea[data-cell-id="${cellId}"]`) as HTMLTextAreaElement | null;
+        if (textarea) {
+          textarea.focus();
+          const len = textarea.value.length;
+          textarea.setSelectionRange(len, len);
+        }
+      }, 40);
+    } else {
+      setNotebookMode("command");
+      const activeEl = document.activeElement;
+      if (activeEl instanceof HTMLElement && (activeEl.tagName === "TEXTAREA" || activeEl.tagName === "INPUT")) {
+        activeEl.blur();
+      }
+    }
+
+    setTimeout(() => {
+      const el = document.getElementById(cellId);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        if (rect.top < 90 || rect.bottom > window.innerHeight - 50) {
+          el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+      }
+    }, 60);
+  };
+
+  const runAndAdvanceCell = async (cellId: string) => {
+    await executeCell(cellId);
+    const idx = activeNb.cells.findIndex(c => c.id === cellId);
+    if (idx !== -1) {
+      if (idx < activeNb.cells.length - 1) {
+        const nextCellId = activeNb.cells[idx + 1].id;
+        focusCellInDOM(nextCellId, true);
+      } else {
+        // Last cell: Insert a new Python code cell below and focus it
+        const newCellId = `c-${Date.now()}`;
+        const newCell: Cell = {
+          id: newCellId,
+          type: "python",
+          code: ""
+        };
+        const updatedCells = [...activeNb.cells, newCell];
+        updateNotebooksWithUndo(
+          notebooks.map(nb => nb.id === activeNbId ? { ...nb, cells: updatedCells } : nb)
+        );
+        focusCellInDOM(newCellId, true);
+      }
+    }
+  };
+
+  const runInPlaceCell = async (cellId: string) => {
+    await executeCell(cellId);
+  };
+
+  const runAndInsertBelow = async (cellId: string) => {
+    await executeCell(cellId);
+    const idx = activeNb.cells.findIndex(c => c.id === cellId);
+    const insertIdx = idx !== -1 ? idx + 1 : activeNb.cells.length;
+    const newCellId = `c-${Date.now()}`;
+    const newCell: Cell = {
+      id: newCellId,
+      type: "python",
+      code: ""
+    };
+    const updatedCells = [...activeNb.cells];
+    updatedCells.splice(insertIdx, 0, newCell);
+    updateNotebooksWithUndo(
+      notebooks.map(nb => nb.id === activeNbId ? { ...nb, cells: updatedCells } : nb)
+    );
+    focusCellInDOM(newCellId, true);
+  };
+
+  const insertCellAbove = (cellId?: string | null) => {
+    const targetId = cellId || activeFocusedCellId || activeNb.cells[0]?.id;
+    const idx = targetId ? activeNb.cells.findIndex(c => c.id === targetId) : 0;
+    const insertIdx = idx !== -1 ? Math.max(0, idx) : 0;
+    const newCellId = `c-${Date.now()}`;
+    const newCell: Cell = {
+      id: newCellId,
+      type: "python",
+      code: ""
+    };
+    const updatedCells = [...activeNb.cells];
+    updatedCells.splice(insertIdx, 0, newCell);
+    updateNotebooksWithUndo(
+      notebooks.map(nb => nb.id === activeNbId ? { ...nb, cells: updatedCells } : nb)
+    );
+    toast.success("Inserted cell above (A / Ctrl+M A)");
+    focusCellInDOM(newCellId, true);
+  };
+
+  const insertCellBelow = (cellId?: string | null) => {
+    const targetId = cellId || activeFocusedCellId || activeNb.cells[activeNb.cells.length - 1]?.id;
+    const idx = targetId ? activeNb.cells.findIndex(c => c.id === targetId) : activeNb.cells.length - 1;
+    const insertIdx = idx !== -1 ? idx + 1 : activeNb.cells.length;
+    const newCellId = `c-${Date.now()}`;
+    const newCell: Cell = {
+      id: newCellId,
+      type: "python",
+      code: ""
+    };
+    const updatedCells = [...activeNb.cells];
+    updatedCells.splice(insertIdx, 0, newCell);
+    updateNotebooksWithUndo(
+      notebooks.map(nb => nb.id === activeNbId ? { ...nb, cells: updatedCells } : nb)
+    );
+    toast.success("Inserted cell below (B / Ctrl+M B)");
+    focusCellInDOM(newCellId, true);
+  };
+
+  const deleteActiveCell = (cellId?: string | null) => {
+    const targetId = cellId || activeFocusedCellId;
+    if (!targetId) return;
+    const idx = activeNb.cells.findIndex(c => c.id === targetId);
+    if (idx === -1) return;
+    const neighborCell = activeNb.cells[idx + 1] || activeNb.cells[idx - 1];
+    deleteCell(targetId);
+    if (neighborCell) {
+      focusCellInDOM(neighborCell.id, false);
+    }
+  };
+
+  const copyActiveCell = (cellId?: string | null) => {
+    const targetId = cellId || activeFocusedCellId;
+    if (!targetId) return;
+    const cell = activeNb.cells.find(c => c.id === targetId);
+    if (!cell) return;
+    setCopiedCell({ ...cell });
+    toast.info("Copied cell to buffer (Press V or Ctrl+M V to paste)");
+  };
+
+  const pasteActiveCell = (cellId?: string | null) => {
+    if (!copiedCell) {
+      toast.error("Clipboard buffer is empty. Press C or Ctrl+M C to copy first.");
+      return;
+    }
+    const targetId = cellId || activeFocusedCellId;
+    const idx = targetId ? activeNb.cells.findIndex(c => c.id === targetId) : activeNb.cells.length - 1;
+    const insertIdx = idx !== -1 ? idx + 1 : activeNb.cells.length;
+    const newCellId = `c-${Date.now()}`;
+    const pasted: Cell = {
+      ...copiedCell,
+      id: newCellId,
+      output: undefined
+    };
+    const updatedCells = [...activeNb.cells];
+    updatedCells.splice(insertIdx, 0, pasted);
+    updateNotebooksWithUndo(
+      notebooks.map(nb => nb.id === activeNbId ? { ...nb, cells: updatedCells } : nb)
+    );
+    toast.success("Pasted cell below (V / Ctrl+M V)");
+    focusCellInDOM(newCellId, false);
+  };
+
+  const cutActiveCell = (cellId?: string | null) => {
+    const targetId = cellId || activeFocusedCellId;
+    if (!targetId) return;
+    const cell = activeNb.cells.find(c => c.id === targetId);
+    if (!cell) return;
+    setCopiedCell({ ...cell });
+    deleteActiveCell(targetId);
+    toast.info("Cut cell to clipboard (X / Ctrl+M X)");
+  };
+
+  // Keyboard events listener (Full Jupyter Shortcut Suite)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isCellTextarea = activeEl && activeEl.tagName === "TEXTAREA" && activeEl.hasAttribute("data-cell-id");
+      const isOtherInput = activeEl && (activeEl.tagName === "INPUT" || (activeEl.tagName === "TEXTAREA" && !isCellTextarea));
+
+      // If user is typing in a modal or non-cell input, ignore unless Escape
+      if (isOtherInput && e.key !== "Escape") {
+        return;
+      }
+
+      // Check current active cell target
+      const currentCellId = (isCellTextarea ? activeEl.getAttribute("data-cell-id") : null) || activeFocusedCellId || activeNb.cells[0]?.id;
+
+      // 1. Check for Ctrl+M (or Cmd+M) shortcut prefix
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "m") {
+        e.preventDefault();
+        setNotebookMode("command");
+        if (activeEl instanceof HTMLElement) activeEl.blur();
+        setCtrlMChordActive(true);
+        if (ctrlMTimerRef.current) clearTimeout(ctrlMTimerRef.current);
+        ctrlMTimerRef.current = setTimeout(() => {
+          setCtrlMChordActive(false);
+        }, 2200);
+        toast.info("Ctrl+M active: Press A, B, D, M, Y, Q, C, V, X, K, J, or H");
+        return;
+      }
+
+      // 2. If Ctrl+M chord is currently active
+      if (ctrlMChordActive) {
+        const key = e.key.toLowerCase();
+        let handled = true;
+
+        if (key === "a") {
+          insertCellAbove(currentCellId);
+        } else if (key === "b") {
+          insertCellBelow(currentCellId);
+        } else if (key === "d") {
+          deleteActiveCell(currentCellId);
+        } else if (key === "m") {
+          if (currentCellId) updateCellType(currentCellId, "markdown");
+          toast.success("Converted cell to Markdown");
+        } else if (key === "y") {
+          if (currentCellId) updateCellType(currentCellId, "python");
+          toast.success("Converted cell to Python");
+        } else if (key === "q") {
+          if (currentCellId) updateCellType(currentCellId, "sql");
+          toast.success("Converted cell to SQL");
+        } else if (key === "c") {
+          copyActiveCell(currentCellId);
+        } else if (key === "v") {
+          pasteActiveCell(currentCellId);
+        } else if (key === "x") {
+          cutActiveCell(currentCellId);
+        } else if (key === "k" || key === "arrowup") {
+          const idx = activeNb.cells.findIndex(c => c.id === currentCellId);
+          if (idx > 0) focusCellInDOM(activeNb.cells[idx - 1].id, false);
+        } else if (key === "j" || key === "arrowdown") {
+          const idx = activeNb.cells.findIndex(c => c.id === currentCellId);
+          if (idx !== -1 && idx < activeNb.cells.length - 1) focusCellInDOM(activeNb.cells[idx + 1].id, false);
+        } else if (key === "h") {
+          setShowKeyboardShortcuts(true);
+        } else if (key === "i") {
+          restartKernel();
+        } else if (key === "l") {
+          toast.info("Toggled cell formatting");
+        } else {
+          handled = false;
+        }
+
+        if (handled) {
+          e.preventDefault();
+          setCtrlMChordActive(false);
+          if (ctrlMTimerRef.current) clearTimeout(ctrlMTimerRef.current);
+          return;
+        }
+      }
+
+      // 3. Execution Shortcuts (Available in both Edit & Command modes)
+      if (e.key === "Enter" && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        if (currentCellId) {
+          runAndAdvanceCell(currentCellId);
+        }
+        return;
+      }
+
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        if (currentCellId) {
+          runInPlaceCell(currentCellId);
+        }
+        return;
+      }
+
+      if (e.key === "Enter" && (e.altKey || (e.shiftKey && e.altKey))) {
+        e.preventDefault();
+        if (currentCellId) {
+          runAndInsertBelow(currentCellId);
+        }
+        return;
+      }
+
+      // 4. Save Shortcut (Ctrl+S / Cmd+S)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        createSnapshot();
+        return;
+      }
+
+      // 5. If currently in EDIT MODE (Inside cell textarea)
+      if (isCellTextarea) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setNotebookMode("command");
+          if (activeEl instanceof HTMLElement) activeEl.blur();
+          if (currentCellId) focusCellInDOM(currentCellId, false);
+        }
+        return;
+      }
+
+      // 6. If currently in COMMAND MODE (Single-key shortcuts)
+      const now = Date.now();
+      const lastKey = lastKeyPressRef.current;
+      const key = e.key.toLowerCase();
+
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (currentCellId) {
+          focusCellInDOM(currentCellId, true);
+        }
+        return;
+      }
+
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setNotebookMode("command");
+        return;
+      }
+
+      if (key === "a" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        insertCellAbove(currentCellId);
+        return;
+      }
+
+      if (key === "b" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        insertCellBelow(currentCellId);
+        return;
+      }
+
+      // Double 'd' key to delete
+      if (key === "d" && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (lastKey.key === "d" && now - lastKey.time < 900) {
+          deleteActiveCell(currentCellId);
+          lastKeyPressRef.current = { key: "", time: 0 };
+        } else {
+          lastKeyPressRef.current = { key: "d", time: now };
+          toast.info("Press 'd' again to delete cell");
+        }
+        return;
+      }
+
+      // Double '0' key to restart kernel
+      if (key === "0" && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (lastKey.key === "0" && now - lastKey.time < 900) {
+          restartKernel();
+          lastKeyPressRef.current = { key: "", time: 0 };
+        } else {
+          lastKeyPressRef.current = { key: "0", time: now };
+          toast.info("Press '0' again to restart kernel");
+        }
+        return;
+      }
+
+      if (key === "y" && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (currentCellId) updateCellType(currentCellId, "python");
+        toast.success("Converted cell to Python Code (Y)");
+        return;
+      }
+
+      if (key === "m" && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (currentCellId) updateCellType(currentCellId, "markdown");
+        toast.success("Converted cell to Markdown (M)");
+        return;
+      }
+
+      if (key === "q" && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (currentCellId) updateCellType(currentCellId, "sql");
+        toast.success("Converted cell to SQL (Q)");
+        return;
+      }
+
+      if (key === "c" && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        copyActiveCell(currentCellId);
+        return;
+      }
+
+      if (key === "v" && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        pasteActiveCell(currentCellId);
+        return;
+      }
+
+      if (key === "x" && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        cutActiveCell(currentCellId);
+        return;
+      }
+
+      if (key === "z" && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+
+      if ((key === "k" || e.key === "ArrowUp") && !e.shiftKey) {
+        e.preventDefault();
+        const idx = activeNb.cells.findIndex(c => c.id === currentCellId);
+        if (idx > 0) {
+          focusCellInDOM(activeNb.cells[idx - 1].id, false);
+        }
+        return;
+      }
+
+      if ((key === "j" || e.key === "ArrowDown") && !e.shiftKey) {
+        e.preventDefault();
+        const idx = activeNb.cells.findIndex(c => c.id === currentCellId);
+        if (idx !== -1 && idx < activeNb.cells.length - 1) {
+          focusCellInDOM(activeNb.cells[idx + 1].id, false);
+        }
+        return;
+      }
+
+      if ((key === "k" || e.key === "ArrowUp") && e.shiftKey) {
+        e.preventDefault();
+        if (currentCellId) moveCell(currentCellId, "up");
+        return;
+      }
+
+      if ((key === "j" || e.key === "ArrowDown") && e.shiftKey) {
+        e.preventDefault();
+        if (currentCellId) moveCell(currentCellId, "down");
+        return;
+      }
+
+      if (key === "f" || ((e.ctrlKey || e.metaKey) && key === "f")) {
+        e.preventDefault();
+        setShowFindReplace(prev => !prev);
+        return;
+      }
+
+      if (key === "h" || e.key === "?") {
+        e.preventDefault();
+        setShowKeyboardShortcuts(true);
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [notebooks, activeNbId, selectedDatasetId, activeFocusedCellId, ctrlMChordActive, copiedCell, undoStack]);
+
+  // Quick AI Cell Action (Explain, Optimize, Visualize, Docstring)
+  const handleQuickAiAction = async (cellId: string, action: "explain" | "optimize" | "visualize" | "fix" | "docstring") => {
+    const cell = activeNb.cells.find(c => c.id === cellId);
+    if (!cell) return;
+
+    if (action === "fix") {
+      handleAiAutoFix(cellId, cell.output?.error?.message || "unknown syntax or runtime error");
+      return;
+    }
+
+    const quota = checkAndConsumeQuota(1, (session?.user as any)?.id);
+    if (!quota.allowed) {
+      triggerLimitModal();
+      toast.error("Monthly AI API quota limit reached for your plan. Please upgrade.");
+      return;
+    }
+
+    toast.info(`AI Copilot generating ${action} action...`);
+
+    let prompt = "";
+    if (action === "explain") {
+      prompt = `Explain the following ${cell.type} code step-by-step with clear, concise bullet points for a data science executive report. Return clean markdown formatted text:\n\n${cell.code}`;
+    } else if (action === "optimize") {
+      prompt = `Optimize the following ${cell.type} code for high performance, vectorization (using pandas/numpy/duckdb), and clean structure. Return ONLY the code block:\n\n${cell.code}`;
+    } else if (action === "visualize") {
+      prompt = `Generate a matplotlib / seaborn visualization code block corresponding to this dataset or logic. Return clean Python code:\n\n${cell.code}`;
+    } else if (action === "docstring") {
+      prompt = `Generate an executive Markdown documentation header and purpose description for this code block:\n\n${cell.code}`;
+    }
+
+    try {
+      const response = await fetch('/api/v1/gemini/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({
+          message: prompt,
+          context: `Active dataset is: ${selectedDataset?.name || 'sales_dataset.xlsx'}. User wants code to put in a notebook.`
+        })
+      });
+
+      const result = await response.json();
+      if (result.success && result.data) {
+        const text = result.data.text || result.data.python_code || result.data.sql_code || "";
+        
+        if (action === "explain" || action === "docstring") {
+          // Insert a Markdown cell right above this cell
+          const cellIdx = activeNb.cells.findIndex(c => c.id === cellId);
+          insertCellAt(Math.max(0, cellIdx), "markdown", text);
+          toast.success("Inserted AI Markdown documentation!");
+        } else if (action === "optimize") {
+          let cleanCode = text;
+          if (cleanCode.includes("```python")) {
+            cleanCode = cleanCode.split("```python")[1].split("```")[0].trim();
+          } else if (cleanCode.includes("```sql")) {
+            cleanCode = cleanCode.split("```sql")[1].split("```")[0].trim();
+          } else if (cleanCode.includes("```")) {
+            cleanCode = cleanCode.split("```")[1].split("```")[0].trim();
+          }
+          updateCellCode(cellId, cleanCode);
+          toast.success("Cell code optimized and vectorized!");
+        } else if (action === "visualize") {
+          let cleanCode = text;
+          if (cleanCode.includes("```python")) {
+            cleanCode = cleanCode.split("```python")[1].split("```")[0].trim();
+          } else if (cleanCode.includes("```")) {
+            cleanCode = cleanCode.split("```")[1].split("```")[0].trim();
+          }
+          const cellIdx = activeNb.cells.findIndex(c => c.id === cellId);
+          insertCellAt(cellIdx + 1, "python", cleanCode);
+          toast.success("Added new AI visualization cell!");
+        }
+      }
+    } catch (e: any) {
+      toast.error(`AI Action failed: ${e.message}`);
+    }
+  };
+
+  // Find & Replace Handlers
+  const handleFindReplaceInCell = (cellId: string, newCode: string) => {
+    updateCellCode(cellId, newCode);
+  };
+
+  const handleFindReplaceAll = (searchTerm: string, replaceTerm: string) => {
+    if (!searchTerm) return;
+    const regex = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g");
+    const updatedCells = activeNb.cells.map(c => ({
+      ...c,
+      code: c.code.replace(regex, replaceTerm)
+    }));
+    updateNotebooksWithUndo(
+      notebooks.map(nb => nb.id === activeNbId ? { ...nb, cells: updatedCells } : nb)
+    );
   };
 
   const installPackageByName = async (packageName: string) => {
@@ -1775,6 +2336,32 @@ export default function Notebooks() {
             <CollaborativeToolbar roomTitle={activeNb.name} />
 
             <Button
+              onClick={() => setIsPresentationMode(true)}
+              className="bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 font-semibold text-xs h-9 rounded-xl shadow-sm flex items-center gap-1.5"
+              title="Toggle Executive Presentation & Report Mode"
+            >
+              <Presentation className="h-4 w-4 text-indigo-400" /> Presentation View
+            </Button>
+
+            <Button
+              onClick={() => setShowSnippetsDrawer(true)}
+              variant="outline"
+              className="bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300 font-semibold text-xs h-9 rounded-xl flex items-center gap-1.5"
+              title="Open Data Science Recipe Library"
+            >
+              <BookOpen className="h-4 w-4 text-amber-400" /> DS Recipes
+            </Button>
+
+            <Button
+              onClick={() => setShowVariableInspectorModal(true)}
+              variant="outline"
+              className="bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/30 text-blue-300 font-semibold text-xs h-9 rounded-xl flex items-center gap-1.5"
+              title="Inspect Kernel Variables in Depth"
+            >
+              <Variable className="h-4 w-4 text-blue-400" /> Variable Inspector
+            </Button>
+
+            <Button
               onClick={() => navigate('/workspace')}
               variant="outline"
               className="bg-slate-800/80 hover:bg-slate-700/80 border-slate-700 text-slate-200 font-semibold text-xs h-9 rounded-xl flex items-center gap-1.5 shadow-sm"
@@ -1832,39 +2419,123 @@ export default function Notebooks() {
           </div>
         </div>
 
-        {/* Search, Undo, Export Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/30 p-3 rounded-xl border border-slate-850">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-500" />
-            <Input
-              placeholder="Search code content in notebook..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 pl-9 text-xs bg-slate-950 border-slate-850 rounded-xl"
-            />
-          </div>
+        {/* Presentation View Mode Switcher */}
+        {isPresentationMode ? (
+          <NotebookPresentationView
+            notebook={activeNb}
+            datasetName={selectedDataset?.name}
+            onExit={() => setIsPresentationMode(false)}
+          />
+        ) : (
+          <>
+            {/* Search, Undo, Export, Find/Replace Toolbar */}
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/30 p-3 rounded-xl border border-slate-850">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-500" />
+                  <Input
+                    placeholder="Search code content in notebook..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="h-9 pl-9 text-xs bg-slate-950 border-slate-850 rounded-xl"
+                  />
+                </div>
 
-          <div className="flex items-center gap-1.5">
-            <Button onClick={handleUndo} variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-slate-400 hover:text-white" title="Undo">
-              <Undo2 className="h-3.5 w-3.5" />
-            </Button>
-            <Button onClick={handleRedo} variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-slate-400 hover:text-white" title="Redo">
-              <Redo2 className="h-3.5 w-3.5" />
-            </Button>
-            <div className="h-4 w-[1px] bg-slate-800 mx-1"></div>
-            <Button onClick={() => handleAutoSave()} variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-slate-400 hover:text-white" title="Save Notebook">
-              <Save className="h-3.5 w-3.5" />
-            </Button>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {/* Jupyter Mode Pill Indicator */}
+                  {ctrlMChordActive ? (
+                    <div className="px-2.5 py-1 rounded-xl text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse flex items-center gap-1.5 shadow-sm">
+                      <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                      <span>Ctrl+M Chord Active (A/B/D/M/Y/Q/C/V/X/H)</span>
+                    </div>
+                  ) : notebookMode === "command" ? (
+                    <button
+                      onClick={() => {
+                        if (activeFocusedCellId) focusCellInDOM(activeFocusedCellId, true);
+                      }}
+                      className="px-2.5 py-1 rounded-xl text-xs font-mono font-bold bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 flex items-center gap-1.5 transition-all shadow-sm"
+                      title="Click or press Enter to switch to Edit Mode in active cell"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
+                      <span>COMMAND MODE</span>
+                      <span className="text-[10px] font-normal text-slate-400 hidden xl:inline">[Enter: Edit, H: Cheatsheet]</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setNotebookMode("command")}
+                      className="px-2.5 py-1 rounded-xl text-xs font-mono font-bold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 transition-all shadow-sm"
+                      title="Click or press Esc to exit to Command Mode"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span>EDIT MODE</span>
+                      <span className="text-[10px] font-normal text-slate-400 hidden xl:inline">[Esc: Command, Shift+Enter: Run]</span>
+                    </button>
+                  )}
 
-            {/* Export Dropdown representation */}
-            <div className="flex items-center border border-slate-800 rounded-lg p-0.5 bg-slate-950">
-              <span className="text-[10px] text-slate-500 px-1.5 font-mono">Export:</span>
-              <button onClick={() => handleExport("ipynb")} className="px-1.5 py-1 text-[10px] text-slate-400 hover:text-white hover:bg-slate-800 rounded font-bold">.ipynb</button>
-              <button onClick={() => handleExport("py")} className="px-1.5 py-1 text-[10px] text-slate-400 hover:text-white hover:bg-slate-800 rounded font-bold">.py</button>
-              <button onClick={() => handleExport("md")} className="px-1.5 py-1 text-[10px] text-slate-400 hover:text-white hover:bg-slate-800 rounded font-bold">.md</button>
+                  <Button
+                    onClick={() => setShowKeyboardShortcuts(true)}
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2.5 text-xs rounded-xl flex items-center gap-1.5 font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30"
+                    title="Open Jupyter Keyboard Shortcuts Cheat Sheet (H / ?)"
+                  >
+                    <BookOpen className="h-3.5 w-3.5 text-amber-400" />
+                    <span>Shortcuts (H)</span>
+                  </Button>
+
+                  <Button
+                    onClick={() => setShowFindReplace(!showFindReplace)}
+                    variant="outline"
+                    size="sm"
+                    className={`h-8 px-2.5 text-xs rounded-xl flex items-center gap-1.5 font-semibold transition-all ${
+                      showFindReplace
+                        ? "bg-indigo-600 text-white border-indigo-500 shadow-md"
+                        : "bg-slate-950 border-slate-800 text-slate-300 hover:text-white"
+                    }`}
+                  >
+                    <Replace className="h-3.5 w-3.5 text-indigo-400" />
+                    <span>Find & Replace</span>
+                  </Button>
+
+                  <div className="h-4 w-[1px] bg-slate-800 mx-0.5"></div>
+
+                  <Button onClick={handleUndo} variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-slate-400 hover:text-white" title="Undo (Z)">
+                    <Undo2 className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button onClick={handleRedo} variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-slate-400 hover:text-white" title="Redo">
+                    <Redo2 className="h-3.5 w-3.5" />
+                  </Button>
+                  <div className="h-4 w-[1px] bg-slate-800 mx-0.5"></div>
+                  <Button onClick={() => handleAutoSave()} variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-slate-400 hover:text-white" title="Save Notebook (Ctrl+S)">
+                    <Save className="h-3.5 w-3.5" />
+                  </Button>
+
+                  {/* Export Dropdown representation */}
+                  <div className="flex items-center border border-slate-800 rounded-lg p-0.5 bg-slate-950">
+                    <span className="text-[10px] text-slate-500 px-1.5 font-mono">Export:</span>
+                    <button onClick={() => handleExport("ipynb")} className="px-1.5 py-1 text-[10px] text-slate-400 hover:text-white hover:bg-slate-800 rounded font-bold">.ipynb</button>
+                    <button onClick={() => handleExport("py")} className="px-1.5 py-1 text-[10px] text-slate-400 hover:text-white hover:bg-slate-800 rounded font-bold">.py</button>
+                    <button onClick={() => handleExport("md")} className="px-1.5 py-1 text-[10px] text-slate-400 hover:text-white hover:bg-slate-800 rounded font-bold">.md</button>
+                    <button onClick={() => handleExport("html")} className="px-1.5 py-1 text-[10px] text-slate-400 hover:text-white hover:bg-slate-800 rounded font-bold">.html</button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Floating Find & Replace Bar */}
+              {showFindReplace && (
+                <NotebookFindReplaceBar
+                  isOpen={showFindReplace}
+                  onClose={() => setShowFindReplace(false)}
+                  cells={activeNb.cells}
+                  onReplaceInCell={handleFindReplaceInCell}
+                  onReplaceAll={handleFindReplaceAll}
+                  onJumpToCell={(cId) => {
+                    const el = document.getElementById(cId);
+                    el?.scrollIntoView({ behavior: "smooth" });
+                  }}
+                />
+              )}
             </div>
-          </div>
-        </div>
 
         {/* Notebook Cells Flow */}
         <div className="space-y-6">
@@ -1877,116 +2548,101 @@ export default function Notebooks() {
           ) : (
             filteredCells.map((cell, idx) => {
               const execMeta = cellExecutionMeta[cell.id];
-              const isMdEditing = markdownEditModes[cell.id] ?? (cell.type === 'markdown' && !cell.output);
+              const lockingUserId = activeLocks[cell.id];
+              const lockingPeer = lockingUserId && lockingUserId !== currentUserId ? collaborators.find(c => c.id === lockingUserId) : null;
 
               return (
-                <Card key={cell.id} id={cell.id} className="bg-slate-900/50 border-slate-800/80 backdrop-blur-xl overflow-hidden group hover:border-amber-500/20 transition-all">
-                  {/* Cell Header Controls */}
-                  <div className="bg-slate-950/80 px-4 py-2 border-b border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2 py-0.5 rounded font-mono font-bold uppercase text-[9px] ${
-                        cell.type === 'python' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                        cell.type === 'sql' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                        'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                      }`}>
-                        In [{idx + 1}] {cell.type}
-                      </span>
-
-                      {cell.type === 'python' && (
-                        <div className="flex items-center bg-slate-900 border border-slate-800 rounded-md p-0.5 text-[9px] font-mono">
-                          <button
-                            onClick={() => setCellRuntimes(prev => ({ ...prev, [cell.id]: "wasm" }))}
-                            className={`px-1.5 py-0.5 rounded transition-all ${
-                              (cellRuntimes[cell.id] || "wasm") === "wasm"
-                                ? "bg-indigo-600 text-white font-bold"
-                                : "text-slate-500 hover:text-slate-300"
-                            }`}
-                            title="Execute locally in client-side Pyodide WASM sandbox"
-                          >
-                            WASM
-                          </button>
-                          <button
-                            onClick={() => setCellRuntimes(prev => ({ ...prev, [cell.id]: "microvm" }))}
-                            className={`px-1.5 py-0.5 rounded transition-all ${
-                              cellRuntimes[cell.id] === "microvm"
-                                ? "bg-amber-600 text-white font-bold"
-                                : "text-slate-500 hover:text-slate-300"
-                            }`}
-                            title="Execute in dedicated MicroVM / gVisor isolated pod fleet"
-                          >
-                            MicroVM Pod
-                          </button>
-                        </div>
-                      )}
-
-                      {execMeta && (
-                        <span className="text-[10px] text-slate-500 flex items-center gap-1 font-mono">
-                          <Clock className="h-3 w-3 text-emerald-400" /> {execMeta.durationMs}ms
-                        </span>
-                      )}
+                <React.Fragment key={cell.id}>
+                  {/* Floating In-Between Add Cell Divider */}
+                  <div className="group/divider relative py-1.5 flex items-center justify-center opacity-0 hover:opacity-100 transition-all duration-200">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-slate-800/60 group-hover/divider:border-indigo-500/30 transition-colors"></div>
                     </div>
-
-                    <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                      {cell.isExecuting ? (
-                        <Button
-                          onClick={() => cancelCellExecution(cell.id)}
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20 rounded-lg flex items-center gap-1 font-semibold"
-                        >
-                          <Ban className="h-3 w-3" /> Cancel
-                        </Button>
-                      ) : (
-                        <Button onClick={() => executeCell(cell.id)} size="sm" variant="ghost" className="h-7 text-xs text-emerald-400 hover:bg-emerald-500/10 rounded-lg">
-                          <Play className="h-3 w-3 mr-1" /> {cell.type === 'markdown' ? (isMdEditing ? 'Render' : 'Edit') : 'Run'}
-                        </Button>
-                      )}
-                      
-                      {cell.type !== 'markdown' && (
-                        <>
-                          <Button onClick={() => runCellsAbove(cell.id)} size="sm" variant="ghost" className="h-7 text-xs text-slate-400 hover:bg-slate-800 rounded-lg" title="Run cells above">
-                            Above
-                          </Button>
-                          <Button onClick={() => runCellsBelow(cell.id)} size="sm" variant="ghost" className="h-7 text-xs text-slate-400 hover:bg-slate-800 rounded-lg" title="Run cells below">
-                            Below
-                          </Button>
-                        </>
-                      )}
-
-                      <Button onClick={() => { setTargetCellId(cell.id); setCopilotOpen(true); }} size="sm" variant="ghost" className="h-7 text-xs text-indigo-300 hover:bg-indigo-500/10 rounded-lg font-semibold">
-                        <Bot className="h-3.5 w-3.5 mr-1 text-indigo-400" /> Copilot
-                      </Button>
-
-                      <div className="h-4 w-[1px] bg-slate-850 mx-1"></div>
-
-                      <Button onClick={() => copyToClipboard(cell.code, "Copied cell code to clipboard!")} size="icon" variant="ghost" className="h-7 w-7 text-slate-400 hover:text-white rounded-lg" title="Copy cell code">
-                        <Copy className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button onClick={() => duplicateCell(cell.id)} size="icon" variant="ghost" className="h-7 w-7 text-slate-400 rounded-lg" title="Duplicate cell">
-                        <CopyPlus className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button onClick={() => moveCell(cell.id, "up")} size="icon" variant="ghost" className="h-7 w-7 text-slate-400 rounded-lg">
-                        <ChevronUp className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button onClick={() => moveCell(cell.id, "down")} size="icon" variant="ghost" className="h-7 w-7 text-slate-400 rounded-lg">
-                        <ChevronDown className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button onClick={() => deleteCell(cell.id)} size="icon" variant="ghost" className="h-7 w-7 text-rose-400 hover:bg-rose-500/10 rounded-lg">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                    <div className="relative z-10 flex items-center gap-1.5 bg-slate-900/95 px-3 py-1 rounded-full border border-slate-800 shadow-xl text-[10px] scale-95 group-hover/divider:scale-100 transition-all backdrop-blur-md">
+                      <span className="text-slate-400 font-mono pr-0.5">+ Insert:</span>
+                      <button
+                        onClick={() => insertCellAt(idx, "python")}
+                        className="px-2 py-0.5 rounded-md bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/20 font-mono font-medium transition-all"
+                      >
+                        Code
+                      </button>
+                      <button
+                        onClick={() => insertCellAt(idx, "sql")}
+                        className="px-2 py-0.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 font-mono font-medium transition-all"
+                      >
+                        SQL
+                      </button>
+                      <button
+                        onClick={() => insertCellAt(idx, "markdown")}
+                        className="px-2 py-0.5 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 font-mono font-medium transition-all"
+                      >
+                        Markdown
+                      </button>
                     </div>
                   </div>
 
-                  <CardContent className="p-4 space-y-4">
+                  <NotebookCellEditor
+                    cell={cell}
+                    index={idx}
+                    isActive={activeFocusedCellId === cell.id}
+                    notebookMode={notebookMode}
+                    isLockedByPeer={lockingPeer ? {
+                      name: lockingPeer.name,
+                      role: lockingPeer.role,
+                      color: lockingPeer.color,
+                      isTyping: Boolean(lockingPeer.isTyping),
+                    } : null}
+                    executionMeta={execMeta ? {
+                      durationMs: execMeta.durationMs,
+                      timestamp: execMeta.timestamp,
+                    } : undefined}
+                    runtime={cellRuntimes[cell.id] || "wasm"}
+                    onRuntimeChange={(rt) => setCellRuntimes(prev => ({ ...prev, [cell.id]: rt }))}
+                    onExecute={() => executeCell(cell.id)}
+                    onRunAndAdvance={() => runAndAdvanceCell(cell.id)}
+                    onRunInPlace={() => runInPlaceCell(cell.id)}
+                    onRunAndInsertBelow={() => runAndInsertBelow(cell.id)}
+                    onEnterCommandMode={() => {
+                      setNotebookMode("command");
+                      setActiveFocusedCellId(cell.id);
+                    }}
+                    onCancel={() => cancelCellExecution(cell.id)}
+                    onRunAbove={() => runCellsAbove(cell.id)}
+                    onRunBelow={() => runCellsBelow(cell.id)}
+                    onUpdateCode={(code) => {
+                      updateCellCode(cell.id, code);
+                      setTyping(true);
+                    }}
+                    onUpdateType={(type) => updateCellType(cell.id, type)}
+                    onDuplicate={() => duplicateCell(cell.id)}
+                    onDelete={() => deleteCell(cell.id)}
+                    onMoveUp={() => moveCell(cell.id, "up")}
+                    onMoveDown={() => moveCell(cell.id, "down")}
+                    onTriggerCopilot={() => {
+                      setTargetCellId(cell.id);
+                      setCopilotOpen(true);
+                    }}
+                    onQuickAiAction={(action) => handleQuickAiAction(cell.id, action)}
+                    onFocus={() => {
+                      setActiveFocusedCellId(cell.id);
+                      setNotebookMode("edit");
+                      focusCell(cell.id);
+                      setTyping(true);
+                    }}
+                    onBlur={() => {
+                      focusCell(null);
+                      setTyping(false);
+                    }}
+                  >
                     {/* Quick Snippets Inserter Strip for Code Cells */}
                     {cell.type !== 'markdown' && (
-                      <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1 text-[10px]">
-                        <span className="text-slate-500 font-mono shrink-0">Snippets:</span>
+                      <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pt-0.5 pb-1 text-[10px] opacity-70 hover:opacity-100 transition-opacity">
+                        <span className="text-slate-500 font-mono shrink-0 select-none">Snippets:</span>
                         {CODE_SNIPPETS.filter(s => s.type === cell.type).map((s, i) => (
                           <button
                             key={i}
                             onClick={() => injectSnippet(cell.id, s.code)}
-                            className="px-2 py-0.5 rounded bg-slate-950 border border-slate-850 text-slate-300 hover:text-amber-300 hover:border-amber-500/30 shrink-0 font-mono transition-colors"
+                            className="px-2 py-0.5 rounded-md bg-slate-950/80 border border-slate-800/80 text-slate-300 hover:text-amber-300 hover:border-amber-500/40 hover:bg-slate-900 shrink-0 font-mono transition-all"
                           >
                             + {s.label}
                           </button>
@@ -1994,85 +2650,32 @@ export default function Notebooks() {
                       </div>
                     )}
 
-                    {/* Collaborative Lock Indicator Banner */}
-                    {(() => {
-                      const lockingUserId = activeLocks[cell.id];
-                      const lockingPeer = lockingUserId && lockingUserId !== currentUserId ? collaborators.find(c => c.id === lockingUserId) : null;
-                      if (!lockingPeer) return null;
-                      return (
-                        <div 
-                          className="flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-semibold mb-2 border transition-all"
-                          style={{ backgroundColor: `${lockingPeer.color}15`, borderColor: `${lockingPeer.color}40`, color: lockingPeer.color }}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Lock className="w-3.5 h-3.5 shrink-0" />
-                            <span>Locked by {lockingPeer.name} ({lockingPeer.role})</span>
-                          </div>
-                          <span className="text-[10px] opacity-80 font-mono">
-                            {lockingPeer.isTyping ? "Typing..." : "CRDT Active"}
-                          </span>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Markdown Rendered / Edit View Switch */}
-                    {cell.type === 'markdown' && !isMdEditing && cell.output?.type === 'markdown' ? (
-                      <div
-                        onClick={() => setMarkdownEditModes(prev => ({ ...prev, [cell.id]: true }))}
-                        className="prose prose-invert prose-xs text-slate-200 bg-slate-950/60 p-4 rounded-xl border border-slate-850 cursor-pointer hover:border-emerald-500/40 transition-all max-w-none"
-                        title="Click to edit Markdown text"
-                      >
-                        <Markdown>{cell.code}</Markdown>
-                        <span className="text-[9px] text-slate-500 block text-right mt-2 font-mono">Click to edit markdown</span>
-                      </div>
-                    ) : (
-                      <div className="relative">
-                        <textarea
-                          value={cell.code}
-                          data-cell-id={cell.id}
-                          onFocus={() => {
-                            focusCell(cell.id);
-                            setTyping(true);
-                          }}
-                          onBlur={() => {
-                            focusCell(null);
-                            setTyping(false);
-                          }}
-                          onChange={(e) => {
-                            updateCellCode(cell.id, e.target.value);
-                            setTyping(true);
-                          }}
-                          rows={Math.max(3, cell.code.split("\n").length)}
-                          className="w-full bg-slate-950 border border-slate-850 rounded-xl p-3 font-mono text-xs text-slate-200 focus:outline-none focus:border-amber-500/40 resize-y leading-relaxed"
-                          placeholder={cell.type === "markdown" ? "## Section Header\nExplain details..." : "# Write executable code..."}
-                        />
-                      </div>
-                    )}
-
                     {/* Cell Output Display Panel */}
                     {cell.isExecuting ? (
-                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-850 flex items-center justify-between gap-2 text-xs text-slate-400 font-mono">
-                        <div className="flex items-center gap-2">
+                      <div className="bg-slate-950/90 p-3.5 rounded-xl border border-slate-800 flex items-center justify-between gap-2 text-xs text-slate-300 font-mono shadow-inner">
+                        <div className="flex items-center gap-2.5">
                           <RefreshCw className="h-3.5 w-3.5 animate-spin text-amber-400" />
-                          <span>Kernel executing cell logic...</span>
+                          <span className="text-slate-400">Kernel executing cell logic...</span>
                         </div>
                         <Button
                           onClick={() => cancelCellExecution(cell.id)}
                           size="sm"
                           variant="outline"
-                          className="bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20 text-xs h-7 px-2.5 rounded-lg flex items-center gap-1 font-sans"
+                          className="bg-rose-500/10 border-rose-500/30 text-rose-300 hover:bg-rose-500/20 text-xs h-6 px-2.5 rounded-lg flex items-center gap-1 font-sans transition-all"
                         >
                           <Ban className="h-3 w-3" /> Cancel Execution
                         </Button>
                       </div>
                     ) : cell.output && cell.type !== 'markdown' ? (
-                      <div className="bg-slate-950 rounded-xl border border-slate-850 overflow-hidden text-xs font-mono">
-                        <div className="bg-slate-900/50 px-3 py-1 border-b border-slate-850 flex items-center justify-between">
-                          <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Cell Output</span>
-                          <Button onClick={() => clearOutput(cell.id)} variant="ghost" size="sm" className="h-5 text-[9px] text-slate-400 p-1">Clear Output</Button>
+                      <div className="bg-slate-950/90 rounded-xl border border-slate-800/90 overflow-hidden text-xs font-mono shadow-inner">
+                        <div className="bg-slate-900/60 px-3 py-1.5 border-b border-slate-800/80 flex items-center justify-between">
+                          <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Output
+                          </span>
+                          <Button onClick={() => clearOutput(cell.id)} variant="ghost" size="sm" className="h-5 text-[10px] text-slate-400 hover:text-slate-200 px-1.5 py-0.5 rounded">Clear Output</Button>
                         </div>
 
-                        <div className="p-4 overflow-x-auto">
+                        <div className="p-3.5 overflow-x-auto">
                           {/* Text / stdout Output */}
                           {cell.output.type === "text" && (
                             <div className="space-y-2">
@@ -2181,8 +2784,8 @@ export default function Notebooks() {
                         </div>
                       </div>
                     ) : null}
-                  </CardContent>
-                </Card>
+                  </NotebookCellEditor>
+                </React.Fragment>
               );
             })
           )}
@@ -2200,7 +2803,9 @@ export default function Notebooks() {
             <Plus className="h-4 w-4 mr-2" /> + Markdown Cell
           </Button>
         </div>
-      </div>
+      </>
+    )}
+  </div>
 
       {/* 3. RIGHT SIDEBAR: Variable Explorer & Package Manager */}
       <div className="w-full lg:w-64 shrink-0 space-y-6">
@@ -2290,19 +2895,47 @@ export default function Notebooks() {
 
         {/* CHEATSHEET SHORTCUTS CARD */}
         <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-xl">
-          <CardContent className="p-4 text-[10px] space-y-1.5 text-slate-400">
-            <div className="font-bold text-slate-300 flex items-center gap-1">
-              <Info className="h-3.5 w-3.5 text-blue-400" /> Interactive Shortcuts
+          <CardContent className="p-4 text-[10px] space-y-2 text-slate-400">
+            <div className="flex items-center justify-between">
+              <div className="font-bold text-slate-300 flex items-center gap-1">
+                <Keyboard className="h-3.5 w-3.5 text-amber-400" /> Jupyter Shortcuts
+              </div>
+              <button
+                onClick={() => setShowKeyboardShortcuts(true)}
+                className="text-[9px] font-mono text-amber-400 hover:text-amber-300 underline"
+              >
+                View all (H)
+              </button>
             </div>
             <div className="flex justify-between border-b border-slate-850/60 pb-1">
-              <span>Run Selected Cell:</span>
-              <kbd className="font-mono bg-slate-950 px-1 rounded text-slate-300">Shift + Enter</kbd>
+              <span>Run & Advance:</span>
+              <kbd className="font-mono bg-slate-950 px-1 rounded text-slate-200">Shift + Enter</kbd>
             </div>
             <div className="flex justify-between border-b border-slate-850/60 pb-1">
-              <span>Save Version:</span>
-              <kbd className="font-mono bg-slate-950 px-1 rounded text-slate-300">Ctrl + S</kbd>
+              <span>Run in Place:</span>
+              <kbd className="font-mono bg-slate-950 px-1 rounded text-slate-200">Ctrl + Enter</kbd>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between border-b border-slate-850/60 pb-1">
+              <span>Insert Cell Above:</span>
+              <kbd className="font-mono bg-slate-950 px-1 rounded text-slate-200">A / Ctrl+M A</kbd>
+            </div>
+            <div className="flex justify-between border-b border-slate-850/60 pb-1">
+              <span>Insert Cell Below:</span>
+              <kbd className="font-mono bg-slate-950 px-1 rounded text-slate-200">B / Ctrl+M B</kbd>
+            </div>
+            <div className="flex justify-between border-b border-slate-850/60 pb-1">
+              <span>Delete Active Cell:</span>
+              <kbd className="font-mono bg-slate-950 px-1 rounded text-slate-200">D D / Ctrl+M D</kbd>
+            </div>
+            <div className="flex justify-between border-b border-slate-850/60 pb-1">
+              <span>Convert Type:</span>
+              <span className="font-mono text-slate-200">Y (Code) / M (Text)</span>
+            </div>
+            <div className="flex justify-between border-b border-slate-850/60 pb-1">
+              <span>Mode Switch:</span>
+              <span className="font-mono text-slate-200">Esc (Cmd) / Enter (Edit)</span>
+            </div>
+            <div className="flex justify-between pt-0.5">
               <span>Exposed variables:</span>
               <span className="font-mono text-[9px] text-amber-400">df, schema, summary</span>
             </div>
@@ -2411,43 +3044,12 @@ export default function Notebooks() {
       </AnimatePresence>
 
       {/* KEYBOARD SHORTCUTS HELP MODAL */}
-      <AnimatePresence>
-        {showKeyboardShortcuts && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
-              <button onClick={() => setShowKeyboardShortcuts(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
-                <X className="h-5 w-5" />
-              </button>
-              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-amber-400" /> Notebook IDE Keyboard Shortcuts
-              </h3>
-              <div className="space-y-2 text-xs text-slate-300 font-sans pb-4">
-                <div className="flex justify-between p-2 rounded bg-slate-950/60 border border-slate-850">
-                  <span className="font-semibold">Run Active Focused Cell:</span>
-                  <kbd className="font-mono bg-slate-900 px-1.5 py-0.5 rounded text-white">Shift + Enter</kbd>
-                </div>
-                <div className="flex justify-between p-2 rounded bg-slate-950/60 border border-slate-850">
-                  <span className="font-semibold">Add New Python Code Cell:</span>
-                  <kbd className="font-mono bg-slate-900 px-1.5 py-0.5 rounded text-white">Alt + P</kbd>
-                </div>
-                <div className="flex justify-between p-2 rounded bg-slate-950/60 border border-slate-850">
-                  <span className="font-semibold">Add New SQL Query Cell:</span>
-                  <kbd className="font-mono bg-slate-900 px-1.5 py-0.5 rounded text-white">Alt + S</kbd>
-                </div>
-                <div className="flex justify-between p-2 rounded bg-slate-950/60 border border-slate-850">
-                  <span className="font-semibold">Add New Markdown Section:</span>
-                  <kbd className="font-mono bg-slate-900 px-1.5 py-0.5 rounded text-white">Alt + M</kbd>
-                </div>
-              </div>
-              <div className="flex justify-end">
-                <Button onClick={() => setShowKeyboardShortcuts(false)} className="bg-slate-800 hover:bg-slate-700 text-white rounded-xl">
-                  Close Help
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+      <NotebookShortcutsModal
+        isOpen={showKeyboardShortcuts}
+        onClose={() => setShowKeyboardShortcuts(false)}
+      />
 
+      <AnimatePresence>
         {/* PYODIDE WASM ZERO-TRUST SANDBOX POLICY MODAL */}
         {showSandboxPolicyModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in">
@@ -2578,211 +3180,35 @@ export default function Notebooks() {
         isOpen={showMicroVMModal}
         onClose={() => setShowMicroVMModal(false)}
       />
+
+      {/* DATA SCIENCE RECIPES DRAWER */}
+      <NotebookSnippetsDrawer
+        isOpen={showSnippetsDrawer}
+        onClose={() => setShowSnippetsDrawer(false)}
+        onInjectSnippet={(code, type) => {
+          if (activeFocusedCellId) {
+            injectSnippet(activeFocusedCellId, code);
+          } else {
+            addCell(type, code);
+          }
+        }}
+        onAddSnippetAsCell={(code, type) => {
+          addCell(type, code);
+        }}
+      />
+
+      {/* KERNEL VARIABLE INSPECTOR MODAL */}
+      <NotebookVariableInspectorModal
+        isOpen={showVariableInspectorModal}
+        onClose={() => setShowVariableInspectorModal(false)}
+        variables={kernelVariables}
+        selectedDataset={selectedDataset}
+      />
     </div>
   );
 }
 
-// INTERACTIVE TABLE OUTPUT COMPONENT WITH RECHARTS SWITCHER
+// INTERACTIVE TABLE OUTPUT COMPONENT WITH RECHARTS SWITCHER & ADVANCED PROFILING
 function InteractiveTableOutput({ data }: { data: any[] }) {
-  const [viewMode, setViewMode] = useState<"table" | "chart">("table");
-  const [chartType, setChartType] = useState<"bar" | "line" | "area" | "pie">("bar");
-  const [xAxisKey, setXAxisKey] = useState<string>("");
-  const [yAxisKey, setYAxisKey] = useState<string>("");
-  const [searchTerm, setSearchTerm] = useState("");
-
-  const columns = useMemo(() => {
-    if (!data || data.length === 0) return [];
-    return Object.keys(data[0]);
-  }, [data]);
-
-  useEffect(() => {
-    if (columns.length > 0) {
-      if (!xAxisKey) setXAxisKey(columns[0]);
-      if (!yAxisKey) {
-        const numCol = columns.find(c => typeof data[0][c] === 'number') || columns[1] || columns[0];
-        setYAxisKey(numCol);
-      }
-    }
-  }, [columns, data]);
-
-  const filteredData = useMemo(() => {
-    if (!searchTerm.trim()) return data;
-    return data.filter(row =>
-      Object.values(row).some(v => String(v).toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-  }, [data, searchTerm]);
-
-  const chartData = useMemo(() => {
-    return filteredData.map((row, idx) => ({
-      ...row,
-      xVal: String(row[xAxisKey] ?? `Row ${idx + 1}`),
-      yVal: Number(row[yAxisKey]) || 0
-    }));
-  }, [filteredData, xAxisKey, yAxisKey]);
-
-  const copyAsCsv = () => {
-    if (!data || data.length === 0) return;
-    const headers = columns.join(",");
-    const rows = data.map(r => columns.map(c => `"${String(r[c] ?? '').replace(/"/g, '""')}"`).join(","));
-    const csvContent = [headers, ...rows].join("\n");
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(csvContent).then(() => {
-        toast.success("Copied table as CSV!");
-      }).catch(() => {
-        toast.error("Failed to copy CSV.");
-      });
-    } else {
-      try {
-        const textArea = document.createElement("textarea");
-        textArea.value = csvContent;
-        textArea.style.position = "fixed";
-        textArea.style.left = "-999999px";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textArea);
-        toast.success("Copied table as CSV!");
-      } catch (e) {
-        toast.error("Failed to copy CSV.");
-      }
-    }
-  };
-
-  return (
-    <div className="space-y-3">
-      {/* View Switcher & Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-900/60 p-2 rounded-xl border border-slate-800">
-        <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
-          <button
-            onClick={() => setViewMode("table")}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold transition-all ${
-              viewMode === "table" ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <TableIcon className="h-3 w-3" /> Data Grid
-          </button>
-          <button
-            onClick={() => setViewMode("chart")}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold transition-all ${
-              viewMode === "chart" ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <BarChart3 className="h-3 w-3" /> Recharts View
-          </button>
-        </div>
-
-        {viewMode === "table" ? (
-          <div className="flex items-center gap-2">
-            <Input
-              placeholder="Filter table rows..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="h-7 text-[10px] w-40 bg-slate-950 border-slate-800 rounded-lg"
-            />
-            <Button onClick={copyAsCsv} variant="ghost" size="sm" className="h-7 text-[10px] text-slate-300 hover:bg-slate-800 rounded-lg">
-              <Copy className="h-3 w-3 mr-1" /> Copy CSV
-            </Button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 text-[10px]">
-            <span className="text-slate-500">Type:</span>
-            <select
-              value={chartType}
-              onChange={e => setChartType(e.target.value as any)}
-              className="bg-slate-950 border border-slate-800 text-slate-200 rounded px-2 py-0.5"
-            >
-              <option value="bar">Bar Plot</option>
-              <option value="line">Line Trend</option>
-              <option value="area">Area Plot</option>
-              <option value="pie">Pie Chart</option>
-            </select>
-
-            <span className="text-slate-500">X-Axis:</span>
-            <select
-              value={xAxisKey}
-              onChange={e => setXAxisKey(e.target.value)}
-              className="bg-slate-950 border border-slate-800 text-slate-200 rounded px-2 py-0.5 max-w-[100px] truncate"
-            >
-              {columns.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-
-            <span className="text-slate-500">Y-Axis:</span>
-            <select
-              value={yAxisKey}
-              onChange={e => setYAxisKey(e.target.value)}
-              className="bg-slate-950 border border-slate-800 text-slate-200 rounded px-2 py-0.5 max-w-[100px] truncate"
-            >
-              {columns.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-        )}
-      </div>
-
-      {/* Table Content */}
-      {viewMode === "table" ? (
-        <div className="overflow-x-auto border border-slate-850 rounded-xl bg-slate-950 max-h-80 custom-scrollbar select-text">
-          <table className="w-full text-left font-mono text-xs">
-            <thead>
-              <tr className="border-b border-slate-800 bg-slate-900 text-slate-400">
-                {columns.map((col) => (
-                  <th key={col} className="p-2.5 font-bold border-r border-slate-800 last:border-r-0 whitespace-nowrap">{col}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredData.map((row: any, r: number) => (
-                <tr key={r} className="border-b border-slate-850/60 last:border-0 hover:bg-slate-900/30">
-                  {columns.map((col: string, c: number) => (
-                    <td key={c} className="p-2.5 text-slate-200 border-r border-slate-850/60 last:border-r-0 whitespace-nowrap">
-                      {row[col] === null || row[col] === undefined ? <span className="text-slate-600 italic">None</span> : String(row[col])}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="w-full h-[240px] min-h-[240px] pt-2 bg-slate-950 p-3 rounded-xl border border-slate-850">
-          <ResponsiveContainer width="100%" height={230}>
-            {chartType === "line" ? (
-              <LineChart data={chartData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
-                <XAxis dataKey="xVal" stroke="#94a3b8" fontSize={11} />
-                <YAxis stroke="#94a3b8" fontSize={11} />
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', color: '#f8fafc' }} />
-                <Line type="monotone" dataKey="yVal" name={yAxisKey} stroke="#6366f1" strokeWidth={2.5} />
-              </LineChart>
-            ) : chartType === "area" ? (
-              <AreaChart data={chartData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
-                <XAxis dataKey="xVal" stroke="#94a3b8" fontSize={11} />
-                <YAxis stroke="#94a3b8" fontSize={11} />
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', color: '#f8fafc' }} />
-                <Area type="monotone" dataKey="yVal" name={yAxisKey} stroke="#10b981" fill="#10b981" fillOpacity={0.2} />
-              </AreaChart>
-            ) : chartType === "pie" ? (
-              <PieChart>
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', color: '#f8fafc' }} />
-                <Pie data={chartData} dataKey="yVal" nameKey="xVal" cx="50%" cy="50%" outerRadius={75} label={(e: any) => e.xVal}>
-                  {chartData.map((_, index) => (
-                    <RechartsCell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                  ))}
-                </Pie>
-              </PieChart>
-            ) : (
-              <BarChart data={chartData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
-                <XAxis dataKey="xVal" stroke="#94a3b8" fontSize={11} />
-                <YAxis stroke="#94a3b8" fontSize={11} />
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', color: '#f8fafc' }} />
-                <Bar dataKey="yVal" name={yAxisKey} fill="#f59e0b" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            )}
-          </ResponsiveContainer>
-        </div>
-      )}
-    </div>
-  );
+  return <NotebookTableOutput data={data} />;
 }

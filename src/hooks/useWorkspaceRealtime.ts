@@ -310,8 +310,8 @@ export function useWorkspaceRealtime(options: UseWorkspaceRealtimeOptions = {}) 
         }
       }
 
-      // Re-fetch in the background to ensure all calculated views stay consistent
-      fetchDashboardMetrics(true);
+      // Re-fetch in the background with batch debouncing to ensure all calculated views stay consistent
+      scheduleSilentRefetch();
     };
 
     // Subscribe to Postgres changes on core workspace tables
@@ -366,23 +366,36 @@ export function useWorkspaceRealtime(options: UseWorkspaceRealtimeOptions = {}) 
         }
       });
 
+    // Debounce timer for background metric refetches
+    let debounceTimer: NodeJS.Timeout | null = null;
+    const scheduleSilentRefetch = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        if (isMountedRef.current) {
+          fetchDashboardMetrics(true);
+        }
+      }, 350);
+    };
+
     // Heartbeat sync and local event listeners for resilient live updates
     const handleLocalUpdate = () => {
-      fetchDashboardMetrics(true);
+      scheduleSilentRefetch();
     };
 
     window.addEventListener('vivexa_data_updated', handleLocalUpdate);
     window.addEventListener('storage', handleLocalUpdate);
     window.addEventListener('focus', handleLocalUpdate);
 
+    // Efficient 45s heartbeat polling only when window is active & visible
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
         fetchDashboardMetrics(true);
       }
-    }, 20000);
+    }, 45000);
 
     return () => {
       isMountedRef.current = false;
+      if (debounceTimer) clearTimeout(debounceTimer);
       clearInterval(interval);
       window.removeEventListener('vivexa_data_updated', handleLocalUpdate);
       window.removeEventListener('storage', handleLocalUpdate);

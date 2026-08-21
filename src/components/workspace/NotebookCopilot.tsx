@@ -29,7 +29,7 @@ interface NotebookCopilotProps {
   sessionToken?: string;
 }
 
-export default function NotebookCopilot({
+const NotebookCopilotComponent: React.FC<NotebookCopilotProps> = ({
   isOpen,
   onClose,
   activeNotebook,
@@ -40,7 +40,7 @@ export default function NotebookCopilot({
   onExecuteCell,
   onInstallPackage,
   sessionToken
-}: NotebookCopilotProps) {
+}) => {
   const [activeTab, setActiveTab] = useState<"chat" | "cell_work" | "error_doctor" | "settings">("chat");
 
   const copyToClipboard = async (text: string, label: string = "Copied to clipboard!") => {
@@ -1187,5 +1187,8 @@ export default function NotebookCopilot({
   </AnimatePresence>,
   document.body
 );
-}
+};
+
+export const NotebookCopilot = React.memo(NotebookCopilotComponent);
+export default NotebookCopilot;
 

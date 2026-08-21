@@ -75,11 +75,40 @@
   border: 1px solid rgba(51, 65, 85, 0.5);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  transition: border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1), 
+              box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), 
+              transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .enterprise-card:hover {
   border-color: rgba(99, 102, 241, 0.35);
+  transform: translateY(-2px);
+  box-shadow: 0 14px 34px -10px rgba(0, 0, 0, 0.65), 0 0 20px -5px rgba(99, 102, 241, 0.12);
+}
+
+/* Dashboard Interactive Elevation & Interactivity */
+.dashboard-card-hover {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), 
+              box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), 
+              border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dashboard-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 34px -10px rgba(0, 0, 0, 0.65), 0 0 20px -5px rgba(99, 102, 241, 0.12);
+  border-color: rgba(99, 102, 241, 0.35);
+}
+
+.kpi-card-hover {
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), 
+              box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1), 
+              border-color 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.kpi-card-hover:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.7), 0 0 24px -6px rgba(99, 102, 241, 0.15);
 }
 
 /* Focus and Outline States */

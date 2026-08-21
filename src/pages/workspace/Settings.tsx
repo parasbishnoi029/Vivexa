@@ -4,7 +4,8 @@ import {
   Smartphone, Camera, Loader2, Key, CreditCard, Building, Users,
   BarChart2, Zap, Sparkles, Download, Lock, CheckCircle2, AlertTriangle,
   FileText, Database, LayoutDashboard, Activity, Clock, HelpCircle,
-  Search, Server, MessageSquare, ExternalLink, Fingerprint, RefreshCw, Trash2
+  Search, Server, MessageSquare, ExternalLink, Fingerprint, RefreshCw, Trash2,
+  Sun, Moon, Laptop, Monitor
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,7 +58,7 @@ const TAB_ALIASES: Record<string, string> = {
 
 export default function WorkspaceSettings() {
   const { user, session } = useAuthStore();
-  const { setTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme, systemTheme, isSystem, hasManualOverride, resetToSystem } = useTheme();
   const token = session?.access_token;
   const initials = user?.email?.substring(0, 2).toUpperCase() || 'U';
 
@@ -964,6 +965,141 @@ Thank you for scaling with Vivexa!
                   <div className="space-y-1.5">
                     <label className="text-slate-300 font-medium block text-xs">Bio & Executive Summary</label>
                     <textarea placeholder="Write a brief summary of your role, responsibilities, or expertise..." value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className="w-full px-3 py-2 bg-slate-950/40 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-indigo-500 placeholder:text-slate-600" />
+                  </div>
+
+                  {/* Appearance & Color Theme Synchronization */}
+                  <div className="pt-4 border-t border-slate-800 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h4 className="font-bold text-white text-xs flex items-center gap-2">
+                          <Laptop className="h-4 w-4 text-indigo-400" /> Color Theme & OS Synchronization
+                        </h4>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Automatically sync with your operating system preference (<code className="text-indigo-300 font-mono text-[10px]">prefers-color-scheme</code>) or select a manual override.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[10px] text-slate-400 shrink-0">
+                        <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>OS Detected:</span>
+                        <span className="font-bold text-indigo-300 capitalize">{systemTheme}</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                      {/* System / OS Sync */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTheme("system");
+                          saveSetting("theme", "system");
+                          toast.success(`Theme set to Auto-Sync with OS (${systemTheme} mode active)`);
+                        }}
+                        className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between gap-3 relative cursor-pointer ${
+                          theme === "system"
+                            ? "bg-indigo-600/10 border-indigo-500 text-white shadow-md shadow-indigo-500/10 ring-1 ring-indigo-500/50"
+                            : "bg-slate-950/40 border-slate-850 text-slate-400 hover:text-slate-200 hover:border-slate-700"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center gap-2 font-bold text-slate-200">
+                            <Monitor className="h-4 w-4 text-indigo-400" />
+                            <span>System Preference</span>
+                          </div>
+                          {theme === "system" && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-slate-400 leading-snug">
+                            Tracks <span className="font-mono text-indigo-300">prefers-color-scheme</span> in real time.
+                          </p>
+                          <span className="text-[10px] text-indigo-400/80 font-mono mt-1 block">
+                            Resolved: {resolvedTheme}
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* Dark Mode */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTheme("dark");
+                          saveSetting("theme", "dark");
+                          toast.success("Theme set to Dark Mode (Manual Override)");
+                        }}
+                        className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between gap-3 relative cursor-pointer ${
+                          theme === "dark"
+                            ? "bg-indigo-600/10 border-indigo-500 text-white shadow-md shadow-indigo-500/10 ring-1 ring-indigo-500/50"
+                            : "bg-slate-950/40 border-slate-850 text-slate-400 hover:text-slate-200 hover:border-slate-700"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center gap-2 font-bold text-slate-200">
+                            <Moon className="h-4 w-4 text-purple-400" />
+                            <span>Dark Mode</span>
+                          </div>
+                          {theme === "dark" && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                              Manual
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-snug">
+                          High contrast deep slate surfaces optimized for analytical focus.
+                        </p>
+                      </button>
+
+                      {/* Light Mode */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTheme("light");
+                          saveSetting("theme", "light");
+                          toast.success("Theme set to Light Mode (Manual Override)");
+                        }}
+                        className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between gap-3 relative cursor-pointer ${
+                          theme === "light"
+                            ? "bg-indigo-600/10 border-indigo-500 text-white shadow-md shadow-indigo-500/10 ring-1 ring-indigo-500/50"
+                            : "bg-slate-950/40 border-slate-850 text-slate-400 hover:text-slate-200 hover:border-slate-700"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center gap-2 font-bold text-slate-200">
+                            <Sun className="h-4 w-4 text-amber-400" />
+                            <span>Light Mode</span>
+                          </div>
+                          {theme === "light" && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                              Manual
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-snug">
+                          Crisp daylight presentation with balanced luminous contrast.
+                        </p>
+                      </button>
+                    </div>
+
+                    {hasManualOverride && (
+                      <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[11px]">
+                        <span className="text-indigo-300">
+                          Manual override is active ({theme} mode). OS preferences are bypassed.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            resetToSystem();
+                            saveSetting("theme", "system");
+                            toast.success("Reverted to automatic OS synchronization.");
+                          }}
+                          className="font-bold text-indigo-400 hover:text-indigo-200 underline cursor-pointer"
+                        >
+                          Reset to OS Sync
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Language & Regional Preferences */}
