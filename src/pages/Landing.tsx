@@ -55,7 +55,7 @@ export default function LandingPage() {
                 className="mb-6 inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-4 py-1.5 text-[11px] font-semibold text-indigo-300 backdrop-blur-md shadow-lg shadow-indigo-500/10"
               >
                 <Sparkles className="h-3.5 w-3.5 text-indigo-400 animate-pulse" />
-                <span>Vivexa 4.0 • Autonomous Multi-Agent Swarms & Decision Intelligence</span>
+                <span>Vivexa 4.2 • Asynchronous Worker Pools • 250MB WASM Safety • Token Budgeting</span>
               </motion.div>
 
               {/* Main Headline */}
@@ -78,7 +78,7 @@ export default function LandingPage() {
                 transition={{ duration: 0.45, delay: 0.1, ease: "easeOut" }}
                 className="mt-6 max-w-3xl text-sm sm:text-base md:text-lg leading-relaxed text-slate-400 font-normal"
               >
-                Coordinate specialized AI agent swarms to profile complex enterprise schemas, run in-browser WebAssembly + MicroVM Python sandboxes, forecast predictive metrics with 95% confidence intervals, and deliver audited C-suite business briefings in seconds.
+                Coordinate specialized AI agent swarms, process zero-copy queries with 250MB WASM memory safety guardrails, offload heavy compute to asynchronous background worker threads, collaborate in real time with Yjs CRDTs, and enforce granular workspace token budgets.
               </motion.p>
 
               {/* Core CTAs */}
@@ -532,19 +532,19 @@ export default function LandingPage() {
                   <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
                     <HardDrive className="h-4 w-4" />
                   </div>
-                  <h3 className="text-sm font-bold text-slate-100">Vivexa Enterprise Lakehouse</h3>
+                  <h3 className="text-sm font-bold text-slate-100">250MB WASM Memory Safety Guardrails</h3>
                   <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Zero-copy query engine over Iceberg, Delta, and Parquet formats. Live telemetry catalog, AST SQL optimizer, and real-time streaming ingestion.
+                    Protects client browser stability with a 250MB WASM threshold. Large datasets automatically failover to server-side pushdown engines seamlessly.
                   </p>
                 </div>
 
                 <div className="p-6 rounded-2xl border border-slate-800/80 bg-slate-950/40 hover:border-indigo-500/30 transition-all space-y-4">
                   <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-                    <FileCheck className="h-4 w-4" />
+                    <Server className="h-4 w-4" />
                   </div>
-                  <h3 className="text-sm font-bold text-slate-100">Senior Data Scientist Executive Reports</h3>
+                  <h3 className="text-sm font-bold text-slate-100">Decoupled Background Workers</h3>
                   <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Automated 4-pass statistical verification with 95% Bootstrap CI. Instant 1-click multi-format exports for PDF, PPTX, HTML, and Markdown.
+                    High-compute MicroVM pod provisioning and AI code execution offloaded to worker threads, ensuring zero event-loop blocking on main API routes.
                   </p>
                 </div>
 
@@ -552,19 +552,19 @@ export default function LandingPage() {
                   <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
                     <Shield className="h-4 w-4" />
                   </div>
-                  <h3 className="text-sm font-bold text-slate-100">SCIM 2.0 & SAML SSO</h3>
+                  <h3 className="text-sm font-bold text-slate-100">Workspace Token Budgeting & Limits</h3>
                   <p className="text-[11px] text-slate-400 leading-relaxed">
-                    RFC 7644 compliant endpoints for automated user lifecycle, Okta/Azure AD group synchronization, and SAML role management.
+                    Granular per-tenant daily AI token caps and query execution timeouts (30s–180s) to prevent unexpected API costs and runaway agent loops.
                   </p>
                 </div>
 
                 <div className="p-6 rounded-2xl border border-slate-800/80 bg-slate-950/40 hover:border-indigo-500/30 transition-all space-y-4">
                   <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-                    <Cpu className="h-4 w-4" />
+                    <Code className="h-4 w-4" />
                   </div>
-                  <h3 className="text-sm font-bold text-slate-100">Hybrid AST Query Router</h3>
+                  <h3 className="text-sm font-bold text-slate-100">Automated E2E Test Suite & AST Security</h3>
                   <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Directs simple analytical workloads to local DuckDB-WASM for sub-10ms compute, automatically offloading heavy queries to Snowflake or Databricks.
+                    Self-healing AST security guards block destructive SQL/code injection, verified against automated Yjs CRDT and worker integration tests.
                   </p>
                 </div>
 

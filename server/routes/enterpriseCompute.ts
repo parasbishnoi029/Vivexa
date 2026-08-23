@@ -149,3 +149,42 @@ enterpriseComputeRouter.get('/cluster/jobs/:id', (req, res) => {
 enterpriseComputeRouter.get('/cluster/jobs', (req, res) => {
   return res.json({ success: true, jobs: backgroundWorkerQueue.getAllJobs() });
 });
+
+// 6. Workspace Rate Limiting & Token Budget Telemetry
+enterpriseComputeRouter.get('/workspace/token-budget', (req, res) => {
+  const workspaceId = (req.query.workspaceId as string) || (req.headers['x-workspace-id'] as string) || "default-workspace";
+  const { getWorkspaceTokenConfig } = require('../limits');
+  const config = getWorkspaceTokenConfig(workspaceId, "pro");
+
+  return res.json({
+    success: true,
+    data: {
+      workspaceId: config.workspaceId,
+      usedTokensToday: config.usedTokensToday,
+      dailyTokenCap: config.dailyTokenCap,
+      remainingTokens: Math.max(0, config.dailyTokenCap - config.usedTokensToday),
+      queryTimeoutMs: config.queryTimeoutMs,
+      utilizationPct: Number(((config.usedTokensToday / config.dailyTokenCap) * 100).toFixed(2)),
+      resetAt: new Date(config.lastReset + 24 * 60 * 60 * 1000).toISOString()
+    }
+  });
+});
+
+// 7. Submit MicroVM / Heavy AI Asynchronous Execution
+enterpriseComputeRouter.post('/microvm/execute-async', (req, res) => {
+  const { code, datasetName, timeoutMs = 60000 } = req.body;
+
+  const job = backgroundWorkerQueue.enqueue(
+    'HEAVY_AI_CODE_EXECUTION',
+    { code, datasetName },
+    timeoutMs
+  );
+
+  return res.json({
+    success: true,
+    message: 'Heavy AI code execution offloaded to background worker queue.',
+    job_id: job.id,
+    status: job.status,
+    createdAt: job.createdAt
+  });
+});

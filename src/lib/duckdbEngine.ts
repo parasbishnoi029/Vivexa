@@ -223,12 +223,19 @@ class DuckDBEngineService {
 
   /**
    * Registers raw CSV text directly into DuckDB WASM Virtual File System.
+   * Enforces 250MB WASM memory safety threshold to prevent browser heap exhaustion.
    */
   public async registerTableFromCsv(
     tableName: string,
     csvContent: string
   ): Promise<DuckDBTableInfo> {
     const cleanName = tableName.replace(/[^a-zA-Z0-9_]/g, "_").toLowerCase();
+    const byteSize = new TextEncoder().encode(csvContent).length;
+    const maxWasmBytes = 250 * 1024 * 1024; // 250MB Guardrail
+
+    if (byteSize > maxWasmBytes) {
+      throw new Error(`WASM_MEMORY_LIMIT_EXCEEDED: CSV payload (${(byteSize / 1024 / 1024).toFixed(1)} MB) exceeds 250MB browser WASM safety limit. Automatic failover to server-side pushdown engine required.`);
+    }
     
     // Parse sample for metadata
     const lines = csvContent.trim().split("\n");

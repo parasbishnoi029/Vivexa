@@ -65,6 +65,83 @@ export const SERVER_PLAN_LIMITS: Record<PlanTier, ServerPlanLimits> = {
 const userAiUsageMap = new Map<string, { count: number; lastReset: number }>();
 const ipRateLimitMap = new Map<string, { count: number; windowStart: number }>();
 
+// Per-Workspace Token Budgeting & Query Execution Timeouts
+export interface WorkspaceTokenConfig {
+  workspaceId: string;
+  usedTokensToday: number;
+  dailyTokenCap: number;
+  queryTimeoutMs: number;
+  lastReset: number;
+}
+
+const workspaceTokenMap = new Map<string, WorkspaceTokenConfig>();
+
+export function getWorkspaceTokenConfig(workspaceId: string = "default-workspace", tier: PlanTier = "free"): WorkspaceTokenConfig {
+  const caps: Record<PlanTier, { dailyTokens: number; timeoutMs: number }> = {
+    free: { dailyTokens: 100000, timeoutMs: 30000 },
+    student: { dailyTokens: 500000, timeoutMs: 45000 },
+    pro: { dailyTokens: 2000000, timeoutMs: 60000 },
+    enterprise: { dailyTokens: 20000000, timeoutMs: 180000 }
+  };
+
+  const config = caps[tier] || caps.free;
+  const now = Date.now();
+  const oneDayMs = 24 * 60 * 60 * 1000;
+
+  let record = workspaceTokenMap.get(workspaceId);
+  if (!record || (now - record.lastReset > oneDayMs)) {
+    record = {
+      workspaceId,
+      usedTokensToday: 0,
+      dailyTokenCap: config.dailyTokens,
+      queryTimeoutMs: config.timeoutMs,
+      lastReset: now
+    };
+    workspaceTokenMap.set(workspaceId, record);
+  }
+
+  return record;
+}
+
+export function consumeWorkspaceTokens(workspaceId: string, tokens: number = 250, tier: PlanTier = "free"): { allowed: boolean; remaining: number; config: WorkspaceTokenConfig } {
+  const record = getWorkspaceTokenConfig(workspaceId, tier);
+  if (record.usedTokensToday + tokens > record.dailyTokenCap) {
+    const remaining = Math.max(0, record.dailyTokenCap - record.usedTokensToday);
+    return { allowed: false, remaining, config: record };
+  }
+
+  record.usedTokensToday += tokens;
+  const remaining = Math.max(0, record.dailyTokenCap - record.usedTokensToday);
+  return { allowed: true, remaining, config: record };
+}
+
+// Workspace Rate Limiter & Token Budgeting Middleware
+export function enforceWorkspaceTokenBudgetMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const workspaceId = (req.headers['x-workspace-id'] as string) || req.body?.workspaceId || "default-workspace";
+  const user = (req as any).user;
+  const tier = resolveUserPlanTier(user);
+
+  const budgetCheck = consumeWorkspaceTokens(workspaceId, 150, tier);
+  
+  res.setHeader("X-Workspace-Token-Remaining", budgetCheck.remaining.toString());
+  res.setHeader("X-Workspace-Query-Timeout-Ms", budgetCheck.config.queryTimeoutMs.toString());
+  (req as any).workspaceTimeoutMs = budgetCheck.config.queryTimeoutMs;
+
+  if (!budgetCheck.allowed) {
+    console.warn(`[WORKSPACE TOKEN CAP EXCEEDED] Workspace ${workspaceId} exceeded daily token cap of ${budgetCheck.config.dailyTokenCap.toLocaleString()} tokens.`);
+    return res.status(429).json({
+      success: false,
+      error: "WORKSPACE_TOKEN_CAP_EXCEEDED",
+      code: "TOKEN_BUDGET_EXHAUSTED",
+      workspaceId,
+      dailyTokenCap: budgetCheck.config.dailyTokenCap,
+      message: `Workspace '${workspaceId}' has exhausted its daily token budget of ${budgetCheck.config.dailyTokenCap.toLocaleString()} AI tokens. Upgrade workspace plan tier or wait for reset.`
+    });
+  }
+
+  next();
+}
+
 export function resolveUserPlanTier(user: any): PlanTier {
   if (!user) return "free";
   const plan = String(user.app_metadata?.plan || user.user_metadata?.plan || user.plan || "free").toLowerCase();

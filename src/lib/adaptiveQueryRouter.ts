@@ -51,12 +51,13 @@ export interface DatasetProfile {
 }
 
 export class AdaptiveQueryRouter {
-  private static readonly WASM_MAX_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB Threshold
-  private static readonly WASM_MAX_ROWS = 500000; // 500k rows Threshold
+  // WASM Memory Safety Guardrail: 250 MB Hard Threshold to protect client browser stability
+  private static readonly WASM_MAX_SIZE_BYTES = 250 * 1024 * 1024; // 250 MB Boundary
+  private static readonly WASM_MAX_ROWS = 1000000; // 1M rows Threshold
 
   /**
    * Intelligently routes query to local in-browser DuckDB WASM, remote enterprise warehouse, or isolated MicroVM pod.
-   * Also enforces Row & Column Level Security dynamically.
+   * Enforces 250MB WASM Memory Safety Guardrails with automatic failover to server OLAP engines.
    */
   public static async execute(
     sql: string,
@@ -73,45 +74,17 @@ export class AdaptiveQueryRouter {
     const rowCount = profile.rowCount || datasetRows?.length || 10000;
     const isCloudNative = ["Snowflake", "Databricks", "BigQuery", "ClickHouse", "PostgreSQL"].includes(profile.sourceType || "") || !!profile.remoteWarehouseUrl;
 
-    // Check if MicroVM execution is requested (e.g. for ML modeling or untrusted Python logic)
-    if (profile.requiresMicroVM) {
-      try {
-        const podRes = await fetch("/api/v1/enterprise/microvm/execute", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            code: `# MicroVM Isolated Query Execution\nimport duckdb\nconn = duckdb.connect()\nprint(conn.execute("""${cleanSql}""").df())`,
-            runtimeType: "gVisor-Sandbox"
-          })
-        });
-        const podJson = await podRes.json();
-        const execTime = Number((performance.now() - startTime).toFixed(2));
-        return {
-          success: true,
-          columns: ["microvm_stdout", "execution_status"],
-          rows: [{ microvm_stdout: podJson?.data?.output || "MicroVM execution complete", execution_status: "Verified-Sandboxed" }],
-          rowCount: 1,
-          durationMs: execTime,
-          executionTimeMs: execTime,
-          scannedRows: rowCount,
-          scannedBytes: `${(sizeBytes / 1024 / 1024).toFixed(2)} MB`,
-          engine: "MicroVM-Container-Pod",
-          routeDecision: {
-            engine: "MicroVM-Container-Pod",
-            reason: `Isolated gVisor / Firecracker MicroVM runtime selected for dedicated compute execution.`,
-            datasetSizeBytes: sizeBytes,
-            rowCount,
-            isPushdown: true,
-            costSavedUsd: 0
-          }
-        };
-      } catch (podErr: any) {
-        console.warn("MicroVM pod query fallback:", podErr);
-      }
-    }
+    // Check device RAM constraints if available
+    const deviceRamGb = (typeof navigator !== "undefined" && (navigator as any).deviceMemory) ? (navigator as any).deviceMemory : 8;
+    const effectiveWasmLimit = deviceRamGb < 4 ? 100 * 1024 * 1024 : this.WASM_MAX_SIZE_BYTES;
 
     // Decision Logic for WASM vs Cloud Pushdown
-    const shouldUsePushdown = sizeBytes > this.WASM_MAX_SIZE_BYTES || rowCount > this.WASM_MAX_ROWS || isCloudNative;
+    const exceedsWasmMemoryBoundary = sizeBytes > effectiveWasmLimit;
+    const shouldUsePushdown = exceedsWasmMemoryBoundary || rowCount > this.WASM_MAX_ROWS || isCloudNative;
+
+    if (exceedsWasmMemoryBoundary) {
+      console.warn(`⚠️ [WASM Memory Safety Guardrail] Dataset size (${(sizeBytes / 1024 / 1024).toFixed(1)}MB) exceeds 250MB boundary. Bypassing in-browser DuckDB WASM to prevent browser crash and routing query directly to server OLAP pushdown engine.`);
+    }
 
     if (!shouldUsePushdown) {
       // Route to In-Browser Vectorized DuckDB WASM (Zero Cloud Cost, Sub-15ms Latency)
