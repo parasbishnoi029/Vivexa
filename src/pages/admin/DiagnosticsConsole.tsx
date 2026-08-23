@@ -1,12 +1,13 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { 
   AlertTriangle, Server, Database, CloudOff, FileWarning, ShieldAlert,
   Search, Filter, Check, CheckCircle2, Trash2, Eye, RefreshCw, 
-  Copy, PlusCircle, X, ExternalLink, HelpCircle, UserCheck
+  Copy, PlusCircle, X, ExternalLink, HelpCircle, UserCheck, Loader2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
 
 interface SystemException {
   id: string;
@@ -25,126 +26,86 @@ interface SystemException {
   assignedTo?: string;
 }
 
-const INITIAL_EXCEPTIONS: SystemException[] = [
-  {
-    id: "ERR-9104",
-    errorClass: "ResourceExceededError",
-    message: "[Gemini API] Resource has been exhausted (e.g. API rate limit exceeded).",
-    category: "api",
-    severity: "critical",
-    timestamp: new Date(Date.now() - 120000).toISOString(), // 2 mins ago
-    stackTrace: `ResourceExceededError: 429 Resource has been exhausted.
-  at GoogleGenAI.generateContent (node_modules/@google/genai/dist/index.js:415:23)
-  at async runPrompt (server/aiAnalyst.ts:89:22)
-  at async aiAnalystRouter.post (server/aiAnalyst.ts:145:12)
-  at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
-  at next (node_modules/express/lib/router/route.js:144:13)`,
-    requestUrl: "/api/v1/gemini/chat",
-    httpMethod: "POST",
-    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
-    ipAddress: "103.42.112.5",
-    userId: "u-9842",
-    status: "active",
-    assignedTo: "info.vivexa@gmail.com"
-  },
-  {
-    id: "ERR-8302",
-    errorClass: "PostgresConnectionError",
-    message: "FATAL: connection pool exhausted at 20 max clients",
-    category: "database",
-    severity: "critical",
-    timestamp: new Date(Date.now() - 900000).toISOString(), // 15 mins ago
-    stackTrace: `PostgresError: FATAL: connection pool exhausted
-  at Pool.connect (node_modules/pg/lib/pool.js:189:12)
-  at async queryDirect (server/adminUsers.ts:38:15)
-  at async adminUsersRouter.get (server/adminUsers.ts:356:22)`,
-    requestUrl: "/api/v1/admin/workspace-members",
-    httpMethod: "GET",
-    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-    ipAddress: "192.168.1.1",
-    userId: "u-1024",
-    status: "active"
-  },
-  {
-    id: "ERR-4720",
-    errorClass: "TypeError",
-    message: "Cannot read properties of undefined (reading 'avatar_url')",
-    category: "frontend",
-    severity: "warning",
-    timestamp: new Date(Date.now() - 2700000).toISOString(), // 45 mins ago
-    stackTrace: `TypeError: Cannot read properties of undefined (reading 'avatar_url')
-  at Users.tsx:934:25
-  at Array.map (<anonymous>)
-  at Users (src/pages/admin/Users.tsx:928:44)
-  at renderWithHooks (node_modules/react-dom/cjs/react-dom.development.js:15486:18)`,
-    requestUrl: "https://vivexa.ai/admin/users",
-    httpMethod: "CLIENT_SIDE",
-    userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X)",
-    ipAddress: "103.42.112.5",
-    userId: "u-9842",
-    status: "active"
-  },
-  {
-    id: "ERR-2911",
-    errorClass: "AuthApiError",
-    message: "Email rate limit exceeded for password reset request mapping",
-    category: "auth",
-    severity: "error",
-    timestamp: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-    stackTrace: `AuthApiError: Email rate limit exceeded
-  at client.auth.resetPasswordForEmail (node_modules/@supabase/gotrue-js/dist/main/GoTrueClient.js:412:19)
-  at async handleReset (server/adminUsers.ts:299:11)`,
-    requestUrl: "/api/v1/admin/users/u-1024/reset-password",
-    httpMethod: "POST",
-    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
-    ipAddress: "103.42.112.5",
-    userId: "u-1024",
-    status: "active"
-  },
-  {
-    id: "ERR-1102",
-    errorClass: "ResendApiError",
-    message: "[Resend API] Authorization header is missing, invalid or expired",
-    category: "api",
-    severity: "error",
-    timestamp: new Date(Date.now() - 10800000).toISOString(), // 3 hours ago
-    stackTrace: `ResendApiError: Authorization header invalid
-  at sendEmail (server/emailService.ts:601:13)
-  at async adminUsersRouter.post (server/adminUsers.ts:162:18)`,
-    requestUrl: "/api/v1/admin/users/invite",
-    httpMethod: "POST",
-    userAgent: "Mozilla/5.0 (X11; Linux x86_64)",
-    ipAddress: "127.0.0.1",
-    userId: "u-9842",
-    status: "resolved",
-    assignedTo: "info.vivexa@gmail.com"
-  },
-  {
-    id: "ERR-0419",
-    errorClass: "DiskSpaceExhausted",
-    message: "[Multipart Parser] Disk space exhausted during file upload streaming",
-    category: "uploads",
-    severity: "critical",
-    timestamp: new Date(Date.now() - 18000000).toISOString(), // 5 hours ago
-    stackTrace: `DiskSpaceExhaustedError: ENOSPC: no space left on device, write '/tmp/upload_9821_tmp'
-  at WriteStream._write (node_modules/formidable/lib/index.js:214:12)
-  at async datasetsRouter.post (server/datasets.ts:89:15)`,
-    requestUrl: "/api/v1/datasets/upload",
-    httpMethod: "POST",
-    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
-    ipAddress: "49.36.12.82",
-    userId: "u-1024",
-    status: "active"
-  }
-];
-
 export default function AdminDiagnosticsConsole() {
-  const [exceptions, setExceptions] = useState<SystemException[]>(INITIAL_EXCEPTIONS);
+  const [exceptions, setExceptions] = useState<SystemException[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [severityFilter, setSeverityFilter] = useState<"all" | "critical" | "error" | "warning">("all");
   const [categoryFilter, setCategoryFilter] = useState<"all" | "backend" | "frontend" | "uploads" | "api" | "auth" | "database">("all");
   const [statusFilter, setStatusFilter] = useState<"active" | "resolved" | "ignored" | "all">("active");
   const [selectedException, setSelectedException] = useState<SystemException | null>(null);
+
+  const fetchRealDiagnostics = async () => {
+    setIsLoading(true);
+    try {
+      // 1. Fetch error or exception logs from audit_logs
+      const { data: auditData } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .or('action.ilike.%error%,action.ilike.%fail%,action.ilike.%exception%')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      // 2. Fetch server telemetry logs
+      let telemetryLogs: any[] = [];
+      try {
+        const res = await fetch('/api/v1/telemetry/logs');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.logs) {
+            telemetryLogs = json.logs.filter((l: any) => l.level === 'ERROR' || l.level === 'WARN');
+          }
+        }
+      } catch (err) {
+        console.warn("Telemetry logs query note:", err);
+      }
+
+      const mappedExceptions: SystemException[] = [];
+
+      if (telemetryLogs && telemetryLogs.length > 0) {
+        telemetryLogs.forEach((l, idx) => {
+          mappedExceptions.push({
+            id: l.id || `LOG-${idx}`,
+            errorClass: l.service ? `${l.service.toUpperCase()}_LOG` : "RuntimeLogEntry",
+            message: l.message || "Server event captured in telemetry stream",
+            category: (l.service === 'auth' || l.service === 'database' || l.service === 'api' || l.service === 'uploads') ? l.service : "backend",
+            severity: l.level === 'ERROR' ? 'critical' : 'warning',
+            timestamp: l.timestamp || new Date().toISOString(),
+            stackTrace: `Service: ${l.service || 'backend'}\nLatency: ${l.latencyMs || 0}ms\nCPU: ${l.cpuUsagePct || 0}%\nMemory: ${l.memoryUsageMb || 0}MB`,
+            status: "active"
+          });
+        });
+      }
+
+      if (auditData && auditData.length > 0) {
+        auditData.forEach(a => {
+          mappedExceptions.push({
+            id: `ERR-${a.id.slice(0, 8)}`,
+            errorClass: a.resource_type ? `${a.resource_type.toUpperCase()}_EVENT` : "AuditEvent",
+            message: a.action || "Audit error condition logged",
+            category: a.resource_type === 'auth' ? 'auth' : a.resource_type === 'api' ? 'api' : 'backend',
+            severity: "error",
+            timestamp: a.created_at || new Date().toISOString(),
+            stackTrace: `Audit ID: ${a.id}\nUser: ${a.user_email || a.user_id || 'System'}\nIP: ${a.ip_address || '127.0.0.1'}`,
+            ipAddress: a.ip_address || '127.0.0.1',
+            userId: a.user_email || a.user_id,
+            status: "active"
+          });
+        });
+      }
+
+      setExceptions(mappedExceptions);
+    } catch (err) {
+      console.warn("Diagnostics fetch note:", err);
+      setExceptions([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRealDiagnostics();
+  }, []);
 
   // Derive counts dynamically for active errors
   const activeStats = useMemo(() => {
@@ -223,42 +184,9 @@ export default function AdminDiagnosticsConsole() {
     toast.success("Stack trace copied to clipboard.");
   };
 
-  const handleSimulateException = () => {
-    const randomClasses = ["APIConnectionTimeout", "JsonWebTokenError", "ZodValidationError", "DatabaseDeadlockError", "QuotaExceededException"];
-    const randomMessages = [
-      "Failed to establish upstream connection to HuggingFace pipeline in 5000ms",
-      "jwt malformed - signature verification failed for incoming mapping token",
-      "Validation failed: [0].slug 'Required field missing', [0].name 'String must be at least 3 chars'",
-      "deadlock detected: Process 9821 acquired share lock on profiles while process 4920 waits",
-      "Workspace quota exceeded: Active dataset size (4.28 GB) exceeds storage allowance (2.0 GB)"
-    ];
-    const randomCategories: Array<"backend" | "frontend" | "uploads" | "api" | "auth" | "database"> = ["api", "auth", "frontend", "database", "uploads"];
-    const randomSeverities: Array<"critical" | "error" | "warning"> = ["critical", "error", "warning"];
-
-    const index = Math.floor(Math.random() * randomClasses.length);
-    const newId = `ERR-${Math.floor(1000 + Math.random() * 9000)}`;
-
-    const newException: SystemException = {
-      id: newId,
-      errorClass: randomClasses[index],
-      message: randomMessages[index],
-      category: randomCategories[index % randomCategories.length],
-      severity: randomSeverities[index % randomSeverities.length],
-      timestamp: new Date().toISOString(),
-      stackTrace: `${randomClasses[index]}: ${randomMessages[index]}
-  at simulationRuntime.ts:42:15
-  at dispatchAction (src/lib/dataEngine.ts:182:11)
-  at processImmediate (node:internal/timers:476:21)`,
-      requestUrl: `/api/v1/simulated/trigger-${newId.toLowerCase()}`,
-      httpMethod: "POST",
-      userAgent: navigator.userAgent,
-      ipAddress: "127.0.0.1",
-      userId: "u-9842",
-      status: "active"
-    };
-
-    setExceptions(prev => [newException, ...prev]);
-    toast.success(`Simulated exception ${newId} captured!`);
+  const handleRefreshDiagnostics = () => {
+    fetchRealDiagnostics();
+    toast.success("Diagnostics telemetry stream re-synchronized.");
   };
 
   return (
@@ -275,12 +203,12 @@ export default function AdminDiagnosticsConsole() {
         </div>
         <div className="flex items-center gap-2.5">
           <Button 
-            onClick={handleSimulateException}
+            onClick={handleRefreshDiagnostics}
             variant="outline" 
             className="bg-slate-900 border-indigo-500/20 hover:bg-slate-800 text-indigo-300 text-xs font-bold gap-1.5 h-9"
           >
-            <PlusCircle className="h-4 w-4 text-indigo-400" />
-            Simulate Exception
+            <RefreshCw className={`h-4 w-4 text-indigo-400 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh Telemetry Stream
           </Button>
           <Button 
             onClick={handleResolveAll}

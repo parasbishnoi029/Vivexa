@@ -9,46 +9,60 @@ export default function AdminSystem() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [metrics, setMetrics] = useState({
     dbLatency: "12ms",
-    cpuUsage: 34,
-    memUsage: 62,
-    activeConnections: 142,
-    uptime: "99.99%",
+    cpuUsage: 12,
+    memUsage: 35,
+    heapUsedMb: "120",
+    heapTotalMb: "256",
+    activeConnections: 1,
+    uptime: "100%",
     version: "v2.4.1-stable"
   });
 
   const [dbStatus, setDbStatus] = useState("Operational");
 
   const checkDb = async () => {
+    setIsRefreshing(true);
     try {
       const start = performance.now();
-      await supabase.from("users").select("id").limit(1);
+      await supabase.from("profiles").select("id").limit(1);
       const end = performance.now();
-      setMetrics(prev => ({ ...prev, dbLatency: Math.round(end - start) + "ms" }));
+      const latencyMs = Math.round(end - start);
       setDbStatus("Operational");
+
+      const res = await fetch('/api/v1/telemetry/metrics');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.metrics) {
+          const m = json.metrics;
+          const heapUsed = parseFloat(m.memoryUsage?.heapUsedMb || 120);
+          const heapTotal = parseFloat(m.memoryUsage?.heapTotalMb || 256);
+          const memPct = Math.min(100, Math.round((heapUsed / heapTotal) * 100));
+
+          setMetrics({
+            dbLatency: `${latencyMs}ms`,
+            cpuUsage: parseFloat(m.systemCpuLoadPct || 12),
+            memUsage: memPct,
+            heapUsedMb: heapUsed.toString(),
+            heapTotalMb: heapTotal.toString(),
+            activeConnections: 1,
+            uptime: "100%",
+            version: "v2.4.1-stable"
+          });
+        }
+      }
     } catch {
       setDbStatus("Degraded");
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
   const handleRefresh = async () => {
-    setIsRefreshing(true);
     await checkDb();
-    setTimeout(() => {
-      // In a real environment, we would fetch hardware stats here.
-      setMetrics(prev => ({
-        ...prev,
-        cpuUsage: 2,
-        memUsage: 45,
-        activeConnections: 5,
-      }));
-      setIsRefreshing(false);
-    }, 800);
   };
 
   useEffect(() => {
     checkDb();
-    const interval = setInterval(handleRefresh, 60000);
-    return () => clearInterval(interval);
   }, []);
 
   const renderStatusCard = (label: string, value: string | number, icon: any, status: 'good' | 'warn' | 'error' = 'good') => {
