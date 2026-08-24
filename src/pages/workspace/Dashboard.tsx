@@ -111,7 +111,7 @@ function generateGroundedTelemetry(
     const calculatedThroughput = Math.round(baselineThroughput * (0.8 + progression * 0.4));
     const calculatedQueries = Math.round(baselineQueries * (0.7 + progression * 0.6));
     const calculatedLatency = Math.max(8, Math.round(baseLatency * (1.1 - progression * 0.2)));
-    const calculatedQuality = Number(Math.min(100, Math.max(85, avgQuality - (i * 0.15))).toFixed(2));
+    const calculatedQuality = Number(Math.min(100, Math.max(0, avgQuality - (i * 0.15))).toFixed(2));
 
     points.push({
       time: timeLabel,
@@ -605,9 +605,9 @@ export default function WorkspaceDashboard() {
         </div>
 
         {/* TOP GROUNDED KPI CARDS */}
-        <motion.div variants={item} layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Card 1: Total Indexed Records & Datasets */}
-          <motion.div layout whileHover={{ y: -4, scale: 1.02 }} transition={{ layout: { type: "spring", stiffness: 350, damping: 25 }, type: "spring", stiffness: 400, damping: 25 }} className="h-full">
+          <div className="h-full">
             <Card 
               onClick={() => navigate('/workspace/datasets')}
               onContextMenu={(e) => handleOpenContextMenu(e, {
@@ -619,11 +619,11 @@ export default function WorkspaceDashboard() {
                 kpiValue: formatCompactNumber(stats.totalRows),
                 qualityScore: stats.avgQuality
               })}
-              className="bg-slate-900/50 border-slate-800/80 hover:border-cyan-500/50 transition-all cursor-pointer group rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl h-full flex flex-col justify-between"
+              className="bg-slate-900/90 border-slate-800/80 hover:border-cyan-500/50 transition-all duration-200 hover:-translate-y-1 hover:shadow-xl cursor-pointer group rounded-2xl p-5 relative overflow-hidden h-full flex flex-col justify-between gpu-layer"
             >
               <div>
                 <div className="flex items-center justify-between">
-                  <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 group-hover:scale-110 transition-transform">
+                  <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 group-hover:scale-105 transition-transform">
                     <Database className="h-5 w-5" />
                   </div>
                   <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">
@@ -632,7 +632,7 @@ export default function WorkspaceDashboard() {
                 </div>
                 <div className="mt-4">
                   <div className="text-3xl font-black text-white tracking-tight">
-                    <motion.span layout>{formatCompactNumber(stats.totalRows)}</motion.span>
+                    <span>{formatCompactNumber(stats.totalRows)}</span>
                   </div>
                   <div className="text-xs font-bold text-slate-400 mt-0.5">
                     Records across {stats.datasets} {stats.datasets === 1 ? 'Dataset' : 'Datasets'}
@@ -649,10 +649,10 @@ export default function WorkspaceDashboard() {
                 <ChevronRight className="h-3.5 w-3.5 text-slate-600 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
               </div>
             </Card>
-          </motion.div>
+          </div>
 
           {/* Card 2: Real Data Quality Index (DQI) */}
-          <motion.div layout whileHover={{ y: -4, scale: 1.02 }} transition={{ layout: { type: "spring", stiffness: 350, damping: 25 }, type: "spring", stiffness: 400, damping: 25 }} className="h-full">
+          <div className="h-full">
             <Card 
               onClick={() => navigate('/workspace/datasets')}
               onContextMenu={(e) => handleOpenContextMenu(e, {
@@ -664,11 +664,11 @@ export default function WorkspaceDashboard() {
                 kpiValue: `${stats.avgQuality}%`,
                 qualityScore: stats.avgQuality
               })}
-              className="bg-slate-900/50 border-slate-800/80 hover:border-emerald-500/50 transition-all cursor-pointer group rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl h-full flex flex-col justify-between"
+              className="bg-slate-900/90 border-slate-800/80 hover:border-emerald-500/50 transition-all duration-200 hover:-translate-y-1 hover:shadow-xl cursor-pointer group rounded-2xl p-5 relative overflow-hidden h-full flex flex-col justify-between gpu-layer"
             >
               <div>
                 <div className="flex items-center justify-between">
-                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 group-hover:scale-110 transition-transform">
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 group-hover:scale-105 transition-transform">
                     <ShieldCheck className="h-5 w-5" />
                   </div>
                   <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
@@ -677,7 +677,7 @@ export default function WorkspaceDashboard() {
                 </div>
                 <div className="mt-4">
                   <div className="text-3xl font-black text-white tracking-tight">
-                    <motion.span layout>{stats.avgQuality}%</motion.span>
+                    <span>{stats.avgQuality}%</span>
                   </div>
                   <div className="text-xs font-bold text-slate-400 mt-0.5">Average Data Quality Index (DQI)</div>
                 </div>
@@ -692,10 +692,10 @@ export default function WorkspaceDashboard() {
                 <ChevronRight className="h-3.5 w-3.5 text-slate-600 group-hover:text-emerald-400 group-hover:translate-x-1 transition-all" />
               </div>
             </Card>
-          </motion.div>
+          </div>
 
           {/* Card 3: Executive Intelligence Reports */}
-          <motion.div layout whileHover={{ y: -4, scale: 1.02 }} transition={{ layout: { type: "spring", stiffness: 350, damping: 25 }, type: "spring", stiffness: 400, damping: 25 }} className="h-full">
+          <div className="h-full">
             <Card 
               onClick={() => navigate('/workspace/reports')}
               onContextMenu={(e) => handleOpenContextMenu(e, {
@@ -706,11 +706,11 @@ export default function WorkspaceDashboard() {
                 path: '/workspace/reports',
                 kpiValue: `${stats.reports}`
               })}
-              className="bg-slate-900/50 border-slate-800/80 hover:border-amber-500/50 transition-all cursor-pointer group rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl h-full flex flex-col justify-between"
+              className="bg-slate-900/90 border-slate-800/80 hover:border-amber-500/50 transition-all duration-200 hover:-translate-y-1 hover:shadow-xl cursor-pointer group rounded-2xl p-5 relative overflow-hidden h-full flex flex-col justify-between gpu-layer"
             >
               <div>
                 <div className="flex items-center justify-between">
-                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 group-hover:scale-110 transition-transform">
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 group-hover:scale-105 transition-transform">
                     <Presentation className="h-5 w-5" />
                   </div>
                   <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
@@ -719,7 +719,7 @@ export default function WorkspaceDashboard() {
                 </div>
                 <div className="mt-4">
                   <div className="text-3xl font-black text-white tracking-tight">
-                    <motion.span layout>{stats.reports}</motion.span>
+                    <span>{stats.reports}</span>
                   </div>
                   <div className="text-xs font-bold text-slate-400 mt-0.5">Executive C-Suite Reports</div>
                 </div>
@@ -734,10 +734,10 @@ export default function WorkspaceDashboard() {
                 <ChevronRight className="h-3.5 w-3.5 text-slate-600 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
               </div>
             </Card>
-          </motion.div>
+          </div>
 
           {/* Card 4: Workspace Projects */}
-          <motion.div layout whileHover={{ y: -4, scale: 1.02 }} transition={{ layout: { type: "spring", stiffness: 350, damping: 25 }, type: "spring", stiffness: 400, damping: 25 }} className="h-full">
+          <div className="h-full">
             <Card 
               onClick={() => navigate('/workspace/projects')}
               onContextMenu={(e) => handleOpenContextMenu(e, {
@@ -748,11 +748,11 @@ export default function WorkspaceDashboard() {
                 path: '/workspace/projects',
                 kpiValue: `${stats.projects}`
               })}
-              className="bg-slate-900/50 border-slate-800/80 hover:border-indigo-500/50 transition-all cursor-pointer group rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl h-full flex flex-col justify-between"
+              className="bg-slate-900/90 border-slate-800/80 hover:border-indigo-500/50 transition-all duration-200 hover:-translate-y-1 hover:shadow-xl cursor-pointer group rounded-2xl p-5 relative overflow-hidden h-full flex flex-col justify-between gpu-layer"
             >
               <div>
                 <div className="flex items-center justify-between">
-                  <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 group-hover:scale-110 transition-transform">
+                  <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 group-hover:scale-105 transition-transform">
                     <FolderKanban className="h-5 w-5" />
                   </div>
                   <span className="text-[10px] font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20 flex items-center gap-1">
@@ -761,7 +761,7 @@ export default function WorkspaceDashboard() {
                 </div>
                 <div className="mt-4">
                   <div className="text-3xl font-black text-white tracking-tight">
-                    <motion.span layout>{stats.projects}</motion.span>
+                    <span>{stats.projects}</span>
                   </div>
                   <div className="text-xs font-bold text-slate-400 mt-0.5">Workspace Projects</div>
                 </div>
@@ -776,10 +776,10 @@ export default function WorkspaceDashboard() {
                 <ChevronRight className="h-3.5 w-3.5 text-slate-600 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
               </div>
             </Card>
-          </motion.div>
+          </div>
 
           {/* Card 5: Team & Talent */}
-          <motion.div layout whileHover={{ y: -4, scale: 1.02 }} transition={{ layout: { type: "spring", stiffness: 350, damping: 25 }, type: "spring", stiffness: 400, damping: 25 }} className="h-full">
+          <div className="h-full">
             <Card 
               onClick={() => navigate('/workspace/organization')}
               onContextMenu={(e) => handleOpenContextMenu(e, {
@@ -790,11 +790,11 @@ export default function WorkspaceDashboard() {
                 path: '/workspace/organization',
                 kpiValue: `${stats.members}`
               })}
-              className="bg-slate-900/50 border-slate-800/80 hover:border-purple-500/50 transition-all cursor-pointer group rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl h-full flex flex-col justify-between"
+              className="bg-slate-900/90 border-slate-800/80 hover:border-purple-500/50 transition-all duration-200 hover:-translate-y-1 hover:shadow-xl cursor-pointer group rounded-2xl p-5 relative overflow-hidden h-full flex flex-col justify-between gpu-layer"
             >
               <div>
                 <div className="flex items-center justify-between">
-                  <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 group-hover:scale-110 transition-transform">
+                  <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 group-hover:scale-105 transition-transform">
                     <Users className="h-5 w-5" />
                   </div>
                   <span className="text-[10px] font-mono text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
@@ -803,7 +803,7 @@ export default function WorkspaceDashboard() {
                 </div>
                 <div className="mt-4">
                   <div className="text-3xl font-black text-white tracking-tight">
-                    <motion.span layout>{stats.members}</motion.span>
+                    <span>{stats.members}</span>
                   </div>
                   <div className="text-xs font-bold text-slate-400 mt-0.5">Team & Talent Members</div>
                 </div>
@@ -818,7 +818,7 @@ export default function WorkspaceDashboard() {
                 <ChevronRight className="h-3.5 w-3.5 text-slate-600 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
               </div>
             </Card>
-          </motion.div>
+          </div>
         </motion.div>
 
         {/* SUMMARIZED INSIGHTS OF THE DAY CARD */}
@@ -1108,7 +1108,7 @@ export default function WorkspaceDashboard() {
                 const projectAnomalies = realAnomalies.filter((a: any) => (a.source && a.source === project.name) || a.title.toLowerCase().includes(project.name.toLowerCase()));
                 const hasAnomaly = projectAnomalies.length > 0 || (idx === 1 && realAnomalies.length > 0);
                 const anomalyCount = hasAnomaly ? Math.max(1, projectAnomalies.length) : 0;
-                const qualityScore = Math.max(82, Math.min(99, Math.round(stats.avgQuality - (idx * 3) + 2)));
+                const qualityScore = typeof project.quality === 'number' ? project.quality : typeof project.data_quality_score === 'number' ? project.data_quality_score : stats.avgQuality;
 
                 return (
                   <ProjectSummaryCard
@@ -1207,7 +1207,7 @@ export default function WorkspaceDashboard() {
               {recentDatasets.map((ds, i) => {
                 const rowCount = Number(ds.row_count || ds.rows || 0);
                 const colCount = Number(ds.column_count || ds.cols || 0);
-                const qualityScore = Number(ds.quality || ds.data_quality_score || 100);
+                const qualityScore = typeof ds.quality === 'number' ? ds.quality : typeof ds.data_quality_score === 'number' ? ds.data_quality_score : 100;
                 const hasAnomaly = qualityScore < 92;
 
                 return (

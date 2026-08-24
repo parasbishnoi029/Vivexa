@@ -1,5 +1,4 @@
 import React, { useEffect, useRef } from 'react';
-import { motion, useScroll, useTransform } from 'motion/react';
 
 export const AppBackground = React.memo(function AppBackground({ 
   children, 
@@ -9,33 +8,44 @@ export const AppBackground = React.memo(function AppBackground({
   centered?: boolean; 
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { scrollY } = useScroll();
-
-  const y1 = useTransform(scrollY, [0, 1000], [0, 100]);
-  const y2 = useTransform(scrollY, [0, 1000], [0, -50]);
 
   useEffect(() => {
     let animId: number = 0;
-    let latestX = 0.5;
-    let latestY = 0.5;
+    let targetX = 50;
+    let targetY = 50;
+    let currentX = 50;
+    let currentY = 50;
+    let isMouseMoving = false;
 
-    const updateCSSVars = () => {
-      if (containerRef.current) {
-        containerRef.current.style.setProperty('--mouse-x', `${(latestX * 100).toFixed(1)}%`);
-        containerRef.current.style.setProperty('--mouse-y', `${(latestY * 100).toFixed(1)}%`);
+    const smoothUpdate = () => {
+      if (!containerRef.current) return;
+      
+      // Gentle interpolation for liquid smoothness without jitter
+      const dx = targetX - currentX;
+      const dy = targetY - currentY;
+      
+      if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
+        currentX += dx * 0.15;
+        currentY += dy * 0.15;
+        containerRef.current.style.setProperty('--mouse-x', `${currentX.toFixed(1)}%`);
+        containerRef.current.style.setProperty('--mouse-y', `${currentY.toFixed(1)}%`);
+        animId = requestAnimationFrame(smoothUpdate);
+      } else {
+        isMouseMoving = false;
+        animId = 0;
       }
-      animId = 0;
     };
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current) return;
       const { clientX, clientY } = e;
-      const { left, top, width, height } = containerRef.current.getBoundingClientRect();
-      latestX = Math.max(0, Math.min(1, (clientX - left) / (width || 1)));
-      latestY = Math.max(0, Math.min(1, (clientY - top) / (height || 1)));
+      const { innerWidth, innerHeight } = window;
+      targetX = Math.max(0, Math.min(100, (clientX / (innerWidth || 1)) * 100));
+      targetY = Math.max(0, Math.min(100, (clientY / (innerHeight || 1)) * 100));
 
-      if (!animId) {
-        animId = requestAnimationFrame(updateCSSVars);
+      if (!isMouseMoving) {
+        isMouseMoving = true;
+        animId = requestAnimationFrame(smoothUpdate);
       }
     };
 
@@ -52,12 +62,14 @@ export const AppBackground = React.memo(function AppBackground({
       className={`relative min-h-screen w-full bg-[#030712] text-slate-50 selection:bg-indigo-500/30 ${centered ? 'flex items-center justify-center' : ''}`}
       style={{ '--mouse-x': '50%', '--mouse-y': '50%' } as React.CSSProperties}
     >
-      {/* Optimized Hardware-Accelerated Background Layers */}
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden transform-gpu">
-        
-        {/* Soft Grid */}
+      {/* Zero-Overhead Hardware-Accelerated Static & Smooth Background Canvas */}
+      <div 
+        className="fixed inset-0 z-0 pointer-events-none overflow-hidden"
+        style={{ contain: 'strict', transform: 'translate3d(0,0,0)', backfaceVisibility: 'hidden' }}
+      >
+        {/* Soft Grid via CSS mask */}
         <div 
-          className="absolute inset-0 opacity-[0.03] pointer-events-none transform-gpu"
+          className="absolute inset-0 opacity-[0.025] pointer-events-none"
           style={{
             backgroundImage: `linear-gradient(to right, #6366f1 1px, transparent 1px), linear-gradient(to bottom, #6366f1 1px, transparent 1px)`,
             backgroundSize: '4rem 4rem',
@@ -66,22 +78,35 @@ export const AppBackground = React.memo(function AppBackground({
           }}
         />
 
-        {/* Aurora Gradient Layers with lightweight blurs & hardware acceleration */}
-        <motion.div 
-          style={{ y: y1 }}
-          className="absolute top-[-10%] left-[-5%] w-[40rem] h-[40rem] bg-indigo-600/10 rounded-full filter blur-[60px] transform-gpu pointer-events-none" 
-        />
-        <motion.div 
-          style={{ y: y2 }}
-          className="absolute bottom-[-10%] right-[-5%] w-[45rem] h-[45rem] bg-violet-600/10 rounded-full filter blur-[60px] transform-gpu pointer-events-none" 
-        />
-        <div className="absolute top-[20%] right-[20%] w-[25rem] h-[25rem] bg-cyan-500/5 rounded-full filter blur-[50px] transform-gpu pointer-events-none" />
-
-        {/* Dynamic Lighting following mouse via CSS variables */}
+        {/* High-Performance Radial Glow Layers (0 Gaussian blur shader passes on GPU) */}
         <div 
-          className="absolute inset-0 opacity-40 pointer-events-none transform-gpu transition-opacity duration-300"
+          className="absolute -top-32 -left-32 w-[600px] h-[600px] pointer-events-none opacity-40"
           style={{
-            background: `radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(99, 102, 241, 0.12), transparent 50%)`
+            background: 'radial-gradient(circle at 40% 40%, rgba(99, 102, 241, 0.18), rgba(79, 70, 229, 0.06) 45%, transparent 70%)',
+            transform: 'translate3d(0,0,0)',
+          }}
+        />
+        <div 
+          className="absolute -bottom-32 -right-32 w-[650px] h-[650px] pointer-events-none opacity-35"
+          style={{
+            background: 'radial-gradient(circle at 60% 60%, rgba(139, 92, 246, 0.16), rgba(124, 58, 237, 0.05) 50%, transparent 70%)',
+            transform: 'translate3d(0,0,0)',
+          }}
+        />
+        <div 
+          className="absolute top-1/3 right-1/4 w-[400px] h-[400px] pointer-events-none opacity-25"
+          style={{
+            background: 'radial-gradient(circle at center, rgba(6, 182, 212, 0.12), transparent 65%)',
+            transform: 'translate3d(0,0,0)',
+          }}
+        />
+
+        {/* Dynamic Interactive Cursor Glow */}
+        <div 
+          className="absolute inset-0 opacity-30 pointer-events-none transition-opacity duration-300"
+          style={{
+            background: `radial-gradient(550px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(99, 102, 241, 0.14), transparent 60%)`,
+            transform: 'translate3d(0,0,0)',
           }}
         />
       </div>

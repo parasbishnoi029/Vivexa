@@ -262,9 +262,15 @@ export function ProjectWizard({ isOpen, onClose, onComplete }: WizardProps) {
             
             <Button 
               onClick={handleNext}
+              disabled={isSubmitting}
               className="bg-indigo-600 hover:bg-indigo-500 text-white min-w-[140px] rounded-xl shadow-[0_0_20px_rgba(79,70,229,0.3)] transition-all hover:shadow-[0_0_30px_rgba(79,70,229,0.5)] border-0"
             >
-              {step === 3 ? (
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : step === 3 ? (
                 'Create Project'
               ) : (
                 <>

@@ -362,6 +362,10 @@ const router = createBrowserRouter([
         element: <Suspense fallback={<PageLoader />}><AIAnalyst /></Suspense>,
       },
       {
+        path: "ai-analyst",
+        element: <Suspense fallback={<PageLoader />}><AIAnalyst /></Suspense>,
+      },
+      {
         path: "decision-engine",
         element: <Suspense fallback={<PageLoader />}><DecisionIntelligence /></Suspense>,
       },
@@ -391,6 +395,10 @@ const router = createBrowserRouter([
       },
       {
         path: "semantic",
+        element: <Suspense fallback={<PageLoader />}><SemanticLayer /></Suspense>,
+      },
+      {
+        path: "semantic-layer",
         element: <Suspense fallback={<PageLoader />}><SemanticLayer /></Suspense>,
       },
       {

@@ -5,13 +5,14 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Settings2, ShieldCheck, Activity, RefreshCw, Download, 
   Trash2, Sparkles, AlertTriangle, CheckCircle2, FileSpreadsheet,
-  Layers, ArrowRight, Check, Sliders
+  Layers, ArrowRight, Check, Sliders, Database, Save
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { createNotification } from '@/lib/notifications';
+import { supabase } from '@/lib/supabase';
 import { 
   detectCleaningIssues, 
   cleanDataset, 
@@ -19,15 +20,17 @@ import {
   CleaningIssue, 
   CleanedDatasetResult 
 } from '@/lib/dataCleaning';
+import { executeDataStudioProcedure } from '@/lib/dataStudioStoredProcedures';
 
 interface Props {
+  datasetId?: string;
   rows: Record<string, any>[];
   datasetName?: string;
   onDatasetCleaned?: (result: CleanedDatasetResult, profile: DatasetProfile) => void;
   datasetSize?: number;
 }
 
-export default function DataCleaningStudio({ rows, datasetName = "Dataset", onDatasetCleaned, datasetSize = 0 }: Props) {
+export default function DataCleaningStudio({ datasetId, rows, datasetName = "Dataset", onDatasetCleaned, datasetSize = 0 }: Props) {
   const [missingStrategy, setMissingStrategy] = useState<CleaningOptions['missingValueStrategy']>('auto');
   const [outlierMethod, setOutlierMethod] = useState<CleaningOptions['outlierMethod']>('iqr');
   const [outlierTreatment, setOutlierTreatment] = useState<CleaningOptions['outlierTreatment']>('cap');
@@ -126,6 +129,8 @@ export default function DataCleaningStudio({ rows, datasetName = "Dataset", onDa
     });
   };
 
+  const [isSavingToDb, setIsSavingToDb] = useState(false);
+
   const handleDownloadCleanedCSV = () => {
     if (!cleanedResult) return;
     const ws = XLSX.utils.json_to_sheet(cleanedResult.cleanedRows);
@@ -133,6 +138,67 @@ export default function DataCleaningStudio({ rows, datasetName = "Dataset", onDa
     XLSX.utils.book_append_sheet(wb, ws, "CleanedData");
     XLSX.writeFile(wb, `${datasetName}_cleaned.csv`);
     toast.success("Downloaded cleaned CSV dataset");
+  };
+
+  const handleSaveToDatabase = async () => {
+    if (!cleanedResult) return;
+    if (!datasetId) {
+      toast.info("Cleaned dataset updated in local view. (Save to database requires dataset ID)");
+      return;
+    }
+
+    setIsSavingToDb(true);
+    const toastId = toast.loading("Invoking Supabase stored procedure & persisting cleaned dataset...");
+
+    try {
+      const spResult = await executeDataStudioProcedure({
+        datasetId,
+        strategy: 'data_studio_cleaning',
+        cleanedRows: cleanedResult.cleanedRows,
+        columns: cleanedResult.columns,
+        qualityScore: cleanedResult.auditLog.qualityScoreAfter,
+        transformationsApplied: cleanedResult.auditLog.transformationsApplied,
+        options: {
+          missingStrategy,
+          outlierMethod,
+          outlierTreatment,
+          scalingStrategy,
+          removeDuplicates,
+          cleanColNames,
+          trimWhitespace,
+          standardizeDates,
+          parseCurrencies,
+          removeConstantCols
+        }
+      });
+
+      if (spResult.success) {
+        toast.success(`Cleaned dataset committed via ${spResult.method === 'supabase_rpc_stored_procedure' ? 'Supabase Stored Procedure' : 'Database Storage Pipeline'}!`, { id: toastId });
+        createNotification({
+          title: "Database Dataset Saved",
+          message: `Cleaned version of "${datasetName}" saved (${cleanedResult.cleanedRows.length} rows, ${cleanedResult.columns.length} cols). Quality score: ${cleanedResult.auditLog.qualityScoreAfter}%.`,
+          type: "dataset_cleaned",
+          priority: "high"
+        });
+
+        if (onDatasetCleaned) {
+          onDatasetCleaned(cleanedResult, {
+            name: datasetName,
+            fileSize: datasetSize,
+            rowCount: cleanedResult.cleanedRows.length,
+            columnCount: cleanedResult.columns.length,
+            qualityScore: cleanedResult.auditLog.qualityScoreAfter,
+            columns: []
+          } as any);
+        }
+      } else {
+        toast.error("Failed to commit cleaned dataset via stored procedure", { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save cleaned dataset to database", { id: toastId });
+    } finally {
+      setIsSavingToDb(false);
+    }
   };
 
   return (
@@ -396,9 +462,25 @@ export default function DataCleaningStudio({ rows, datasetName = "Dataset", onDa
                 Final dataset size: {cleanedResult.cleanedRows.length} rows × {cleanedResult.columns.length} columns.
               </CardDescription>
             </div>
-            <Button onClick={handleDownloadCleanedCSV} className="bg-emerald-600 hover:bg-emerald-700 text-white mt-3 sm:mt-0">
-              <Download className="h-4 w-4 mr-2" /> Download Cleaned CSV
-            </Button>
+            <div className="flex items-center gap-3 mt-3 sm:mt-0">
+              {datasetId && (
+                <Button 
+                  onClick={handleSaveToDatabase} 
+                  disabled={isSavingToDb}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_15px_rgba(79,70,229,0.3)]"
+                >
+                  {isSavingToDb ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Save & Implement to Database
+                </Button>
+              )}
+              <Button onClick={handleDownloadCleanedCSV} variant="outline" className="border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700">
+                <Download className="h-4 w-4 mr-2" /> Download Cleaned CSV
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="bg-slate-950/60 rounded-xl p-4 border border-slate-800 space-y-2">

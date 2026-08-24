@@ -3,7 +3,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import { 
   Plus, Search, Filter, FolderKanban, Star, Clock, MoreVertical, 
   Archive, Trash2, Copy, Layers, Activity, Share2,
-  CheckSquare, Square, ChevronDown, ChevronUp, ListTodo
+  CheckSquare, Square, ChevronDown, ChevronUp, ListTodo,
+  Wand2, Zap, Sparkles, Edit3, ArrowUpRight, Loader2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -278,6 +279,53 @@ export default function Projects() {
     setIsShareDialogOpen(true);
   };
 
+  const handleAIRefineProject = async (id: string, name: string) => {
+    const toastId = toast.loading(`Refining project "${name}" with Gemini AI...`);
+    try {
+      const { session } = useAuthStore.getState();
+      const res = await fetch(`/api/v1/projects/${id}/refine-ai`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        }
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`Project "${name}" successfully refined with AI executive scope & milestones!`, { id: toastId });
+        loadProjects();
+      } else {
+        throw new Error(json.error || "Failed to refine project");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "AI Refinement failed", { id: toastId });
+    }
+  };
+
+  const handleUpgradeProject = async (id: string, name: string) => {
+    const toastId = toast.loading(`Upgrading compute tier for "${name}"...`);
+    try {
+      const { session } = useAuthStore.getState();
+      const res = await fetch(`/api/v1/projects/${id}/upgrade`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({ requested_tier: 'Enterprise' })
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`Project "${name}" compute tier upgraded to Enterprise Vector Cluster!`, { id: toastId });
+        loadProjects();
+      } else {
+        throw new Error(json.error || "Failed to upgrade project tier");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Upgrade failed", { id: toastId });
+    }
+  };
+
   const filteredProjects = useMemo(() => {
     return projects.filter(p => {
       const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.description?.toLowerCase().includes(search.toLowerCase());
@@ -400,44 +448,63 @@ export default function Projects() {
                           <Star className={`h-4 w-4 ${project.is_favorite ? 'fill-amber-400' : ''}`} />
                         </Button>
                         
-                         <Button 
-                           variant="ghost" 
-                           size="icon" 
-                           onClick={(e) => { e.preventDefault(); shareProject(project.id, project.name); }}
-                           className="h-8 w-8 rounded-full text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 transition-colors"
-                           title="Share Project"
-                         >
-                           <Share2 className="h-3.5 w-3.5" />
-                         </Button>
-                         
-    <Button 
-      variant="ghost" 
-      size="icon" 
-      onClick={(e) => { e.preventDefault(); renameProject(project.id, project.name); }}
-      className="h-8 w-8 rounded-full text-slate-500 hover:text-white hover:bg-slate-800 transition-colors"
-      title="Rename Project"
-    >
-      <Search className="h-3.5 w-3.5 hidden" />
-      <span className="text-[10px] font-medium leading-none">Edit</span>
-    </Button>
-    <Button 
-      variant="ghost" 
-      size="icon" 
-      onClick={(e) => { e.preventDefault(); toggleArchive(project.id, project.status); }}
-      className="h-8 w-8 rounded-full text-slate-500 hover:text-amber-400 hover:bg-amber-400/10 transition-colors"
-      title="Archive/Restore Project"
-    >
-      <Archive className="h-3.5 w-3.5" />
-    </Button>
-    <Button 
-      variant="ghost" 
-      size="icon" 
-      onClick={(e) => { e.preventDefault(); deleteProject(project.id); }}
-      className="h-8 w-8 rounded-full text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
-      title="Delete Project"
-    >
-      <Trash2 className="h-3.5 w-3.5" />
-    </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={(e) => { e.preventDefault(); handleAIRefineProject(project.id, project.name); }}
+                          className="h-8 w-8 rounded-full text-slate-500 hover:text-cyan-400 hover:bg-cyan-400/10 transition-colors"
+                          title="Refine with AI (Gemini)"
+                        >
+                          <Wand2 className="h-3.5 w-3.5" />
+                        </Button>
+
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={(e) => { e.preventDefault(); handleUpgradeProject(project.id, project.name); }}
+                          className="h-8 w-8 rounded-full text-slate-500 hover:text-amber-400 hover:bg-amber-400/10 transition-colors"
+                          title="Upgrade Compute Tier"
+                        >
+                          <Zap className="h-3.5 w-3.5" />
+                        </Button>
+
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={(e) => { e.preventDefault(); shareProject(project.id, project.name); }}
+                          className="h-8 w-8 rounded-full text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 transition-colors"
+                          title="Share Project"
+                        >
+                          <Share2 className="h-3.5 w-3.5" />
+                        </Button>
+                        
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={(e) => { e.preventDefault(); renameProject(project.id, project.name); }}
+                          className="h-8 w-8 rounded-full text-slate-500 hover:text-white hover:bg-slate-800 transition-colors"
+                          title="Rename / Edit Project"
+                        >
+                          <Edit3 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={(e) => { e.preventDefault(); toggleArchive(project.id, project.status); }}
+                          className="h-8 w-8 rounded-full text-slate-500 hover:text-amber-400 hover:bg-amber-400/10 transition-colors"
+                          title="Archive/Restore Project"
+                        >
+                          <Archive className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={(e) => { e.preventDefault(); deleteProject(project.id); }}
+                          className="h-8 w-8 rounded-full text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                          title="Delete Project"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
   
                       </div>
                     </div>
@@ -477,41 +544,80 @@ export default function Projects() {
           onClose={() => setIsWizardOpen(false)} 
           onComplete={async (newProject) => {
             if (user) {
-               await syncUserAndWorkspace(user);
-               let workspaceIdToInsert = selectedWorkspaceId;
-               if (!workspaceIdToInsert || workspaceIdToInsert === "all") {
-                 const { data: wsList } = await supabase
-                   .from('workspaces')
-                   .select('id')
-                   .eq('owner_id', user.id)
-                   .order('created_at', { ascending: true })
-                   .limit(1);
-                 if (wsList && wsList.length > 0) {
-                   workspaceIdToInsert = wsList[0].id;
-                 }
-               }
-                const encryptedDesc = await encryptField(newProject.description || "", user.id);
-               const { data, error } = await supabase.from('projects').insert({
-                 name: newProject.name,
-                  description: encryptedDesc,
-                 industry: newProject.industry,
-                 color: newProject.theme || 'indigo',
-                 owner_id: user.id,
-                 workspace_id: workspaceIdToInsert || undefined,
-                 status: 'Active'
-               }).select();
-               if (error) {
-                 throw new Error(error.message || 'Failed to create project');
-               }
-               toast.success("Project created successfully");
-               createNotification({
-                 title: "Project Created",
-                 message: `New project "${newProject.name}" was successfully created.`,
-                 type: "project_created",
-                 priority: "medium",
-                 actionUrl: data && data[0] ? `/workspace/projects/${data[0].id}` : "/workspace/projects"
-               });
-               loadProjects();
+              const { session } = useAuthStore.getState();
+              try {
+                const res = await fetch('/api/v1/projects', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session?.access_token}`
+                  },
+                  body: JSON.stringify({
+                    name: newProject.name,
+                    description: newProject.description,
+                    industry: newProject.industry,
+                    goal: newProject.goal,
+                    currency: newProject.currency,
+                    units: newProject.units,
+                    theme: newProject.theme,
+                    privacy: newProject.privacy,
+                    workspace_id: selectedWorkspaceId
+                  })
+                });
+                const json = await res.json();
+                if (json.success && json.data) {
+                  toast.success(`Project "${newProject.name}" created successfully!`);
+                  createNotification({
+                    title: "Project Created",
+                    message: `New project "${newProject.name}" was successfully created.`,
+                    type: "project_created",
+                    priority: "medium",
+                    actionUrl: `/workspace/projects/${json.data.id}`
+                  });
+                  loadProjects();
+                  setIsWizardOpen(false);
+                  return;
+                }
+              } catch (apiErr) {
+                console.warn("API project creation fallback:", apiErr);
+              }
+
+              // Fallback to client-side Supabase insert if API call falls through
+              await syncUserAndWorkspace(user);
+              let workspaceIdToInsert = selectedWorkspaceId;
+              if (!workspaceIdToInsert || workspaceIdToInsert === "all") {
+                const { data: wsList } = await supabase
+                  .from('workspaces')
+                  .select('id')
+                  .eq('owner_id', user.id)
+                  .order('created_at', { ascending: true })
+                  .limit(1);
+                if (wsList && wsList.length > 0) {
+                  workspaceIdToInsert = wsList[0].id;
+                }
+              }
+              const encryptedDesc = await encryptField(newProject.description || "", user.id);
+              const { data, error } = await supabase.from('projects').insert({
+                name: newProject.name,
+                description: encryptedDesc,
+                industry: newProject.industry,
+                color: newProject.theme || 'indigo',
+                owner_id: user.id,
+                workspace_id: workspaceIdToInsert || undefined,
+                status: 'Active'
+              }).select();
+              if (error) {
+                throw new Error(error.message || 'Failed to create project');
+              }
+              toast.success("Project created successfully");
+              createNotification({
+                title: "Project Created",
+                message: `New project "${newProject.name}" was successfully created.`,
+                type: "project_created",
+                priority: "medium",
+                actionUrl: data && data[0] ? `/workspace/projects/${data[0].id}` : "/workspace/projects"
+              });
+              loadProjects();
             }
             setIsWizardOpen(false);
           }}

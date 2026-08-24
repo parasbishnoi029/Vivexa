@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { 
   FolderKanban, Database, BarChart3, Activity, 
   ArrowLeft, Clock, MoreVertical, Edit2, Trash2,
-  FileText, Zap, LayoutDashboard, Share2, MessageSquare, ListTodo, Plus, Info, TrendingUp, RefreshCw
+  FileText, Zap, LayoutDashboard, Share2, MessageSquare, ListTodo, Plus, Info, TrendingUp, RefreshCw,
+  Wand2, Sparkles, Loader2, Check
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,14 +17,24 @@ import { Badge } from "@/components/ui/badge";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { CartesianGrid } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ShareDialog } from "@/components/ShareDialog";
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, session } = useAuthStore();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isAIRefining, setIsAIRefining] = useState(false);
+  const [isUpgrading, setIsUpgrading] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
-  const { data: project, isLoading: isProjectLoading } = useQuery({
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editIndustry, setEditIndustry] = useState("");
+
+  const { data: project, isLoading: isProjectLoading, refetch: refetchProject } = useQuery({
     queryKey: ['project', id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -33,6 +44,11 @@ export default function ProjectDetail() {
         .single();
       
       if (error) throw error;
+      if (data) {
+        setEditName(data.name || "");
+        setEditDescription(data.description || "");
+        setEditIndustry(data.industry || "finance");
+      }
       return data;
     },
     enabled: !!id
@@ -134,6 +150,91 @@ export default function ProjectDetail() {
     }
   };
 
+  const handleAIRefine = async () => {
+    setIsAIRefining(true);
+    const toastId = toast.loading("Gemini AI is refining project executive summary and milestones...");
+    try {
+      const res = await fetch(`/api/v1/projects/${id}/refine-ai`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        }
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("AI project refinement completed!", { id: toastId });
+        refetchProject();
+      } else {
+        throw new Error(json.error || "Refinement failed");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to refine project", { id: toastId });
+    } finally {
+      setIsAIRefining(false);
+    }
+  };
+
+  const handleUpgrade = async () => {
+    setIsUpgrading(true);
+    const toastId = toast.loading("Upgrading project compute tier...");
+    try {
+      const res = await fetch(`/api/v1/projects/${id}/upgrade`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({ requested_tier: 'Enterprise' })
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Project upgraded to Enterprise Vector Cluster!", { id: toastId });
+        refetchProject();
+      } else {
+        throw new Error(json.error || "Upgrade failed");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Upgrade failed", { id: toastId });
+    } finally {
+      setIsUpgrading(false);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editName.trim()) {
+      toast.error("Project name is required.");
+      return;
+    }
+    setIsSavingEdit(true);
+    try {
+      const res = await fetch(`/api/v1/projects/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({
+          name: editName.trim(),
+          description: editDescription.trim(),
+          industry: editIndustry
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Project details updated successfully.");
+        setIsEditOpen(false);
+        refetchProject();
+      } else {
+        throw new Error(json.error || "Failed to update project");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update project");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
   if (isProjectLoading) {
     return (
       <div className="space-y-6 max-w-6xl mx-auto animate-pulse">
@@ -209,14 +310,49 @@ export default function ProjectDetail() {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <Button variant="outline" className="bg-slate-800 border-slate-700 hover:bg-slate-700">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <Button 
+            onClick={handleAIRefine}
+            disabled={isAIRefining}
+            variant="outline" 
+            className="bg-cyan-950/40 border-cyan-800/60 text-cyan-300 hover:bg-cyan-900/60"
+          >
+            {isAIRefining ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2 text-cyan-400" />}
+            Refine with AI
+          </Button>
+
+          <Button 
+            onClick={handleUpgrade}
+            disabled={isUpgrading}
+            variant="outline" 
+            className="bg-amber-950/40 border-amber-800/60 text-amber-300 hover:bg-amber-900/60"
+          >
+            {isUpgrading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Zap className="h-4 w-4 mr-2 text-amber-400" />}
+            Upgrade Tier
+          </Button>
+
+          <Button 
+            onClick={() => setIsShareOpen(true)}
+            variant="outline" 
+            className="bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200"
+          >
             <Share2 className="h-4 w-4 mr-2" /> Share
           </Button>
-          <Button variant="outline" className="bg-slate-800 border-slate-700 hover:bg-slate-700">
+
+          <Button 
+            onClick={() => setIsEditOpen(true)}
+            variant="outline" 
+            className="bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200"
+          >
             <Edit2 className="h-4 w-4 mr-2" /> Edit
           </Button>
-          <Button variant="destructive" onClick={handleDelete} disabled={isDeleting} className="bg-rose-600/20 text-rose-400 hover:bg-rose-600/40 border border-rose-600/30">
+
+          <Button 
+            variant="destructive" 
+            onClick={handleDelete} 
+            disabled={isDeleting} 
+            className="bg-rose-600/20 text-rose-400 hover:bg-rose-600/40 border border-rose-600/30"
+          >
             <Trash2 className="h-4 w-4 mr-2" /> Delete
           </Button>
         </div>
@@ -444,6 +580,86 @@ export default function ProjectDetail() {
           </Card>
         </div>
       </div>
+
+      {/* Edit Project Dialog */}
+      {isEditOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl relative"
+          >
+            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              <Edit2 className="h-5 w-5 text-indigo-400" /> Refine Project Details
+            </h3>
+            
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-slate-400 font-medium block mb-1">Project Name</label>
+                <input 
+                  type="text" 
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  placeholder="e.g., Q3 Financial Audit"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 font-medium block mb-1">Description / Focus Scope</label>
+                <textarea 
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  rows={3}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 resize-none"
+                  placeholder="Describe project research goals..."
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 font-medium block mb-1">Industry Vertical</label>
+                <select 
+                  value={editIndustry}
+                  onChange={(e) => setEditIndustry(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="finance">Finance & Banking</option>
+                  <option value="healthcare">Healthcare & Life Sciences</option>
+                  <option value="ecommerce">E-Commerce & Retail</option>
+                  <option value="technology">SaaS & Technology</option>
+                  <option value="energy">Energy & Infrastructure</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button 
+                variant="ghost" 
+                onClick={() => setIsEditOpen(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveEdit}
+                disabled={isSavingEdit}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white"
+              >
+                {isSavingEdit ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
+                Save Changes
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Share Dialog */}
+      <ShareDialog 
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        title={`Project: ${project?.name || 'Untitled'}`}
+        shareUrl={`${window.location.origin}/workspace/projects/${id}`}
+      />
     </motion.div>
   );
 }

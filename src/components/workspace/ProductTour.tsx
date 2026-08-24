@@ -62,7 +62,7 @@ const TOUR_STEPS: TourStep[] = [
     subtitle: "Autonomous Conversational Data Scientist",
     description: "Ask complex strategic or statistical questions in natural language. Vivexa writes analytical SQL, calculates correlations, identifies causal drivers, and generates interactive chart visualizations.",
     icon: Bot,
-    targetRoute: "/workspace/ai-analyst",
+    targetRoute: "/workspace/ai",
     actionLabel: "Try AI Analyst",
     highlights: [
       "Natural language queries translated to deterministic SQL & Python execution",
@@ -94,7 +94,7 @@ const TOUR_STEPS: TourStep[] = [
     subtitle: "Instant ⌘K Search, Ontology & Metric Contracts",
     description: "Navigate everywhere at the speed of thought using the global Command Palette (Cmd/Ctrl + K). Define centralized business metrics and explore your enterprise digital twin ontology.",
     icon: Command,
-    targetRoute: "/workspace/semantic-layer",
+    targetRoute: "/workspace/semantic",
     actionLabel: "View Semantic Layer",
     highlights: [
       "Press Cmd+K / Ctrl+K anywhere to search pages, projects, datasets, and quick actions",
@@ -193,6 +193,10 @@ export function ProductTour() {
     toast.success("Tour complete! You're ready to unlock the full power of Vivexa AI.", {
       icon: <Sparkles className="h-4 w-4 text-indigo-400" />
     });
+    // Ensure the user lands on a valid workspace route after completing the tour
+    if (!window.location.pathname.startsWith("/workspace")) {
+      navigate("/workspace");
+    }
   };
 
   const currentStep = TOUR_STEPS[currentStepIndex];

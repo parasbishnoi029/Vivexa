@@ -19,6 +19,7 @@ import { ticketsRouter } from "./server/routes/tickets";
 import { aiRouter } from "./server/routes/ai";
 import { ragRouter } from "./server/routes/rag";
 import { dbtRouter } from "./server/routes/dbt";
+import { semanticRouter } from "./server/routes/semantic";
 import { qualityRouter } from "./server/routes/quality";
 import { collabRouter } from "./server/routes/collab";
 import { auditRouter } from "./server/routes/audit";
@@ -847,6 +848,7 @@ async function resolveRecoveryUrl(actionLink: string, publicOrigin: string): Pro
   apiRouter.use('/scim', scimRouter);
   apiRouter.use('/rag', ragRouter);
   apiRouter.use('/dbt', dbtRouter);
+  apiRouter.use('/semantic', semanticRouter);
   apiRouter.use('/quality', qualityRouter);
   apiRouter.use('/collab', collabRouter);
   apiRouter.use('/audit', auditRouter);

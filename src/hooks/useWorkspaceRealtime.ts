@@ -173,18 +173,37 @@ export function useWorkspaceRealtime(options: UseWorkspaceRealtimeOptions = {}) 
         const rows = Number(ds.row_count || ds.rows || ds.metadata?.row_count || 0);
         const cols = Number(ds.column_count || ds.cols || ds.metadata?.column_count || 0);
         const size = Number(ds.size_bytes || ds.metadata?.file_size || 0);
-        const quality = Number(ds.quality || ds.data_quality_score || ds.metadata?.data_quality_score || 0);
+        
+        let quality = 0;
+        let hasQualityField = false;
+
+        if (typeof ds.quality === 'number') {
+          quality = ds.quality;
+          hasQualityField = true;
+        } else if (typeof ds.data_quality_score === 'number') {
+          quality = ds.data_quality_score;
+          hasQualityField = true;
+        } else if (typeof ds.metadata?.data_quality_score === 'number') {
+          quality = ds.metadata.data_quality_score;
+          hasQualityField = true;
+        } else if (ds.quality !== undefined && ds.quality !== null && !isNaN(Number(ds.quality))) {
+          quality = Number(ds.quality);
+          hasQualityField = true;
+        }
 
         totalRows += rows;
         totalCols = Math.max(totalCols, cols);
         totalSizeBytes += size;
-        if (quality > 0) {
+
+        if (hasQualityField) {
           qualitySum += quality;
           qualityCount++;
         }
       });
 
-      const avgQuality = qualityCount > 0 ? Number((qualitySum / qualityCount).toFixed(1)) : 98.4;
+      const avgQuality = qualityCount > 0 
+        ? Number((qualitySum / qualityCount).toFixed(1)) 
+        : (datasetsList.length === 0 ? 100 : 98.4);
       const storageGB = totalSizeBytes > 0 ? totalSizeBytes / (1024 * 1024 * 1024) : 0;
 
       // Also account for local storage saved executive reports if any

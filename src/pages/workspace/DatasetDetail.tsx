@@ -727,10 +727,9 @@ export default function DatasetDetail() {
                             {c.numericStats ? `${c.numericStats.outlierCount} (${c.numericStats.outlierPercentage.toFixed(2)}%)` : 'N/A'}
                           </td>
                           <td className="px-4 py-3 text-rose-400 font-bold">
-                            {(c.domainInvalidCount && c.domainInvalidCount > 0) ? `${c.domainInvalidCount} Flagged` : 'None'}
-                          </td>
-                          <td className="px-4 py-3 text-rose-400 font-bold">
-                            {(c.domainInvalidCount && c.domainInvalidCount > 0) ? `${c.domainInvalidCount} Flagged` : 'None'}
+                            {((c.domainInvalidCount && c.domainInvalidCount > 0) || (c.numericStats?.domainInvalidCount && c.numericStats.domainInvalidCount > 0)) 
+                              ? `${c.domainInvalidCount || c.numericStats?.domainInvalidCount} Flagged` 
+                              : 'None'}
                           </td>
                         </tr>
                       ))}
@@ -753,6 +752,7 @@ export default function DatasetDetail() {
 
           {activeTab === "cleaning" && (
             <DataCleaningStudio
+              datasetId={dataset.id}
               rows={fullRows}
               datasetName={dataset.name}
               datasetSize={dataset.size_bytes}
@@ -762,6 +762,7 @@ export default function DatasetDetail() {
                 setProfile(profile);
                 setSortCol(null);
                 setCurrentPage(1);
+                setDataset((prev: any) => prev ? { ...prev, rows: res.cleanedRows.length, cols: res.columns.length, quality: res.auditLog.qualityScoreAfter } : prev);
               }}
             />
           )}

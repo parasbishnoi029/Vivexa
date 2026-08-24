@@ -758,8 +758,8 @@ export default function WorkspaceLayout() {
           <motion.aside 
             initial={{ x: -300, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="h-full w-64 rounded-2xl border border-slate-800/50 bg-slate-900/60 backdrop-blur-2xl flex flex-col shadow-2xl overflow-hidden relative"
+            transition={{ type: "spring", stiffness: 350, damping: 30 }}
+            className="h-full w-64 rounded-2xl border border-slate-800/80 bg-slate-900/95 flex flex-col shadow-2xl overflow-hidden relative gpu-layer"
           >
             <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/5 to-transparent pointer-events-none" />
             
@@ -1072,10 +1072,10 @@ export default function WorkspaceLayout() {
               {/* MNC++ Multi-Tenant Workspace Switcher */}
               <div className="relative" ref={workspaceMenuRef}>
                 <motion.button 
-                  whileHover={{ scale: 1.01, translateY: -1 }}
+                  whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => setIsWorkspaceMenuOpen(!isWorkspaceMenuOpen)}
-                  className="flex items-center gap-3 bg-slate-900/40 border border-slate-800/60 backdrop-blur-2xl px-4 py-2 rounded-2xl transition-all hover:bg-slate-800/60 hover:border-indigo-500/40 group shadow-[0_8px_30px_rgb(0,0,0,0.12)] relative overflow-hidden h-14"
+                  className="flex items-center gap-3 bg-slate-900/90 border border-slate-800/80 px-4 py-2 rounded-2xl transition-colors hover:bg-slate-850 hover:border-indigo-500/40 group shadow-lg relative overflow-hidden h-14"
                 >
                   <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/5 via-transparent to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-600 flex items-center justify-center text-[11px] font-black text-white shadow-[0_0_20px_rgba(79,70,229,0.4)] border border-white/10 relative z-10">
@@ -1234,14 +1234,14 @@ export default function WorkspaceLayout() {
             </div>
           </header>
           
-          <main className="flex-1 overflow-y-auto p-4 md:p-8 pt-4 relative z-10 scrollbar-hide">
+          <main className="flex-1 overflow-y-auto p-4 md:p-8 pt-4 relative z-10 scrollbar-hide smooth-scroll">
              <AnimatePresence mode="wait">
                <motion.div
                  key={location.pathname}
-                 initial={{ opacity: 0, y: 8 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 exit={{ opacity: 0, y: -8 }}
-                 transition={{ duration: 0.15, ease: "easeOut" }}
+                 initial={{ opacity: 0 }}
+                 animate={{ opacity: 1 }}
+                 exit={{ opacity: 0 }}
+                 transition={{ duration: 0.12, ease: "easeOut" }}
                  className="h-full"
                >
                  <Outlet />

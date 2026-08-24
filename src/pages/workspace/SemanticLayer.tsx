@@ -1,32 +1,22 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Database, Layers, Target, Shield, Activity, 
   Plus, Search, Filter, MoreVertical, Settings2,
   Code2, Share2, Info, ChevronRight, BarChart3,
-  Terminal, Zap, Boxes, GitBranch, RefreshCw, Download
+  Terminal, Zap, Boxes, GitBranch, RefreshCw, Download, Copy, Play, Trash2, Edit3, CheckCircle2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { ShareDialog } from "@/components/ShareDialog";
 import { DbtCubeSyncModal } from "@/components/workspace/DbtCubeSyncModal";
+import { CreateEditMetricModal, SemanticMetricItem } from "@/components/workspace/CreateEditMetricModal";
+import { TestSqlModal } from "@/components/workspace/TestSqlModal";
+import { LineageMapModal } from "@/components/workspace/LineageMapModal";
 import { ParsedSemanticMetric } from "@/lib/dbtCubeParser";
 
-interface SemanticMetric {
-  id: string;
-  name: string;
-  description: string;
-  expression: string;
-  sql: string;
-  type: "Sum" | "Count" | "Average" | "Ratio" | "Distinct";
-  category: "Revenue" | "User Growth" | "Operational" | "Risk";
-  status: "Verified" | "Draft";
-  owner: string;
-  lineage: string[];
-}
-
-const INITIAL_ENTERPRISE_METRICS: SemanticMetric[] = [
+const INITIAL_ENTERPRISE_METRICS: SemanticMetricItem[] = [
   {
     id: "m-mrr-01",
     name: "Monthly Recurring Revenue (MRR)",
@@ -90,7 +80,7 @@ const INITIAL_ENTERPRISE_METRICS: SemanticMetric[] = [
 ];
 
 export default function SemanticLayer() {
-  const [metrics, setMetrics] = useState<SemanticMetric[]>(() => {
+  const [metrics, setMetrics] = useState<SemanticMetricItem[]>(() => {
     try {
       const saved = localStorage.getItem('vivexa_semantic_metrics');
       return saved ? JSON.parse(saved) : INITIAL_ENTERPRISE_METRICS;
@@ -99,35 +89,93 @@ export default function SemanticLayer() {
     }
   });
 
-  // Auto-persist changes
-  useMemo(() => {
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Sync with backend API on mount
+  useEffect(() => {
+    const fetchServerMetrics = async () => {
+      setIsLoading(true);
+      try {
+        const res = await fetch("/api/v1/semantic/metrics");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.metrics && data.metrics.length > 0) {
+            const mapped: SemanticMetricItem[] = data.metrics.map((m: any) => ({
+              id: m.metricId || m.id,
+              name: m.name,
+              description: m.description,
+              expression: m.expression || m.pythonFormula || m.sqlFormula,
+              sql: m.sqlFormula || m.sql || m.expression,
+              type: m.type || "Sum",
+              category: m.category || "Revenue",
+              status: m.status || "Verified",
+              owner: m.owner || "Enterprise Data Team",
+              lineage: m.lineage || ["Lakehouse.Warehouse"]
+            }));
+
+            // Merge with local state
+            setMetrics(prev => {
+              const prevMap = new Map(prev.map(p => [p.id, p]));
+              mapped.forEach(m => prevMap.set(m.id, m));
+              return Array.from(prevMap.values());
+            });
+          }
+        }
+      } catch (err) {
+        // Silent fallback to local storage
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchServerMetrics();
+  }, []);
+
+  // Auto-persist local changes
+  useEffect(() => {
     localStorage.setItem('vivexa_semantic_metrics', JSON.stringify(metrics));
   }, [metrics]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("All");
 
   const filteredMetrics = useMemo(() => {
     return metrics.filter(m => {
       const matchesSearch = m.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            m.description.toLowerCase().includes(searchQuery.toLowerCase());
+                            m.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            m.expression.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCat = activeCategory === "All" || m.category === activeCategory;
       return matchesSearch && matchesCat;
     });
   }, [metrics, searchQuery, activeCategory]);
 
-  const [selectedMetric, setSelectedMetric] = useState<SemanticMetric | null>(INITIAL_ENTERPRISE_METRICS[0]);
+  const [selectedMetric, setSelectedMetric] = useState<SemanticMetricItem | null>(() => metrics[0] || INITIAL_ENTERPRISE_METRICS[0]);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isDbtSyncOpen, setIsDbtSyncOpen] = useState(false);
+  const [isCreateEditOpen, setIsCreateEditOpen] = useState(false);
+  const [metricToEdit, setMetricToEdit] = useState<SemanticMetricItem | null>(null);
+  const [isTestSqlOpen, setIsTestSqlOpen] = useState(false);
+  const [isLineageOpen, setIsLineageOpen] = useState(false);
+
+  // Keep selectedMetric updated if metrics list changes
+  useEffect(() => {
+    if (selectedMetric) {
+      const updated = metrics.find(m => m.id === selectedMetric.id);
+      if (updated) setSelectedMetric(updated);
+    } else if (metrics.length > 0) {
+      setSelectedMetric(metrics[0]);
+    }
+  }, [metrics]);
 
   const handleImportMetrics = (newMetrics: ParsedSemanticMetric[]) => {
-    const formatted: SemanticMetric[] = newMetrics.map(nm => ({
+    const formatted: SemanticMetricItem[] = newMetrics.map(nm => ({
       id: nm.id,
       name: nm.name,
       description: nm.description,
       expression: nm.expression,
       sql: nm.sql,
       type: nm.type,
-      category: nm.category,
+      category: nm.category as any,
       status: nm.status,
       owner: nm.owner,
       lineage: nm.lineage
@@ -138,6 +186,71 @@ export default function SemanticLayer() {
       const filteredNew = formatted.filter(m => !existingIds.has(m.id));
       return [...filteredNew, ...prev];
     });
+    toast.success(`Imported ${newMetrics.length} semantic definitions!`);
+  };
+
+  const handleSaveMetric = (savedMetric: SemanticMetricItem) => {
+    setMetrics(prev => {
+      const exists = prev.some(m => m.id === savedMetric.id);
+      if (exists) {
+        return prev.map(m => m.id === savedMetric.id ? savedMetric : m);
+      } else {
+        return [savedMetric, ...prev];
+      }
+    });
+    setSelectedMetric(savedMetric);
+  };
+
+  const handleDeleteMetric = (metricId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const target = metrics.find(m => m.id === metricId);
+    if (!target) return;
+
+    if (confirm(`Are you sure you want to remove metric "${target.name}"?`)) {
+      setMetrics(prev => prev.filter(m => m.id !== metricId));
+      if (selectedMetric?.id === metricId) {
+        const remaining = metrics.filter(m => m.id !== metricId);
+        setSelectedMetric(remaining.length > 0 ? remaining[0] : null);
+      }
+      toast.success(`Metric "${target.name}" deleted.`);
+
+      // Sync backend
+      fetch(`/api/v1/semantic/metrics/${metricId}`, { method: "DELETE" }).catch(() => {});
+    }
+  };
+
+  const handlePromotedMetric = (metricId: string) => {
+    setMetrics(prev => prev.map(m => m.id === metricId ? { ...m, status: "Verified" } : m));
+    if (selectedMetric?.id === metricId) {
+      setSelectedMetric(prev => prev ? { ...prev, status: "Verified" } : null);
+    }
+  };
+
+  const handleExport = async (format: "dbt-yaml" | "cube-schema" | "json") => {
+    const toastId = toast.loading(`Generating ${format} manifest...`);
+    try {
+      const res = await fetch("/api/v1/semantic/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ format })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const blob = new Blob([data.content], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = data.filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success(`Exported ${data.filename}!`, { id: toastId });
+      } else {
+        toast.error("Export failed.", { id: toastId });
+      }
+    } catch {
+      toast.error("Export failed.", { id: toastId });
+    }
   };
 
   return (
@@ -159,11 +272,19 @@ export default function SemanticLayer() {
                 {metrics.length} Definitions
               </span>
             </h1>
-            <p className="text-sm text-slate-400 mt-0.5">The source of truth for business logic. Define once, deploy everywhere.</p>
+            <p className="text-sm text-slate-400 mt-0.5">The enterprise source of truth for business logic. Define once, deploy everywhere.</p>
           </div>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
+          <Button 
+            onClick={() => handleExport("dbt-yaml")}
+            variant="outline"
+            className="border-slate-800 bg-slate-900/80 hover:bg-slate-800 text-slate-300 font-semibold rounded-xl text-xs gap-1.5"
+          >
+            <Download className="h-3.5 w-3.5 text-indigo-400" /> Export dbt
+          </Button>
+
           <Button 
             onClick={() => setIsDbtSyncOpen(true)}
             variant="outline" 
@@ -173,7 +294,13 @@ export default function SemanticLayer() {
             dbt & Cube.js Sync
           </Button>
 
-          <Button className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl px-5 text-xs">
+          <Button 
+            onClick={() => {
+              setMetricToEdit(null);
+              setIsCreateEditOpen(true);
+            }}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl px-5 text-xs shadow-lg shadow-indigo-600/20"
+          >
             <Plus className="h-4 w-4 mr-2" /> Create Metric
           </Button>
         </div>
@@ -196,11 +323,11 @@ export default function SemanticLayer() {
               />
             </div>
             <div className="flex items-center gap-2 overflow-x-auto pb-1 bg-slate-950/40 p-1 rounded-xl border border-slate-800/60">
-              {["All", "Revenue", "User Growth", "Operational", "Risk"].map(cat => (
+              {["All", "Revenue", "SaaS", "Financial", "User Growth", "Operational", "Risk", "Customer"].map(cat => (
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
                     activeCategory === cat ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
@@ -233,14 +360,22 @@ export default function SemanticLayer() {
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="font-bold text-white group-hover:text-indigo-300 transition-colors">{metric.name}</h3>
-                          {metric.status === 'Verified' && <Shield className="h-3.5 w-3.5 text-emerald-400" />}
+                          {metric.status === 'Verified' ? (
+                            <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                              <Shield className="h-3 w-3" /> Verified
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                              Draft
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-slate-400 mt-1 line-clamp-1">{metric.description}</p>
                         
-                        <div className="flex items-center gap-4 mt-4">
+                        <div className="flex items-center gap-4 mt-4 flex-wrap">
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">Expression:</span>
-                            <code className="text-[10px] bg-slate-950 px-2 py-0.5 rounded text-indigo-300 border border-slate-800">{metric.expression}</code>
+                            <code className="text-[10px] bg-slate-950 px-2 py-0.5 rounded text-indigo-300 border border-slate-800 font-mono">{metric.expression}</code>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">Owner:</span>
@@ -249,20 +384,44 @@ export default function SemanticLayer() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-white">
-                        <Code2 className="h-4 w-4" />
-                      </Button>
+
+                    <div className="flex items-center gap-1">
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="h-8 w-8 text-slate-500 hover:text-white"
-                        onClick={(e) => { e.stopPropagation(); setIsShareDialogOpen(true); }}
+                        title="Test SQL Execution"
+                        className="h-8 w-8 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedMetric(metric);
+                          setIsTestSqlOpen(true);
+                        }}
                       >
-                        <Share2 className="h-4 w-4" />
+                        <Terminal className="h-4 w-4 text-emerald-400" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-white">
-                        <MoreVertical className="h-4 w-4" />
+
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        title="Edit Metric"
+                        className="h-8 w-8 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMetricToEdit(metric);
+                          setIsCreateEditOpen(true);
+                        }}
+                      >
+                        <Edit3 className="h-4 w-4" />
+                      </Button>
+
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        title="Delete Metric"
+                        className="h-8 w-8 text-slate-500 hover:text-rose-400 hover:bg-slate-800 rounded-lg"
+                        onClick={(e) => handleDeleteMetric(metric.id, e)}
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
@@ -275,17 +434,35 @@ export default function SemanticLayer() {
         {/* Right: Metric Definition Studio */}
         <div className="space-y-6">
           <Card className="bg-slate-900/60 border-slate-800/60 rounded-3xl overflow-hidden sticky top-24 shadow-2xl">
-            <CardHeader className="border-b border-slate-800/40 p-5 bg-slate-950/20">
+            <CardHeader className="border-b border-slate-800/40 p-5 bg-slate-950/20 flex flex-row items-center justify-between">
               <CardTitle className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2">
                 <Code2 className="h-4 w-4 text-indigo-400" /> Intelligence Studio
               </CardTitle>
+              {selectedMetric && (
+                <span className="text-[10px] font-bold font-mono text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
+                  {selectedMetric.category}
+                </span>
+              )}
             </CardHeader>
             <CardContent className="p-6">
               {selectedMetric ? (
-                <div className="space-y-8">
+                <div className="space-y-6">
                   <div className="space-y-1">
-                    <h2 className="text-xl font-bold text-white">{selectedMetric.name}</h2>
-                    <p className="text-[11px] text-slate-500 leading-relaxed">{selectedMetric.description}</p>
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-xl font-bold text-white">{selectedMetric.name}</h2>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-slate-500 hover:text-white"
+                        onClick={() => {
+                          setMetricToEdit(selectedMetric);
+                          setIsCreateEditOpen(true);
+                        }}
+                      >
+                        <Edit3 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">{selectedMetric.description}</p>
                   </div>
 
                   <div className="space-y-4">
@@ -302,52 +479,85 @@ export default function SemanticLayer() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">SQL Projection</span>
-                        <Button variant="ghost" size="sm" className="h-6 text-[10px] text-slate-500 hover:text-white p-0">Copy SQL</Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 text-[10px] text-slate-400 hover:text-white p-0 gap-1"
+                          onClick={() => {
+                            navigator.clipboard.writeText(selectedMetric.sql || selectedMetric.expression);
+                            toast.success("SQL copied to clipboard!");
+                          }}
+                        >
+                          <Copy className="h-3 w-3" /> Copy SQL
+                        </Button>
                       </div>
-                      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-400 leading-relaxed break-all">
+                      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-300 leading-relaxed break-all">
                         {selectedMetric.sql}
                       </div>
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">Lineage Map</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">Lineage Map</h3>
+                      <Button
+                        variant="link"
+                        onClick={() => setIsLineageOpen(true)}
+                        className="text-[10px] text-indigo-400 hover:text-indigo-300 p-0 h-auto"
+                      >
+                        Full Graph
+                      </Button>
+                    </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       {selectedMetric.lineage.map((l, i) => (
                         <div key={i} className="flex items-center gap-2">
-                          <span className="text-[10px] bg-slate-950 px-2 py-1 rounded border border-slate-800 text-slate-400 font-mono">{l}</span>
+                          <span className="text-[10px] bg-slate-950 px-2 py-1 rounded border border-slate-800 text-slate-300 font-mono">{l}</span>
                           {i < selectedMetric.lineage.length - 1 && <ChevronRight className="h-3 w-3 text-slate-600" />}
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">Health Validation</h3>
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <div className="flex items-center justify-between p-3 rounded-2xl bg-indigo-500/5 border border-indigo-500/10">
                         <div className="flex items-center gap-3">
                           <Shield className="h-4 w-4 text-indigo-400" />
-                          <span className="text-xs text-slate-300">Logic Verification</span>
+                          <span className="text-xs text-slate-300">Logic Integrity</span>
                         </div>
-                        <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">PASSED</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                          selectedMetric.status === 'Verified' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                        }`}>
+                          {selectedMetric.status === 'Verified' ? 'PASSED' : 'PENDING'}
+                        </span>
                       </div>
                       <div className="flex items-center justify-between p-3 rounded-2xl bg-indigo-500/5 border border-indigo-500/10">
                         <div className="flex items-center gap-3">
                           <Activity className="h-4 w-4 text-indigo-400" />
-                          <span className="text-xs text-slate-300">Downstream Usage</span>
+                          <span className="text-xs text-slate-300">Active Downstream Consumers</span>
                         </div>
-                        <span className="text-xs font-bold text-white">42 Consumers</span>
+                        <span className="text-xs font-bold text-white">42 Nodes</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="pt-6 border-t border-slate-800/40 grid grid-cols-2 gap-3">
-                    <Button className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold h-10">
-                      <Zap className="h-3.5 w-3.5 mr-2" /> Push to Prod
+                  <div className="pt-4 border-t border-slate-800/40 grid grid-cols-2 gap-3">
+                    <Button 
+                      onClick={() => setIsTestSqlOpen(true)}
+                      className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold h-10 shadow-lg shadow-indigo-600/20 gap-1.5"
+                    >
+                      <Terminal className="h-3.5 w-3.5" /> Test SQL & Push
                     </Button>
-                    <Button variant="outline" className="bg-slate-900 border-slate-800 text-slate-400 hover:text-white rounded-xl text-xs h-10">
-                      <Settings2 className="h-3.5 w-3.5 mr-2" /> Fine-tune
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setMetricToEdit(selectedMetric);
+                        setIsCreateEditOpen(true);
+                      }}
+                      className="bg-slate-900 border-slate-800 text-slate-300 hover:text-white rounded-xl text-xs h-10 gap-1.5"
+                    >
+                      <Settings2 className="h-3.5 w-3.5" /> Fine-tune
                     </Button>
                   </div>
                 </div>
@@ -365,12 +575,12 @@ export default function SemanticLayer() {
             </CardContent>
           </Card>
 
-          <div className="p-6 bg-emerald-500/5 border border-emerald-500/10 rounded-3xl space-y-4">
+          <div className="p-5 bg-emerald-500/5 border border-emerald-500/10 rounded-3xl space-y-3">
             <h4 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-2">
               <Shield className="h-3.5 w-3.5" /> Intelligence Health Validation
             </h4>
-            <p className="text-[10px] text-slate-500 leading-relaxed italic">
-              All metrics marked as <span className="text-emerald-400 font-bold">Verified</span> have passed autonomous SQL integrity audits and are safe for multi-agent use.
+            <p className="text-[10px] text-slate-400 leading-relaxed italic">
+              All metrics marked as <span className="text-emerald-400 font-bold">Verified</span> automatically update AI Agent prompts and Smart Semantic Query Caches instantly.
             </p>
           </div>
         </div>
@@ -382,11 +592,11 @@ export default function SemanticLayer() {
           <div className="flex flex-col md:flex-row gap-8 items-center">
             <div className="flex-1 space-y-4">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold uppercase text-indigo-400">
-                <Zap className="h-3 w-3 fill-indigo-400" /> Semantic Linkage
+                <Zap className="h-3 w-3 fill-indigo-400" /> Universal Semantic Linkage
               </div>
               <h3 className="text-2xl font-bold text-white">Universal Metric Distribution</h3>
               <p className="text-slate-400 text-sm leading-relaxed">
-                Vivexa automatically maps your semantic definitions to downstream assets. Changes to <strong>CAC</strong> logic will propagate to 12 active Dashboards, 4 AI Agents, and 8 Scheduled Reports instantly.
+                Vivexa automatically maps your semantic definitions to downstream assets. Formula changes propagate to 12 active Dashboards, 4 AI Agents, and 8 Scheduled Reports instantly.
               </p>
               <div className="flex items-center gap-6 pt-4">
                 <div className="flex flex-col">
@@ -395,8 +605,8 @@ export default function SemanticLayer() {
                 </div>
                 <div className="w-px h-10 bg-slate-800" />
                 <div className="flex flex-col">
-                  <span className="text-2xl font-bold text-white">12s</span>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Avg Propagation</span>
+                  <span className="text-2xl font-bold text-white">&lt; 10ms</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Avg Cache Latency</span>
                 </div>
               </div>
             </div>
@@ -415,21 +625,50 @@ export default function SemanticLayer() {
                   </span>
                 </div>
               ))}
-              <Button variant="link" className="w-full text-indigo-400 text-xs mt-2">View Full Lineage Map</Button>
+              <Button 
+                variant="link" 
+                onClick={() => setIsLineageOpen(true)}
+                className="w-full text-indigo-400 text-xs mt-2"
+              >
+                View Full Lineage Map
+              </Button>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Modals */}
       <ShareDialog
         isOpen={isShareDialogOpen}
         onClose={() => setIsShareDialogOpen(false)}
         title={selectedMetric ? `Metric: ${selectedMetric.name}` : "Semantic Layer"}
       />
+      
       <DbtCubeSyncModal
         isOpen={isDbtSyncOpen}
         onClose={() => setIsDbtSyncOpen(false)}
         onImportMetrics={handleImportMetrics}
-        currentMetrics={metrics}
+        currentMetrics={metrics as any}
+      />
+
+      <CreateEditMetricModal
+        isOpen={isCreateEditOpen}
+        onClose={() => setIsCreateEditOpen(false)}
+        metricToEdit={metricToEdit}
+        onSaveMetric={handleSaveMetric}
+      />
+
+      <TestSqlModal
+        isOpen={isTestSqlOpen}
+        onClose={() => setIsTestSqlOpen(false)}
+        metric={selectedMetric}
+        onPromoted={handlePromotedMetric}
+      />
+
+      <LineageMapModal
+        isOpen={isLineageOpen}
+        onClose={() => setIsLineageOpen(false)}
+        metric={selectedMetric}
       />
     </motion.div>
   );
