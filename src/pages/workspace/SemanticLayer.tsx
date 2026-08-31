@@ -15,6 +15,7 @@ import { CreateEditMetricModal, SemanticMetricItem } from "@/components/workspac
 import { TestSqlModal } from "@/components/workspace/TestSqlModal";
 import { LineageMapModal } from "@/components/workspace/LineageMapModal";
 import { ParsedSemanticMetric } from "@/lib/dbtCubeParser";
+import { VisualDimensionRelationshipBuilder } from "@/components/workspace/VisualDimensionRelationshipBuilder";
 
 const INITIAL_ENTERPRISE_METRICS: SemanticMetricItem[] = [
   {
@@ -150,6 +151,7 @@ export default function SemanticLayer() {
   }, [metrics, searchQuery, activeCategory]);
 
   const [selectedMetric, setSelectedMetric] = useState<SemanticMetricItem | null>(() => metrics[0] || INITIAL_ENTERPRISE_METRICS[0]);
+  const [viewMode, setViewMode] = useState<"catalog" | "relationships">("catalog");
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isDbtSyncOpen, setIsDbtSyncOpen] = useState(false);
   const [isCreateEditOpen, setIsCreateEditOpen] = useState(false);
@@ -277,6 +279,29 @@ export default function SemanticLayer() {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center rounded-xl bg-slate-950/80 border border-slate-800 p-1">
+            <button
+              onClick={() => setViewMode("catalog")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                viewMode === "catalog"
+                  ? "bg-indigo-600 text-white shadow-md"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Layers className="h-3.5 w-3.5 inline mr-1.5" /> Metrics Catalog
+            </button>
+            <button
+              onClick={() => setViewMode("relationships")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                viewMode === "relationships"
+                  ? "bg-cyan-600 text-white shadow-md"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Boxes className="h-3.5 w-3.5 inline mr-1.5 text-cyan-300" /> Visual Dimension Builder
+            </button>
+          </div>
+
           <Button 
             onClick={() => handleExport("dbt-yaml")}
             variant="outline"
@@ -306,8 +331,17 @@ export default function SemanticLayer() {
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {viewMode === "relationships" ? (
+        <VisualDimensionRelationshipBuilder
+          onSaveRelationship={(rel) => {
+            // Also create a semantic metric/dimension entry if needed
+            toast.success(`Dimension join '${rel.name}' synced with semantic engine.`);
+          }}
+        />
+      ) : (
+        <>
+          {/* Main Content Area */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Metrics Catalog */}
         <div className="lg:col-span-2 space-y-4">
           {/* Search & Filters */}
@@ -636,6 +670,8 @@ export default function SemanticLayer() {
           </div>
         </CardContent>
       </Card>
+      </>
+      )}
 
       {/* Modals */}
       <ShareDialog

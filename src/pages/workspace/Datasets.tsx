@@ -22,6 +22,9 @@ import { createNotification } from "@/lib/notifications";
 import { profileDataset } from "@/lib/dataEngine";
 import { Skeleton } from "@/components/ui/skeleton";
 import DataCleaningStudio from "@/components/workspace/DataCleaningStudio";
+import { VisualDimensionRelationshipBuilder } from "@/components/workspace/VisualDimensionRelationshipBuilder";
+import { EmbeddedDuckDBWorkbench } from "@/components/workspace/EmbeddedDuckDBWorkbench";
+import { Boxes, Zap } from "lucide-react";
 
 // Dynamic metadata extractor to safely compute or default all 31 enterprise-grade fields
 export function getDatasetMetadata(dataset: any, user: any) {
@@ -126,7 +129,7 @@ export default function Datasets() {
   const user = useAuthStore(state => state.user);
 
   // Data Studio View State & Direct Ingestion
-  const [activeTab, setActiveTab] = useState<'warehouse' | 'studio'>('warehouse');
+  const [activeTab, setActiveTab] = useState<'warehouse' | 'studio' | 'duckdb' | 'dimensions'>('warehouse');
   const [selectedStudioDatasetId, setSelectedStudioDatasetId] = useState<string>("");
   const [studioRows, setStudioRows] = useState<Record<string, any>[]>([]);
   const [isStudioLoading, setIsStudioLoading] = useState(false);
@@ -539,7 +542,7 @@ export default function Datasets() {
 
         {/* Top View Mode Switcher & Actions */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 shadow-inner">
+          <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 shadow-inner flex-wrap">
             <button
               onClick={() => setActiveTab('warehouse')}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
@@ -566,6 +569,28 @@ export default function Datasets() {
             >
               <Sparkles className="h-3.5 w-3.5 text-purple-300" />
               Data Studio & Lab
+            </button>
+            <button
+              onClick={() => setActiveTab('duckdb')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                activeTab === 'duckdb' 
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md shadow-orange-600/30' 
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Zap className="h-3.5 w-3.5 text-amber-300" />
+              In-Browser DuckDB-Wasm
+            </button>
+            <button
+              onClick={() => setActiveTab('dimensions')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                activeTab === 'dimensions' 
+                  ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-600/30' 
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Boxes className="h-3.5 w-3.5 text-cyan-300" />
+              Dimension Builder
             </button>
           </div>
 
@@ -678,6 +703,20 @@ export default function Datasets() {
               )}
             </div>
           )}
+        </motion.div>
+      ) : activeTab === 'duckdb' ? (
+        <motion.div variants={itemVariants} className="space-y-6">
+          <EmbeddedDuckDBWorkbench
+            datasetName={(datasets || []).find((d: any) => d.id === selectedStudioDatasetId)?.name || "ecommerce_analytics_q3.parquet"}
+          />
+        </motion.div>
+      ) : activeTab === 'dimensions' ? (
+        <motion.div variants={itemVariants} className="space-y-6">
+          <VisualDimensionRelationshipBuilder
+            onSaveRelationship={(rel) => {
+              toast.success(`Dimension join '${rel.name}' saved to semantic schema.`);
+            }}
+          />
         </motion.div>
       ) : (
         <>

@@ -11,12 +11,14 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { MicroVMPodManagerModal } from "@/components/workspace/MicroVMPodManagerModal";
+import { ComplianceEvidenceModal } from "@/components/workspace/ComplianceEvidenceModal";
 
 const CPU_METRICS_DATA: any[] = [];
 
 export default function Observability() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showMicroVMModal, setShowMicroVMModal] = useState(false);
+  const [showComplianceModal, setShowComplianceModal] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
   const [metrics, setMetrics] = useState({
     uptime: "99.99%",
@@ -223,7 +225,15 @@ export default function Observability() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button
+            onClick={() => setShowComplianceModal(true)}
+            variant="outline"
+            className="bg-emerald-600/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/20 text-xs font-semibold flex items-center gap-2"
+          >
+            <ShieldCheck className="h-4 w-4 text-emerald-400" /> SOC2 & HIPAA Compliance
+          </Button>
+
           <Button
             onClick={() => setShowMicroVMModal(true)}
             variant="outline"
@@ -580,6 +590,11 @@ export default function Observability() {
       <MicroVMPodManagerModal
         isOpen={showMicroVMModal}
         onClose={() => setShowMicroVMModal(false)}
+      />
+
+      <ComplianceEvidenceModal
+        isOpen={showComplianceModal}
+        onClose={() => setShowComplianceModal(false)}
       />
     </div>
   );
