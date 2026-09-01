@@ -31,7 +31,7 @@ interface BIChartsGridProps {
   onDeleteWidget: (id: string) => void;
 }
 
-export function BIChartsGrid({
+function BIChartsGridComponent({
   primaryDateCol,
   primaryMeasureCol,
   primaryDimCol,
@@ -505,3 +505,5 @@ export function BIChartsGrid({
     </div>
   );
 }
+
+export const BIChartsGrid = React.memo(BIChartsGridComponent);

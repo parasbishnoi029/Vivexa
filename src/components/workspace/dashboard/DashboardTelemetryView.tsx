@@ -23,7 +23,7 @@ interface DashboardTelemetryViewProps {
   onNavigate: (path: string) => void;
 }
 
-export const DashboardTelemetryView: React.FC<DashboardTelemetryViewProps> = ({
+const DashboardTelemetryViewComponent: React.FC<DashboardTelemetryViewProps> = ({
   analyticsData,
   chartMetric,
   timeRange,
@@ -219,3 +219,5 @@ export const DashboardTelemetryView: React.FC<DashboardTelemetryViewProps> = ({
     </div>
   );
 };
+
+export const DashboardTelemetryView = React.memo(DashboardTelemetryViewComponent);

@@ -46,7 +46,7 @@ interface DashboardExecutiveViewProps {
   onExportDatasetsCsv: () => void;
 }
 
-export const DashboardExecutiveView: React.FC<DashboardExecutiveViewProps> = ({
+const DashboardExecutiveViewComponent: React.FC<DashboardExecutiveViewProps> = ({
   stats,
   recentProjects,
   recentDatasets,
@@ -426,3 +426,5 @@ export const DashboardExecutiveView: React.FC<DashboardExecutiveViewProps> = ({
     </div>
   );
 };
+
+export const DashboardExecutiveView = React.memo(DashboardExecutiveViewComponent);

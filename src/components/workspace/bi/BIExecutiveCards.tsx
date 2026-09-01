@@ -21,7 +21,7 @@ interface BIExecutiveCardsProps {
   secondaryDimBreakdown: { name: string; value: number }[];
 }
 
-export function BIExecutiveCards({
+function BIExecutiveCardsComponent({
   filteredRowsCount,
   totalRowsCount,
   primaryMeasureCol,
@@ -146,3 +146,5 @@ export function BIExecutiveCards({
     </div>
   );
 }
+
+export const BIExecutiveCards = React.memo(BIExecutiveCardsComponent);

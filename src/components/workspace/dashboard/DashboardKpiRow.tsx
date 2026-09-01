@@ -30,7 +30,7 @@ function formatCompact(num: number): string {
   return num.toLocaleString();
 }
 
-export const DashboardKpiRow: React.FC<DashboardKpiRowProps> = ({
+const DashboardKpiRowComponent: React.FC<DashboardKpiRowProps> = ({
   stats,
   showSparklines,
   density,
@@ -252,3 +252,5 @@ export const DashboardKpiRow: React.FC<DashboardKpiRowProps> = ({
     </div>
   );
 };
+
+export const DashboardKpiRow = React.memo(DashboardKpiRowComponent);

@@ -18,7 +18,7 @@ interface BIVirtualizedTableProps {
   onExportCSV: () => void;
 }
 
-export function BIVirtualizedTable({
+function BIVirtualizedTableComponent({
   sortedFilteredRows,
   totalFilteredCount,
   totalDatasetCount,
@@ -173,3 +173,5 @@ export function BIVirtualizedTable({
     </Card>
   );
 }
+
+export const BIVirtualizedTable = React.memo(BIVirtualizedTableComponent);

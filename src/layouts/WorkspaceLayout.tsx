@@ -501,12 +501,74 @@ export default function WorkspaceLayout() {
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
 
+  // Navigation cleanup manager for aborting pending API requests and tearing down interval-based observers
+  const navigationAbortControllerRef = useRef<AbortController | null>(null);
+  const prevPathnameRef = useRef<string>(location.pathname);
+
+  useEffect(() => {
+    const currentPath = location.pathname;
+    const prevPath = prevPathnameRef.current;
+
+    const isDataHeavy = (path: string) =>
+      path === "/workspace" ||
+      path.startsWith("/workspace/dashboards") ||
+      path.startsWith("/workspace/bi") ||
+      path.startsWith("/workspace/lakehouse") ||
+      path.startsWith("/workspace/observability") ||
+      path.startsWith("/workspace/predictions") ||
+      path.startsWith("/workspace/forecasting") ||
+      path.startsWith("/workspace/ai");
+
+    if (prevPath !== currentPath) {
+      // 1. Abort any in-flight requests managed by the navigation controller
+      if (navigationAbortControllerRef.current) {
+        try {
+          navigationAbortControllerRef.current.abort("navigation_cleanup");
+        } catch {
+          // ignore abort error
+        }
+      }
+
+      // 2. Initialize fresh abort controller for next route lifecycle
+      navigationAbortControllerRef.current = new AbortController();
+
+      // 3. Dispatch global cleanup event to notify all active dashboard & observer listeners
+      window.dispatchEvent(
+        new CustomEvent("workspace_route_cleanup", {
+          detail: {
+            from: prevPath,
+            to: currentPath,
+            wasDataHeavy: isDataHeavy(prevPath),
+            isDataHeavy: isDataHeavy(currentPath)
+          }
+        })
+      );
+
+      prevPathnameRef.current = currentPath;
+    }
+
+    return () => {
+      if (navigationAbortControllerRef.current) {
+        try {
+          navigationAbortControllerRef.current.abort("layout_unmount");
+        } catch {
+          // ignore
+        }
+      }
+    };
+  }, [location.pathname]);
+
   useEffect(() => {
     let active = true;
+    const healthController = new AbortController();
+
     const checkHealth = async () => {
       const startTime = Date.now();
       try {
-        const res = await fetch('/api/v1/health', { cache: 'no-store' });
+        const res = await fetch('/api/v1/health', { 
+          cache: 'no-store',
+          signal: healthController.signal 
+        });
         const endTime = Date.now();
         if (!active) return;
         if (res.ok) {
@@ -521,8 +583,8 @@ export default function WorkspaceLayout() {
           setHealthStatus('offline');
           setLatency(null);
         }
-      } catch (err) {
-        if (!active) return;
+      } catch (err: any) {
+        if (!active || err?.name === 'AbortError') return;
         setHealthStatus('offline');
         setLatency(null);
       }
@@ -533,6 +595,7 @@ export default function WorkspaceLayout() {
 
     return () => {
       active = false;
+      healthController.abort();
       clearInterval(interval);
     };
   }, []);
@@ -595,20 +658,24 @@ export default function WorkspaceLayout() {
   };
 
   useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+
     async function loadWorkspaces() {
       if (!user) return;
       try {
         const sessionResult = await supabase.auth.getSession();
         const session = sessionResult.data.session;
-        if (!session) return;
+        if (!session || !active) return;
 
         const res = await fetch('/api/v1/organization/workspaces', {
           headers: {
             "Authorization": `Bearer ${session.access_token}`
-          }
+          },
+          signal: controller.signal
         });
         const json = await res.json();
-        if (json.success && Array.isArray(json.data)) {
+        if (active && json.success && Array.isArray(json.data)) {
           setWorkspaces(json.data);
           
           const activeId = useWorkspaceStore.getState().selectedWorkspaceId;
@@ -617,11 +684,18 @@ export default function WorkspaceLayout() {
             setSelectedWorkspaceId(json.data[0].id);
           }
         }
-      } catch (err) {
-        console.warn("Error fetching workspaces in WorkspaceLayout:", err);
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          console.warn("Error fetching workspaces in WorkspaceLayout:", err);
+        }
       }
     }
     loadWorkspaces();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [user?.id]);
 
   const handleCreateWorkspace = async (e: React.FormEvent) => {

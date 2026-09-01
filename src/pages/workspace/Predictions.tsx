@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
 import { parseDatasetFile } from "@/lib/datasetParser";
+import { ENTERPRISE_SAMPLE_DATASETS } from "@/lib/biDatasets";
 import { toast } from "sonner";
 import { incrementAiUsage } from "@/lib/telemetry";
 
@@ -45,19 +46,41 @@ export default function Predictions() {
   const [isInferring, setIsInferring] = useState(false);
   const [activeTab, setActiveTab] = useState<'metrics' | 'playground'>('metrics');
 
-  // Load user's datasets
+  // Load user's datasets and merge with Enterprise Benchmark Datasets
   useEffect(() => {
     async function loadDatasets() {
-      if (!user) return;
       setIsLoadingDatasets(true);
+      const sampleList = ENTERPRISE_SAMPLE_DATASETS.map(s => ({
+        id: s.id,
+        name: s.name,
+        category: s.category,
+        columns: s.columns,
+        row_count: s.rowCount,
+        isSample: true,
+        description: s.description
+      }));
+
       try {
-        const { data, error } = await supabase.from('datasets').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
-        if (!error && data && data.length > 0) {
-          setDatasets(data);
-          setSelectedDatasetId(data[0].id);
+        if (user) {
+          const { data, error } = await supabase
+            .from('datasets')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+
+          if (!error && data && data.length > 0) {
+            const combined = [...data, ...sampleList];
+            setDatasets(combined);
+            setSelectedDatasetId(combined[0].id);
+            return;
+          }
         }
+        setDatasets(sampleList);
+        setSelectedDatasetId(sampleList[0].id);
       } catch (err) {
         console.error(err);
+        setDatasets(sampleList);
+        setSelectedDatasetId(sampleList[0].id);
       } finally {
         setIsLoadingDatasets(false);
       }
@@ -73,19 +96,34 @@ export default function Predictions() {
       if (!ds) return;
       setSelectedDataset(ds);
 
+      if (ds.isSample && ds.columns) {
+        setColumns(ds.columns);
+        if (ds.columns.length > 0) {
+          setTargetColumn(ds.columns[ds.columns.length - 1]);
+          setFeatureColumns(ds.columns.slice(0, ds.columns.length - 1));
+        }
+        return;
+      }
+
       if (ds.storage_path) {
         try {
           const { data: fileData, error } = await supabase.storage.from('datasets').download(ds.storage_path);
           if (!error && fileData) {
             const parsed = await parseDatasetFile(fileData, ds.name);
-            setColumns(parsed.columns || []);
-            if (parsed.columns.length > 0) {
-              setTargetColumn(parsed.columns[parsed.columns.length - 1]);
-              setFeatureColumns(parsed.columns.slice(0, parsed.columns.length - 1));
+            const cols = parsed.columns || [];
+            setColumns(cols);
+            if (cols.length > 0) {
+              setTargetColumn(cols[cols.length - 1]);
+              setFeatureColumns(cols.slice(0, cols.length - 1));
             }
           }
         } catch (err) {
           console.error("Failed to parse dataset file for predictions:", err);
+          if (ds.columns && ds.columns.length > 0) {
+            setColumns(ds.columns);
+            setTargetColumn(ds.columns[ds.columns.length - 1]);
+            setFeatureColumns(ds.columns.slice(0, ds.columns.length - 1));
+          }
         }
       }
     }
@@ -96,7 +134,7 @@ export default function Predictions() {
   useEffect(() => {
     const initialInputs: Record<string, string> = {};
     featureColumns.forEach(f => {
-      initialInputs[f] = (Math.random() * 50 + 10).toFixed(4);
+      initialInputs[f] = (Math.random() * 50 + 10).toFixed(2);
     });
     setInferenceInputs(initialInputs);
     setInferenceResult(null);
@@ -248,11 +286,11 @@ else:
         setIsTraining(false);
         setModelTrained(true);
         setTrainingMetrics({
-          accuracy: baseAcc.toFixed(4) + "%",
-          precision: (baseAcc - 1.4).toFixed(4) + "%",
-          recall: (baseAcc - 0.8).toFixed(4) + "%",
-          f1Score: (baseAcc - 1.1).toFixed(4) + "%",
-          trainingTime: (0.42 + featCount * 0.15).toFixed(4) + "s",
+          accuracy: baseAcc.toFixed(1) + "%",
+          precision: (baseAcc - 1.4).toFixed(1) + "%",
+          recall: (baseAcc - 0.8).toFixed(1) + "%",
+          f1Score: (baseAcc - 1.1).toFixed(1) + "%",
+          trainingTime: (0.42 + featCount * 0.15).toFixed(2) + "s",
           featureImportance: computedFeatureImportance
         });
       }, 1000);

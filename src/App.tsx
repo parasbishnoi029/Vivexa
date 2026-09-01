@@ -394,6 +394,10 @@ const router = createBrowserRouter([
         element: <Suspense fallback={<PageLoader />}><Lakehouse /></Suspense>,
       },
       {
+        path: "live",
+        element: <Suspense fallback={<PageLoader />}><Observability /></Suspense>,
+      },
+      {
         path: "semantic",
         element: <Suspense fallback={<PageLoader />}><SemanticLayer /></Suspense>,
       },
@@ -406,6 +410,10 @@ const router = createBrowserRouter([
         element: <Suspense fallback={<PageLoader />}><Ontology /></Suspense>,
       },
       {
+        path: "knowledge-graph",
+        element: <Suspense fallback={<PageLoader />}><Ontology /></Suspense>,
+      },
+      {
         path: "marketplace",
         element: <Suspense fallback={<PageLoader />}><Marketplace /></Suspense>,
       },
@@ -414,11 +422,23 @@ const router = createBrowserRouter([
         element: <Suspense fallback={<PageLoader />}><SearchAnalytics /></Suspense>,
       },
       {
+        path: "search-analytics",
+        element: <Suspense fallback={<PageLoader />}><SearchAnalytics /></Suspense>,
+      },
+      {
         path: "models",
         element: <Suspense fallback={<PageLoader />}><SavedModels /></Suspense>,
       },
       {
+        path: "saved-models",
+        element: <Suspense fallback={<PageLoader />}><SavedModels /></Suspense>,
+      },
+      {
         path: "memory",
+        element: <Suspense fallback={<PageLoader />}><ProjectMemory /></Suspense>,
+      },
+      {
+        path: "project-memory",
         element: <Suspense fallback={<PageLoader />}><ProjectMemory /></Suspense>,
       },
       {
@@ -431,6 +451,10 @@ const router = createBrowserRouter([
       },
       {
         path: "apikeys",
+        element: <Suspense fallback={<PageLoader />}><APIKeys /></Suspense>,
+      },
+      {
+        path: "api-keys",
         element: <Suspense fallback={<PageLoader />}><APIKeys /></Suspense>,
       },
       {
@@ -454,11 +478,19 @@ const router = createBrowserRouter([
         element: <Suspense fallback={<PageLoader />}><DashboardsBuilder /></Suspense>,
       },
       {
+        path: "bi-studio",
+        element: <Suspense fallback={<PageLoader />}><DashboardsBuilder /></Suspense>,
+      },
+      {
         path: "all",
         element: <Suspense fallback={<PageLoader />}><AllFeatures /></Suspense>,
       },
       {
         path: "features",
+        element: <Suspense fallback={<PageLoader />}><AllFeatures /></Suspense>,
+      },
+      {
+        path: "all-features",
         element: <Suspense fallback={<PageLoader />}><AllFeatures /></Suspense>,
       },
       {

@@ -21,7 +21,7 @@ interface DashboardHeaderProps {
   onOpenSettings: () => void;
 }
 
-export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
+const DashboardHeaderComponent: React.FC<DashboardHeaderProps> = ({
   welcomeGreeting,
   userName,
   isLive,
@@ -152,3 +152,5 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     </div>
   );
 };
+
+export const DashboardHeader = React.memo(DashboardHeaderComponent);

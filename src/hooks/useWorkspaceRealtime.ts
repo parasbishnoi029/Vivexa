@@ -401,13 +401,18 @@ export function useWorkspaceRealtime(options: UseWorkspaceRealtimeOptions = {}) 
       scheduleSilentRefetch();
     };
 
+    const handleRouteCleanup = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+    };
+
     window.addEventListener('vivexa_data_updated', handleLocalUpdate);
     window.addEventListener('storage', handleLocalUpdate);
     window.addEventListener('focus', handleLocalUpdate);
+    window.addEventListener('workspace_route_cleanup', handleRouteCleanup);
 
     // Efficient 45s heartbeat polling only when window is active & visible
     const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && isMountedRef.current) {
         fetchDashboardMetrics(true);
       }
     }, 45000);
@@ -419,6 +424,7 @@ export function useWorkspaceRealtime(options: UseWorkspaceRealtimeOptions = {}) 
       window.removeEventListener('vivexa_data_updated', handleLocalUpdate);
       window.removeEventListener('storage', handleLocalUpdate);
       window.removeEventListener('focus', handleLocalUpdate);
+      window.removeEventListener('workspace_route_cleanup', handleRouteCleanup);
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
       }

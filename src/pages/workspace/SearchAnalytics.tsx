@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
+import { ENTERPRISE_SAMPLE_DATASETS } from "@/lib/biDatasets";
 
 interface InsightResult {
   id: string;
@@ -32,17 +33,50 @@ export default function SearchAnalytics() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const sampleDatasets = ENTERPRISE_SAMPLE_DATASETS.map(s => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      row_count: s.rowCount,
+      column_count: s.columns.length,
+      file_type: "Parquet/CSV",
+      data_quality_score: 99.2
+    }));
+
+    const sampleReports = [
+      {
+        id: "rep-sample-1",
+        title: "Q3 Global Enterprise Revenue Briefing",
+        domain: "Finance & Operations",
+        archetype: "Senior Data Scientist Briefing",
+        accuracy_rating: "99.98%"
+      },
+      {
+        id: "rep-sample-2",
+        title: "Customer Churn & Behavioral Risk Analysis",
+        domain: "Customer Success & Growth",
+        archetype: "Predictive Machine Learning Audit",
+        accuracy_rating: "98.70%"
+      }
+    ];
+
     async function loadData() {
-      if (!user) return;
+      if (!user) {
+        setDatasets(sampleDatasets);
+        setReports(sampleReports);
+        return;
+      }
       try {
         const [{ data: dData }, { data: rData }] = await Promise.all([
           supabase.from("datasets").select("*").eq("user_id", user.id),
           supabase.from("reports").select("*").eq("user_id", user.id)
         ]);
-        setDatasets(dData || []);
-        setReports(rData || []);
+        setDatasets([...(dData || []), ...sampleDatasets]);
+        setReports([...(rData || []), ...sampleReports]);
       } catch (err) {
         console.error("Error loading search index:", err);
+        setDatasets(sampleDatasets);
+        setReports(sampleReports);
       }
     }
     loadData();

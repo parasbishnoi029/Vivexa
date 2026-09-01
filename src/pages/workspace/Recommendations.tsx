@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
+import { ENTERPRISE_SAMPLE_DATASETS } from "@/lib/biDatasets";
 import { toast } from "sonner";
 
 const container = {
@@ -32,14 +33,44 @@ export default function Recommendations() {
   const [recommendations, setRecommendations] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!user) return;
-    supabase.from('datasets').select('*').eq('user_id', user.id).then(({ data }) => {
-      if (data && data.length > 0) {
-        setDatasets(data);
-        setSelectedDatasetId(data[0].id);
-        generateRecommendationsForDataset(data[0]);
+    const sampleList = ENTERPRISE_SAMPLE_DATASETS.map(s => ({
+      id: s.id,
+      name: s.name,
+      category: s.category,
+      schema: { columns: s.columns },
+      columns: s.columns,
+      row_count: s.rowCount,
+      isSample: true,
+      description: s.description
+    }));
+
+    async function loadDatasets() {
+      if (!user) {
+        setDatasets(sampleList);
+        setSelectedDatasetId(sampleList[0].id);
+        generateRecommendationsForDataset(sampleList[0]);
+        return;
       }
-    });
+
+      try {
+        const { data } = await supabase.from('datasets').select('*').eq('user_id', user.id);
+        if (data && data.length > 0) {
+          const combined = [...data, ...sampleList];
+          setDatasets(combined);
+          setSelectedDatasetId(combined[0].id);
+          generateRecommendationsForDataset(combined[0]);
+        } else {
+          setDatasets(sampleList);
+          setSelectedDatasetId(sampleList[0].id);
+          generateRecommendationsForDataset(sampleList[0]);
+        }
+      } catch {
+        setDatasets(sampleList);
+        setSelectedDatasetId(sampleList[0].id);
+        generateRecommendationsForDataset(sampleList[0]);
+      }
+    }
+    loadDatasets();
   }, [user]);
 
   const generateRecommendationsForDataset = (ds: any) => {

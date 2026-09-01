@@ -15,7 +15,7 @@ interface DashboardOperationsViewProps {
   onNavigate: (path: string) => void;
 }
 
-export const DashboardOperationsView: React.FC<DashboardOperationsViewProps> = ({
+const DashboardOperationsViewComponent: React.FC<DashboardOperationsViewProps> = ({
   stats,
   diagnosticsLogs,
   isDiagnosing,
@@ -118,3 +118,5 @@ export const DashboardOperationsView: React.FC<DashboardOperationsViewProps> = (
     </div>
   );
 };
+
+export const DashboardOperationsView = React.memo(DashboardOperationsViewComponent);

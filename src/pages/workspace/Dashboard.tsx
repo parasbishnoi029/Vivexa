@@ -200,25 +200,42 @@ export default function WorkspaceDashboard() {
     { time: new Date().toLocaleTimeString(), msg: "Database telemetry synchronization pipeline active.", type: "info" },
   ]);
 
-  // Periodic real roundtrip health verification
+  // Periodic real roundtrip health verification with abort/cleanup handling
   useEffect(() => {
     if (!isStreaming) return;
+    let isMounted = true;
+    let intervalId: NodeJS.Timeout | null = null;
 
     const pingCheck = async () => {
+      if (!isMounted) return;
       try {
         const start = performance.now();
         await supabase.from('projects').select('id', { count: 'exact', head: true }).limit(1);
         const end = performance.now();
-        const roundtrip = Math.max(6, Math.round(end - start));
-        setLatencyCheck(roundtrip);
+        if (isMounted) {
+          const roundtrip = Math.max(6, Math.round(end - start));
+          setLatencyCheck(roundtrip);
+        }
       } catch (err) {
         // Continue silently
       }
     };
 
     pingCheck();
-    const interval = setInterval(pingCheck, 15000);
-    return () => clearInterval(interval);
+    intervalId = setInterval(pingCheck, 15000);
+
+    const handleRouteCleanup = () => {
+      isMounted = false;
+      if (intervalId) clearInterval(intervalId);
+    };
+
+    window.addEventListener("workspace_route_cleanup", handleRouteCleanup);
+
+    return () => {
+      isMounted = false;
+      if (intervalId) clearInterval(intervalId);
+      window.removeEventListener("workspace_route_cleanup", handleRouteCleanup);
+    };
   }, [isStreaming]);
 
   // Listen for global quick action to open new project wizard

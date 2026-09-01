@@ -23,7 +23,7 @@ interface BIDatasetSelectorProps {
   onOpenUploadModal: () => void;
 }
 
-export function BIDatasetSelector({
+function BIDatasetSelectorComponent({
   selectedDatasetId,
   datasetsList,
   onSelectDataset,
@@ -183,3 +183,5 @@ export function BIDatasetSelector({
     </div>
   );
 }
+
+export const BIDatasetSelector = React.memo(BIDatasetSelectorComponent);

@@ -22,7 +22,7 @@ interface BISemanticSidebarProps {
   onOpenUploadModal: () => void;
 }
 
-export function BISemanticSidebar({
+function BISemanticSidebarComponent({
   isOpen,
   onClose,
   selectedDataset,
@@ -220,3 +220,5 @@ export function BISemanticSidebar({
     </>
   );
 }
+
+export const BISemanticSidebar = React.memo(BISemanticSidebarComponent);
