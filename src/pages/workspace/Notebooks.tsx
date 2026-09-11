@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, Fragment } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback, Fragment } from "react";
 import { useNavigate } from "react-router-dom";
 import Markdown from "react-markdown";
 import { motion, AnimatePresence } from "motion/react";
@@ -11,7 +11,7 @@ import {
   Table as TableIcon, BarChart3, PieChart as PieIcon, LineChart as LineIcon,
   Sliders, Eye, EyeOff, FileText, FileSpreadsheet, Layers, Sparkle,
   ArrowRight, Bot, Wrench, ArrowLeft, Shield, Lock, Activity, Presentation,
-  Replace, SlidersHorizontal, Share2, Printer, Keyboard, Brain
+  Replace, SlidersHorizontal, Share2, Printer, Keyboard, Brain, Loader2
 } from "lucide-react";
 import { pyodideSandbox, PYODIDE_SANDBOX_POLICY, PyodideExecutionResult } from "@/lib/pyodideSandbox";
 import NotebookCopilot from "@/components/workspace/NotebookCopilot";
@@ -354,6 +354,97 @@ export default function Notebooks() {
   const [showMicroVMModal, setShowMicroVMModal] = useState(false);
   const [cellRuntimes, setCellRuntimes] = useState<Record<string, "wasm" | "microvm">>({});
 
+  // Local storage autosave state & persistence
+  const [lastAutosavedAt, setLastAutosavedAt] = useState<Date | null>(() => {
+    try {
+      const saved = localStorage.getItem("vivexa_notebooks_saved_at");
+      return saved ? new Date(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [isAutosaving, setIsAutosaving] = useState(false);
+  const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasHydratedNotebooksRef = useRef(false);
+
+  // Synchronize notebooks to localStorage
+  const saveNotebooksToLocalStorage = useCallback(() => {
+    try {
+      setIsAutosaving(true);
+      const now = new Date();
+      localStorage.setItem("vivexa_notebooks_autosave", JSON.stringify(notebooks));
+      localStorage.setItem("vivexa_notebook_active_id", activeNbId);
+      localStorage.setItem("vivexa_notebooks_saved_at", now.toISOString());
+      setLastAutosavedAt(now);
+    } catch (err) {
+      console.warn("[Notebooks] Local storage write failed:", err);
+    } finally {
+      setIsAutosaving(false);
+    }
+  }, [notebooks, activeNbId]);
+
+  // Hydrate from localStorage on mount if store was reset
+  useEffect(() => {
+    try {
+      const savedRaw = localStorage.getItem("vivexa_notebooks_autosave");
+      const savedActiveId = localStorage.getItem("vivexa_notebook_active_id");
+      if (savedRaw) {
+        const parsed = JSON.parse(savedRaw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          if (notebooks.length === 0 || !notebooks.some(n => n.cells?.length > 0)) {
+            setNotebooks(parsed);
+            if (savedActiveId && parsed.some(n => n.id === savedActiveId)) {
+              setActiveNbId(savedActiveId);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[Notebooks] Failed to hydrate from localStorage:", err);
+    }
+    hasHydratedNotebooksRef.current = true;
+  }, []);
+
+  // Debounced autosave watcher
+  useEffect(() => {
+    if (!hasHydratedNotebooksRef.current || notebooks.length === 0) return;
+
+    if (autosaveTimeoutRef.current) {
+      clearTimeout(autosaveTimeoutRef.current);
+    }
+
+    setIsAutosaving(true);
+    autosaveTimeoutRef.current = setTimeout(() => {
+      saveNotebooksToLocalStorage();
+    }, 500);
+
+    return () => {
+      if (autosaveTimeoutRef.current) {
+        clearTimeout(autosaveTimeoutRef.current);
+      }
+    };
+  }, [notebooks, activeNbId, saveNotebooksToLocalStorage]);
+
+  // Flush on page unload / hide
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      saveNotebooksToLocalStorage();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        saveNotebooksToLocalStorage();
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [saveNotebooksToLocalStorage]);
+
   // Enterprise Pillar Modal States
   const [showHybridComputeModal, setShowHybridComputeModal] = useState(false);
   const [hybridComputeEngine, setHybridComputeEngine] = useState<ExecutionEngineType>("wasm");
@@ -548,7 +639,8 @@ export default function Notebooks() {
 
   // Auto-Save notification
   const handleAutoSave = () => {
-    toast.success("Autosave: Notebook changes synchronized successfully.");
+    saveNotebooksToLocalStorage();
+    toast.success("Autosave: Notebook changes synchronized and saved locally.");
   };
 
   // Version Snapshots
@@ -2591,6 +2683,24 @@ export default function Notebooks() {
                   <Button onClick={() => handleAutoSave()} variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-slate-400 hover:text-white" title="Save Notebook (Ctrl+S)">
                     <Save className="h-3.5 w-3.5" />
                   </Button>
+
+                  {/* Autosave Status Badge */}
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/90 border border-slate-800 text-[10px] font-mono">
+                    {isAutosaving ? (
+                      <>
+                        <Loader2 className="h-3 w-3 text-amber-400 animate-spin" />
+                        <span className="text-amber-300">Autosaving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-3 w-3 text-emerald-400" />
+                        <span className="text-slate-300">Autosaved</span>
+                        {lastAutosavedAt && (
+                          <span className="text-slate-500 hidden sm:inline">{lastAutosavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                        )}
+                      </>
+                    )}
+                  </div>
 
                   {/* Export Dropdown representation */}
                   <div className="flex items-center border border-slate-800 rounded-lg p-0.5 bg-slate-950">

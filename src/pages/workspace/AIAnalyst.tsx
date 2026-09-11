@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -6,7 +6,8 @@ import {
   CheckCircle2, ArrowRight, RefreshCw, Loader2, AlertCircle, Play, Info,
   Cpu, Activity, Target, Layers, PieChart as PieChartIcon,
   Users, Scale, Database, LineChart as LineChartIcon, AlertTriangle,
-  Copy, Check, Download, ExternalLink, Filter, ChevronRight, Blocks
+  Copy, Check, Download, ExternalLink, Filter, ChevronRight, Blocks,
+  Save, Trash2, Edit3, MessageSquare
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,15 +43,43 @@ const itemVariants = {
   show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 300, damping: 24 } }
 };
 
+const STORAGE_KEY_PREFIX = "vivexa_ai_analyst_";
+
+interface SavedAnalystState {
+  datasetId?: string;
+  activeTab?: "executive" | "consensus" | "ml_eda" | "domain" | "features" | "audit";
+  selectedFeatureCol?: string;
+  analystNotes?: string;
+  customHypothesis?: string;
+  analysisResult?: any;
+  computedProfile?: DatasetProfile | null;
+  enterpriseIntelligence?: any;
+  dataEntryCheck?: DataEntryErrorCheckResult | null;
+  savedAt: string;
+}
+
 export default function AIAnalyst() {
   const { session, user } = useAuthStore();
   const { getActivePluginsForHook } = usePlugins();
   const activeAiPlugins = getActivePluginsForHook("dataset_ai_analyst");
   const navigate = useNavigate();
   const [datasets, setDatasets] = useState<any[]>([]);
-  const [selectedDatasetId, setSelectedDatasetId] = useState<string>("");
+  const [selectedDatasetId, setSelectedDatasetId] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}active_dataset_id`);
+      return saved || "";
+    } catch {
+      return "";
+    }
+  });
+
+  // Local storage autosaved fields
   const [activeTab, setActiveTab] = useState<"executive" | "consensus" | "ml_eda" | "domain" | "features" | "audit">("executive");
   const [selectedFeatureCol, setSelectedFeatureCol] = useState<string>("");
+  const [analystNotes, setAnalystNotes] = useState<string>("");
+  const [customHypothesis, setCustomHypothesis] = useState<string>("");
+  const [showScratchpad, setShowScratchpad] = useState<boolean>(true);
+
   const [copiedSummary, setCopiedSummary] = useState(false);
   const [dataEntryCheck, setDataEntryCheck] = useState<DataEntryErrorCheckResult | null>(null);
   const [isOptimizerModalOpen, setIsOptimizerModalOpen] = useState(false);
@@ -65,6 +94,137 @@ export default function AIAnalyst() {
   const [datasetCache, setDatasetCache] = useState<Record<string, any[]>>({});
   const [statusText, setStatusText] = useState("");
 
+  // Autosave status & indicators
+  const [lastAutosavedAt, setLastAutosavedAt] = useState<Date | null>(null);
+  const [isAutosaving, setIsAutosaving] = useState(false);
+  const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasHydratedRef = useRef(false);
+
+  // Helper to load state from localStorage for a specific dataset
+  const loadSavedState = useCallback((datasetId: string) => {
+    if (!datasetId) return false;
+    try {
+      const key = `${STORAGE_KEY_PREFIX}${datasetId}`;
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed: SavedAnalystState = JSON.parse(raw);
+        if (parsed.analysisResult) setAnalysisResult(parsed.analysisResult);
+        if (parsed.computedProfile) setComputedProfile(parsed.computedProfile);
+        if (parsed.enterpriseIntelligence) setEnterpriseIntelligence(parsed.enterpriseIntelligence);
+        if (parsed.analystNotes !== undefined) setAnalystNotes(parsed.analystNotes);
+        if (parsed.customHypothesis !== undefined) setCustomHypothesis(parsed.customHypothesis);
+        if (parsed.activeTab) setActiveTab(parsed.activeTab);
+        if (parsed.selectedFeatureCol) setSelectedFeatureCol(parsed.selectedFeatureCol);
+        if (parsed.dataEntryCheck) setDataEntryCheck(parsed.dataEntryCheck);
+        if (parsed.savedAt) setLastAutosavedAt(new Date(parsed.savedAt));
+        return true;
+      }
+    } catch (err) {
+      console.warn("[AIAnalyst] Failed to hydrate autosaved state:", err);
+    }
+    return false;
+  }, []);
+
+  // Save current state to localStorage
+  const saveStateToLocalStorage = useCallback(() => {
+    if (!selectedDatasetId) return;
+    try {
+      setIsAutosaving(true);
+      const now = new Date();
+      
+      // Keep profile lightweight for localStorage quota safety
+      let safeProfile: DatasetProfile | null = null;
+      if (computedProfile) {
+        const { ...restProfile } = computedProfile;
+        safeProfile = restProfile as DatasetProfile;
+      }
+
+      const stateToSave: SavedAnalystState = {
+        datasetId: selectedDatasetId,
+        activeTab,
+        selectedFeatureCol,
+        analystNotes,
+        customHypothesis,
+        analysisResult,
+        computedProfile: safeProfile,
+        enterpriseIntelligence,
+        dataEntryCheck,
+        savedAt: now.toISOString()
+      };
+
+      const key = `${STORAGE_KEY_PREFIX}${selectedDatasetId}`;
+      localStorage.setItem(key, JSON.stringify(stateToSave));
+      localStorage.setItem(`${STORAGE_KEY_PREFIX}active_dataset_id`, selectedDatasetId);
+      setLastAutosavedAt(now);
+    } catch (err) {
+      console.warn("[AIAnalyst] Failed to autosave state to localStorage:", err);
+    } finally {
+      setIsAutosaving(false);
+    }
+  }, [
+    selectedDatasetId,
+    activeTab,
+    selectedFeatureCol,
+    analystNotes,
+    customHypothesis,
+    analysisResult,
+    computedProfile,
+    enterpriseIntelligence,
+    dataEntryCheck
+  ]);
+
+  // Debounced autosave effect
+  useEffect(() => {
+    if (!hasHydratedRef.current || !selectedDatasetId) return;
+
+    if (autosaveTimeoutRef.current) {
+      clearTimeout(autosaveTimeoutRef.current);
+    }
+
+    setIsAutosaving(true);
+    autosaveTimeoutRef.current = setTimeout(() => {
+      saveStateToLocalStorage();
+    }, 600);
+
+    return () => {
+      if (autosaveTimeoutRef.current) {
+        clearTimeout(autosaveTimeoutRef.current);
+      }
+    };
+  }, [
+    selectedDatasetId,
+    activeTab,
+    selectedFeatureCol,
+    analystNotes,
+    customHypothesis,
+    analysisResult,
+    computedProfile,
+    enterpriseIntelligence,
+    dataEntryCheck,
+    saveStateToLocalStorage
+  ]);
+
+  // Flush state immediately on page unload / hide
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      saveStateToLocalStorage();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        saveStateToLocalStorage();
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [saveStateToLocalStorage]);
+
+  // Load datasets and initial saved state
   useEffect(() => {
     const sampleList = ENTERPRISE_SAMPLE_DATASETS.map(s => ({
       id: s.id,
@@ -77,29 +237,83 @@ export default function AIAnalyst() {
     }));
 
     async function loadDatasets() {
+      let activeId = selectedDatasetId;
       if (!user) {
         setDatasets(sampleList);
-        setSelectedDatasetId(sampleList[0].id);
-        return;
+        if (!activeId || !sampleList.some(s => s.id === activeId)) {
+          activeId = sampleList[0].id;
+          setSelectedDatasetId(activeId);
+        }
+      } else {
+        try {
+          const { data } = await supabase.from('datasets').select('*').eq('user_id', user.id);
+          if (data && data.length > 0) {
+            const combined = [...data, ...sampleList];
+            setDatasets(combined);
+            if (!activeId || !combined.some(d => d.id === activeId)) {
+              activeId = combined[0].id;
+              setSelectedDatasetId(activeId);
+            }
+          } else {
+            setDatasets(sampleList);
+            if (!activeId || !sampleList.some(s => s.id === activeId)) {
+              activeId = sampleList[0].id;
+              setSelectedDatasetId(activeId);
+            }
+          }
+        } catch {
+          setDatasets(sampleList);
+          if (!activeId || !sampleList.some(s => s.id === activeId)) {
+            activeId = sampleList[0].id;
+            setSelectedDatasetId(activeId);
+          }
+        }
       }
 
-      try {
-        const { data } = await supabase.from('datasets').select('*').eq('user_id', user.id);
-        if (data && data.length > 0) {
-          const combined = [...data, ...sampleList];
-          setDatasets(combined);
-          setSelectedDatasetId(combined[0].id);
-        } else {
-          setDatasets(sampleList);
-          setSelectedDatasetId(sampleList[0].id);
-        }
-      } catch {
-        setDatasets(sampleList);
-        setSelectedDatasetId(sampleList[0].id);
+      // Hydrate state for the determined active dataset
+      if (activeId) {
+        loadSavedState(activeId);
       }
+      hasHydratedRef.current = true;
     }
     loadDatasets();
-  }, [user]);
+  }, [user, loadSavedState]);
+
+  // When selectedDatasetId changes from UI selector
+  const handleDatasetChange = (newDatasetId: string) => {
+    setSelectedDatasetId(newDatasetId);
+    try {
+      localStorage.setItem(`${STORAGE_KEY_PREFIX}active_dataset_id`, newDatasetId);
+    } catch {
+      // ignore
+    }
+    const hasSaved = loadSavedState(newDatasetId);
+    if (!hasSaved) {
+      setAnalysisResult(null);
+      setComputedProfile(null);
+      setEnterpriseIntelligence(null);
+      setDataEntryCheck(null);
+      setAnalystNotes("");
+      setCustomHypothesis("");
+    }
+  };
+
+  const handleClearSavedAnalysis = () => {
+    if (!selectedDatasetId) return;
+    try {
+      localStorage.removeItem(`${STORAGE_KEY_PREFIX}${selectedDatasetId}`);
+      setAnalysisResult(null);
+      setComputedProfile(null);
+      setEnterpriseIntelligence(null);
+      setDataEntryCheck(null);
+      setAnalystNotes("");
+      setCustomHypothesis("");
+      setLastAutosavedAt(null);
+      toast.success("Autosaved analysis state cleared for this dataset.");
+    } catch (err) {
+      console.warn("Failed to clear local storage:", err);
+    }
+  };
 
   const runSeniorDataScientistAnalysis = async () => {
     if (!selectedDatasetId) return;
@@ -303,13 +517,13 @@ ${(analysisResult.summary.strategic_actions || []).map((a: any) => `- [${a.prior
         )}
 
         {/* Action Controls Bar */}
-        <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-2xl mx-auto">
+        <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-3xl mx-auto">
           {/* Dataset Selector */}
           <div className="w-full sm:w-auto flex-1 text-left">
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Active Dataset</label>
             <select
               value={selectedDatasetId}
-              onChange={e => setSelectedDatasetId(e.target.value)}
+              onChange={e => handleDatasetChange(e.target.value)}
               className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-medium"
             >
               {datasets.map(d => (
@@ -319,7 +533,7 @@ ${(analysisResult.summary.strategic_actions || []).map((a: any) => `- [${a.prior
           </div>
 
           {/* Assessment Trigger Button */}
-          <div className="w-full sm:w-auto pt-4 sm:pt-0 self-end flex gap-2">
+          <div className="w-full sm:w-auto pt-4 sm:pt-0 self-end flex gap-2 flex-wrap sm:flex-nowrap">
             <Button
               onClick={runSeniorDataScientistAnalysis}
               disabled={isAnalyzing}
@@ -334,7 +548,7 @@ ${(analysisResult.summary.strategic_actions || []).map((a: any) => `- [${a.prior
               className="border-indigo-500/30 text-indigo-300 hover:bg-indigo-950/40 font-bold px-4 py-2.5 h-[38px] transition-all flex items-center gap-1.5"
             >
               <Zap className="h-4 w-4 text-indigo-400" />
-              Optimizer Engine
+              Optimizer
             </Button>
             <Button
               onClick={() => setIsDuckDBWorkbenchOpen(true)}
@@ -346,6 +560,101 @@ ${(analysisResult.summary.strategic_actions || []).map((a: any) => `- [${a.prior
             </Button>
           </div>
         </div>
+
+        {/* Local Storage Autosave Status Bar */}
+        <div className="mt-3 flex items-center justify-center gap-3 text-xs text-slate-400 max-w-2xl mx-auto flex-wrap">
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950 border border-slate-800 text-[11px]">
+            {isAutosaving ? (
+              <>
+                <Loader2 className="h-3 w-3 text-amber-400 animate-spin" />
+                <span className="text-amber-300">Autosaving draft to LocalStorage...</span>
+              </>
+            ) : lastAutosavedAt ? (
+              <>
+                <Check className="h-3 w-3 text-emerald-400" />
+                <span className="text-slate-300">
+                  Autosaved locally <span className="text-slate-500">({lastAutosavedAt.toLocaleTimeString()})</span>
+                </span>
+              </>
+            ) : (
+              <>
+                <Save className="h-3 w-3 text-slate-500" />
+                <span className="text-slate-500">Local storage autosave active</span>
+              </>
+            )}
+          </div>
+
+          <button
+            onClick={() => setShowScratchpad(!showScratchpad)}
+            className="flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
+          >
+            <Edit3 className="h-3 w-3" />
+            <span>{showScratchpad ? "Hide Scratchpad" : "Analyst Scratchpad & Hypotheses"}</span>
+          </button>
+
+          {(analysisResult || analystNotes || customHypothesis) && (
+            <button
+              onClick={handleClearSavedAnalysis}
+              className="flex items-center gap-1 text-[11px] text-rose-400 hover:text-rose-300 transition-colors"
+              title="Clear saved draft and reset analysis for this dataset"
+            >
+              <Trash2 className="h-3 w-3" />
+              <span>Reset Draft</span>
+            </button>
+          )}
+        </div>
+
+        {/* Interactive Analyst Hypothesis & Scratchpad */}
+        <AnimatePresence>
+          {showScratchpad && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mt-4 max-w-3xl mx-auto text-left overflow-hidden"
+            >
+              <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-xl shadow-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Brain className="h-4 w-4 text-indigo-400" />
+                    <span className="text-xs font-bold text-slate-200">Analyst Hypothesis & Research Scratchpad</span>
+                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded font-mono">
+                      Autosaved
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-500">Persisted locally across refreshes</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      Custom Hypothesis / Question
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Does customer discount rate cause churn spikes?"
+                      value={customHypothesis}
+                      onChange={e => setCustomHypothesis(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      Analyst Research Notes
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Draft investigation notes, anomalies observed, domain thoughts..."
+                      value={analystNotes}
+                      onChange={e => setAnalystNotes(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 resize-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {statusText && (
           <p className="text-xs text-indigo-400 mt-3 font-medium animate-pulse flex items-center justify-center gap-2">
