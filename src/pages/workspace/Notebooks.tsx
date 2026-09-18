@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { pyodideSandbox, PYODIDE_SANDBOX_POLICY, PyodideExecutionResult } from "@/lib/pyodideSandbox";
 import NotebookCopilot from "@/components/workspace/NotebookCopilot";
+import { NotebookToolbar } from "@/components/workspace/notebooks/NotebookToolbar";
+import { NotebookCellList } from "@/components/workspace/notebooks/NotebookCellList";
 import { NotebookFindReplaceBar } from "@/components/workspace/NotebookFindReplaceBar";
 import { NotebookSnippetsDrawer } from "@/components/workspace/NotebookSnippetsDrawer";
 import { NotebookVariableInspectorModal } from "@/components/workspace/NotebookVariableInspectorModal";
@@ -2438,160 +2440,39 @@ export default function Notebooks() {
       {/* 2. MAIN CENTER: Notebook Canvas Editor & Execution Panel */}
       <div className="flex-1 space-y-6">
         
-        {/* Notebook Top Bar Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/50 p-5 rounded-2xl border border-slate-800/80 backdrop-blur-xl shadow-xl">
-          <div className="flex items-center gap-4">
-            <div className="h-11 w-11 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
-              <Terminal className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h1 className="text-lg font-extrabold tracking-tight text-white">{activeNb.name}</h1>
-                <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                  kernelStatus === 'Busy' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20 animate-pulse' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                }`}>
-                  Kernel: {kernelStatus}
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Active Dataset: <span className="text-amber-300 font-semibold">{selectedDataset?.name || 'sales_dataset.xlsx'}</span> • Compiled Execution Kernel
-              </p>
-            </div>
-          </div>
-
-          {/* Action Controls */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <CollaborativeToolbar roomTitle={activeNb.name} />
-
-            <Button
-              onClick={() => setIsPresentationMode(true)}
-              className="bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 font-semibold text-xs h-9 rounded-xl shadow-sm flex items-center gap-1.5"
-              title="Toggle Executive Presentation & Report Mode"
-            >
-              <Presentation className="h-4 w-4 text-indigo-400" /> Presentation View
-            </Button>
-
-            <Button
-              onClick={() => setShowSnippetsDrawer(true)}
-              variant="outline"
-              className="bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300 font-semibold text-xs h-9 rounded-xl flex items-center gap-1.5"
-              title="Open Data Science Recipe Library"
-            >
-              <BookOpen className="h-4 w-4 text-amber-400" /> DS Recipes
-            </Button>
-
-            <Button
-              onClick={() => setShowVariableInspectorModal(true)}
-              variant="outline"
-              className="bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/30 text-blue-300 font-semibold text-xs h-9 rounded-xl flex items-center gap-1.5"
-              title="Inspect Kernel Variables in Depth"
-            >
-              <Variable className="h-4 w-4 text-blue-400" /> Variable Inspector
-            </Button>
-
-            <Button
-              onClick={() => navigate('/workspace')}
-              variant="outline"
-              className="bg-slate-800/80 hover:bg-slate-700/80 border-slate-700 text-slate-200 font-semibold text-xs h-9 rounded-xl flex items-center gap-1.5 shadow-sm"
-              title="Back to Workspace"
-            >
-              <ArrowLeft className="h-4 w-4 text-amber-400" /> Back
-            </Button>
-            {kernelStatus === 'Busy' && (
-              <Button
-                onClick={cancelAllExecutions}
-                className="bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs h-9 rounded-xl shadow-lg shadow-rose-900/30 flex items-center gap-1.5 animate-pulse"
-                title="Cancel ongoing cell executions"
-              >
-                <Ban className="h-3.5 w-3.5" /> Cancel Execution
-              </Button>
-            )}
-            <Button
-              onClick={() => setShowHybridComputeModal(true)}
-              variant="outline"
-              className="bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 text-xs h-9 rounded-xl flex items-center gap-1.5 font-mono shadow-sm"
-              title="Configure Adaptive Execution Engine (Local WASM vs Cloud Warehouse)"
-            >
-              <Cpu className="h-3.5 w-3.5 text-emerald-400" />
-              <span className="hidden sm:inline">Engine:</span>
-              <span className="uppercase font-bold text-emerald-400">{hybridComputeEngine === "wasm" ? "WASM Edge" : hybridComputeEngine === "container" ? "Container" : "DWH Pushdown"}</span>
-            </Button>
-            <Button
-              onClick={() => setShowReactiveDAGModal(true)}
-              variant="outline"
-              className="bg-purple-500/10 border-purple-500/30 text-purple-300 hover:bg-purple-500/20 text-xs h-9 rounded-xl flex items-center gap-1.5 font-mono shadow-sm"
-              title="Inspect AST Variable Lineage and Cascade Reactive Run"
-            >
-              <Layers className="h-3.5 w-3.5 text-purple-400" />
-              <span className="hidden md:inline">Reactive DAG</span>
-            </Button>
-            <Button
-              onClick={() => setShowSemanticRAGModal(true)}
-              variant="outline"
-              className="bg-indigo-500/10 border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20 text-xs h-9 rounded-xl flex items-center gap-1.5 font-mono shadow-sm"
-              title="Organizational Query Memory & Semantic Vector RAG"
-            >
-              <Brain className="h-3.5 w-3.5 text-indigo-400" />
-              <span className="hidden xl:inline">Semantic RAG</span>
-            </Button>
-            <Button
-              onClick={() => setShowEnterpriseGovernanceModal(true)}
-              variant="outline"
-              className="bg-emerald-950/40 border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/40 text-xs h-9 rounded-xl flex items-center gap-1.5 font-mono shadow-sm"
-              title="Enterprise PII Masking, Zero-Retention, and SOC2 Audit Logs"
-            >
-              <Shield className="h-3.5 w-3.5 text-emerald-400" />
-              <span className="hidden lg:inline">Governance</span>
-            </Button>
-            <Button
-              onClick={() => setShowCRDTStudioModal(true)}
-              variant="outline"
-              className="bg-blue-500/10 border-blue-500/30 text-blue-300 hover:bg-blue-500/20 text-xs h-9 rounded-xl flex items-center gap-1.5 font-mono shadow-sm"
-              title="Real-Time Yjs CRDT Collaboration & Git-Native .vivexa.md Export"
-            >
-              <Share2 className="h-3.5 w-3.5 text-blue-400" />
-              <span className="hidden lg:inline">Collab & Git</span>
-            </Button>
-            <Button
-              onClick={() => setCopilotOpen(true)}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs h-9 rounded-xl shadow-lg shadow-indigo-900/30 border border-indigo-400/30 relative"
-            >
-              <Bot className="h-4 w-4 mr-1.5 text-indigo-300" />
-              AI Copilot
-              {activeNb.cells.some(c => c.output?.type === 'error') && (
-                <span className="ml-1.5 px-1.5 py-0.2 text-[10px] bg-rose-500 text-white rounded-full font-mono animate-pulse">
-                  {activeNb.cells.filter(c => c.output?.type === 'error').length} err
-                </span>
-              )}
-            </Button>
-            <Button onClick={runAllCells} className="bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs h-9 rounded-xl shadow-lg shadow-amber-900/20">
-              <Play className="h-3.5 w-3.5 mr-1.5" /> Run All
-            </Button>
-            <Button onClick={restartKernel} variant="outline" className="bg-slate-800/80 border-slate-700 text-slate-300 text-xs h-9 rounded-xl">
-              <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Restart Kernel
-            </Button>
-            <Button
-              onClick={() => setShowTimeTravelModal(true)}
-              variant="outline"
-              className="bg-indigo-600/10 border-indigo-500/30 text-indigo-300 hover:bg-indigo-600/20 text-xs h-9 rounded-xl flex items-center gap-1.5 font-mono"
-            >
-              <History className="h-3.5 w-3.5 text-indigo-400" /> Time-Travel WAL
-            </Button>
-            <Button
-              onClick={() => setShowMicroVMModal(true)}
-              variant="outline"
-              className="bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 text-xs h-9 rounded-xl flex items-center gap-1.5 font-mono"
-            >
-              <Cpu className="h-3.5 w-3.5 text-amber-400" /> MicroVM Fleet
-            </Button>
-            <Button onClick={clearAllOutputs} variant="ghost" className="text-slate-400 hover:text-white text-xs h-9 rounded-xl">
-              Clear Outputs
-            </Button>
-            <Button onClick={() => setShowKeyboardShortcuts(true)} variant="ghost" className="text-slate-400 hover:text-white h-9 w-9 p-0 rounded-xl" title="Shortcuts">
-              <HelpCircle className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        {/* Modular Notebook Top Bar Header & Controls */}
+        <NotebookToolbar
+          activeNb={activeNb}
+          kernelStatus={kernelStatus}
+          selectedDatasetName={selectedDataset?.name}
+          isPresentationMode={isPresentationMode}
+          setIsPresentationMode={setIsPresentationMode}
+          setShowSnippetsDrawer={setShowSnippetsDrawer}
+          setShowVariableInspectorModal={setShowVariableInspectorModal}
+          setShowCRDTCollabStudio={setShowCRDTStudioModal}
+          setCopilotOpen={setCopilotOpen}
+          runAllCells={runAllCells}
+          restartKernel={restartKernel}
+          setShowTimeTravelModal={setShowTimeTravelModal}
+          setShowMicroVMModal={setShowMicroVMModal}
+          clearAllOutputs={clearAllOutputs}
+          setShowKeyboardShortcuts={setShowKeyboardShortcuts}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          ctrlMChordActive={ctrlMChordActive}
+          notebookMode={notebookMode}
+          setNotebookMode={setNotebookMode}
+          activeFocusedCellId={activeFocusedCellId}
+          focusCellInDOM={focusCellInDOM}
+          showFindReplace={showFindReplace}
+          setShowFindReplace={setShowFindReplace}
+          handleUndo={handleUndo}
+          handleRedo={handleRedo}
+          handleAutoSave={handleAutoSave}
+          isAutosaving={isAutosaving}
+          lastAutosavedAt={lastAutosavedAt}
+          handleExport={handleExport}
+        />
 
         {/* Presentation View Mode Switcher */}
         {isPresentationMode ? (
@@ -2604,115 +2485,6 @@ export default function Notebooks() {
           <>
             {/* Search, Undo, Export, Find/Replace Toolbar */}
             <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/30 p-3 rounded-xl border border-slate-850">
-                <div className="relative flex-1 max-w-sm">
-                  <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-500" />
-                  <Input
-                    placeholder="Search code content in notebook..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="h-9 pl-9 text-xs bg-slate-950 border-slate-850 rounded-xl"
-                  />
-                </div>
-
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {/* Jupyter Mode Pill Indicator */}
-                  {ctrlMChordActive ? (
-                    <div className="px-2.5 py-1 rounded-xl text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse flex items-center gap-1.5 shadow-sm">
-                      <Sparkles className="h-3.5 w-3.5 text-amber-400" />
-                      <span>Ctrl+M Chord Active (A/B/D/M/Y/Q/C/V/X/H)</span>
-                    </div>
-                  ) : notebookMode === "command" ? (
-                    <button
-                      onClick={() => {
-                        if (activeFocusedCellId) focusCellInDOM(activeFocusedCellId, true);
-                      }}
-                      className="px-2.5 py-1 rounded-xl text-xs font-mono font-bold bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 flex items-center gap-1.5 transition-all shadow-sm"
-                      title="Click or press Enter to switch to Edit Mode in active cell"
-                    >
-                      <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
-                      <span>COMMAND MODE</span>
-                      <span className="text-[10px] font-normal text-slate-400 hidden xl:inline">[Enter: Edit, H: Cheatsheet]</span>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setNotebookMode("command")}
-                      className="px-2.5 py-1 rounded-xl text-xs font-mono font-bold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 transition-all shadow-sm"
-                      title="Click or press Esc to exit to Command Mode"
-                    >
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                      <span>EDIT MODE</span>
-                      <span className="text-[10px] font-normal text-slate-400 hidden xl:inline">[Esc: Command, Shift+Enter: Run]</span>
-                    </button>
-                  )}
-
-                  <Button
-                    onClick={() => setShowKeyboardShortcuts(true)}
-                    variant="outline"
-                    size="sm"
-                    className="h-8 px-2.5 text-xs rounded-xl flex items-center gap-1.5 font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30"
-                    title="Open Jupyter Keyboard Shortcuts Cheat Sheet (H / ?)"
-                  >
-                    <BookOpen className="h-3.5 w-3.5 text-amber-400" />
-                    <span>Shortcuts (H)</span>
-                  </Button>
-
-                  <Button
-                    onClick={() => setShowFindReplace(!showFindReplace)}
-                    variant="outline"
-                    size="sm"
-                    className={`h-8 px-2.5 text-xs rounded-xl flex items-center gap-1.5 font-semibold transition-all ${
-                      showFindReplace
-                        ? "bg-indigo-600 text-white border-indigo-500 shadow-md"
-                        : "bg-slate-950 border-slate-800 text-slate-300 hover:text-white"
-                    }`}
-                  >
-                    <Replace className="h-3.5 w-3.5 text-indigo-400" />
-                    <span>Find & Replace</span>
-                  </Button>
-
-                  <div className="h-4 w-[1px] bg-slate-800 mx-0.5"></div>
-
-                  <Button onClick={handleUndo} variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-slate-400 hover:text-white" title="Undo (Z)">
-                    <Undo2 className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button onClick={handleRedo} variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-slate-400 hover:text-white" title="Redo">
-                    <Redo2 className="h-3.5 w-3.5" />
-                  </Button>
-                  <div className="h-4 w-[1px] bg-slate-800 mx-0.5"></div>
-                  <Button onClick={() => handleAutoSave()} variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-slate-400 hover:text-white" title="Save Notebook (Ctrl+S)">
-                    <Save className="h-3.5 w-3.5" />
-                  </Button>
-
-                  {/* Autosave Status Badge */}
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/90 border border-slate-800 text-[10px] font-mono">
-                    {isAutosaving ? (
-                      <>
-                        <Loader2 className="h-3 w-3 text-amber-400 animate-spin" />
-                        <span className="text-amber-300">Autosaving...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Check className="h-3 w-3 text-emerald-400" />
-                        <span className="text-slate-300">Autosaved</span>
-                        {lastAutosavedAt && (
-                          <span className="text-slate-500 hidden sm:inline">{lastAutosavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  {/* Export Dropdown representation */}
-                  <div className="flex items-center border border-slate-800 rounded-lg p-0.5 bg-slate-950">
-                    <span className="text-[10px] text-slate-500 px-1.5 font-mono">Export:</span>
-                    <button onClick={() => handleExport("ipynb")} className="px-1.5 py-1 text-[10px] text-slate-400 hover:text-white hover:bg-slate-800 rounded font-bold">.ipynb</button>
-                    <button onClick={() => handleExport("py")} className="px-1.5 py-1 text-[10px] text-slate-400 hover:text-white hover:bg-slate-800 rounded font-bold">.py</button>
-                    <button onClick={() => handleExport("md")} className="px-1.5 py-1 text-[10px] text-slate-400 hover:text-white hover:bg-slate-800 rounded font-bold">.md</button>
-                    <button onClick={() => handleExport("html")} className="px-1.5 py-1 text-[10px] text-slate-400 hover:text-white hover:bg-slate-800 rounded font-bold">.html</button>
-                  </div>
-                </div>
-              </div>
-
               {/* Floating Find & Replace Bar */}
               {showFindReplace && (
                 <NotebookFindReplaceBar
@@ -2729,286 +2501,50 @@ export default function Notebooks() {
               )}
             </div>
 
-        {/* Notebook Cells Flow */}
-        <div className="space-y-6">
-          {filteredCells.length === 0 ? (
-            <div className="p-8 text-center bg-slate-900/20 border border-slate-850 rounded-2xl">
-              <Terminal className="h-8 w-8 text-slate-600 mx-auto mb-2" />
-              <h3 className="text-sm font-bold text-slate-300">No matching cells</h3>
-              <p className="text-xs text-slate-500">Create a cell below or clear your search queries.</p>
-            </div>
-          ) : (
-            filteredCells.map((cell, idx) => {
-              const execMeta = cellExecutionMeta[cell.id];
-              const lockingUserId = activeLocks[cell.id];
-              const lockingPeer = lockingUserId && lockingUserId !== currentUserId ? collaborators.find(c => c.id === lockingUserId) : null;
-
-              return (
-                <React.Fragment key={cell.id}>
-                  {/* Floating In-Between Add Cell Divider */}
-                  <div className="group/divider relative py-1.5 flex items-center justify-center opacity-0 hover:opacity-100 transition-all duration-200">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-slate-800/60 group-hover/divider:border-indigo-500/30 transition-colors"></div>
-                    </div>
-                    <div className="relative z-10 flex items-center gap-1.5 bg-slate-900/95 px-3 py-1 rounded-full border border-slate-800 shadow-xl text-[10px] scale-95 group-hover/divider:scale-100 transition-all backdrop-blur-md">
-                      <span className="text-slate-400 font-mono pr-0.5">+ Insert:</span>
-                      <button
-                        onClick={() => insertCellAt(idx, "python")}
-                        className="px-2 py-0.5 rounded-md bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/20 font-mono font-medium transition-all"
-                      >
-                        Code
-                      </button>
-                      <button
-                        onClick={() => insertCellAt(idx, "sql")}
-                        className="px-2 py-0.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 font-mono font-medium transition-all"
-                      >
-                        SQL
-                      </button>
-                      <button
-                        onClick={() => insertCellAt(idx, "markdown")}
-                        className="px-2 py-0.5 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 font-mono font-medium transition-all"
-                      >
-                        Markdown
-                      </button>
-                    </div>
-                  </div>
-
-                  <NotebookCellEditor
-                    cell={cell}
-                    index={idx}
-                    isActive={activeFocusedCellId === cell.id}
-                    notebookMode={notebookMode}
-                    isLockedByPeer={lockingPeer ? {
-                      name: lockingPeer.name,
-                      role: lockingPeer.role,
-                      color: lockingPeer.color,
-                      isTyping: Boolean(lockingPeer.isTyping),
-                    } : null}
-                    executionMeta={execMeta ? {
-                      durationMs: execMeta.durationMs,
-                      timestamp: execMeta.timestamp,
-                    } : undefined}
-                    runtime={cellRuntimes[cell.id] || "wasm"}
-                    onRuntimeChange={(rt) => setCellRuntimes(prev => ({ ...prev, [cell.id]: rt }))}
-                    onExecute={() => executeCell(cell.id)}
-                    onRunAndAdvance={() => runAndAdvanceCell(cell.id)}
-                    onRunInPlace={() => runInPlaceCell(cell.id)}
-                    onRunAndInsertBelow={() => runAndInsertBelow(cell.id)}
-                    onEnterCommandMode={() => {
-                      setNotebookMode("command");
-                      setActiveFocusedCellId(cell.id);
-                    }}
-                    onCancel={() => cancelCellExecution(cell.id)}
-                    onRunAbove={() => runCellsAbove(cell.id)}
-                    onRunBelow={() => runCellsBelow(cell.id)}
-                    onUpdateCode={(code) => {
-                      updateCellCode(cell.id, code);
-                      setTyping(true);
-                    }}
-                    onUpdateType={(type) => updateCellType(cell.id, type)}
-                    onDuplicate={() => duplicateCell(cell.id)}
-                    onDelete={() => deleteCell(cell.id)}
-                    onMoveUp={() => moveCell(cell.id, "up")}
-                    onMoveDown={() => moveCell(cell.id, "down")}
-                    onTriggerCopilot={() => {
-                      setTargetCellId(cell.id);
-                      setCopilotOpen(true);
-                    }}
-                    onQuickAiAction={(action) => handleQuickAiAction(cell.id, action)}
-                    onFocus={() => {
-                      setActiveFocusedCellId(cell.id);
-                      setNotebookMode("edit");
-                      focusCell(cell.id);
-                      setTyping(true);
-                    }}
-                    onBlur={() => {
-                      focusCell(null);
-                      setTyping(false);
-                    }}
-                  >
-                    {/* Quick Snippets Inserter Strip for Code Cells */}
-                    {cell.type !== 'markdown' && (
-                      <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pt-0.5 pb-1 text-[10px] opacity-70 hover:opacity-100 transition-opacity">
-                        <span className="text-slate-500 font-mono shrink-0 select-none">Snippets:</span>
-                        {CODE_SNIPPETS.filter(s => s.type === cell.type).map((s, i) => (
-                          <button
-                            key={i}
-                            onClick={() => injectSnippet(cell.id, s.code)}
-                            className="px-2 py-0.5 rounded-md bg-slate-950/80 border border-slate-800/80 text-slate-300 hover:text-amber-300 hover:border-amber-500/40 hover:bg-slate-900 shrink-0 font-mono transition-all"
-                          >
-                            + {s.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Cell Output Display Panel */}
-                    {cell.isExecuting ? (
-                      <div className="bg-slate-950/90 p-3.5 rounded-xl border border-slate-800 flex items-center justify-between gap-2 text-xs text-slate-300 font-mono shadow-inner">
-                        <div className="flex items-center gap-2.5">
-                          <RefreshCw className="h-3.5 w-3.5 animate-spin text-amber-400" />
-                          <span className="text-slate-400">Kernel executing cell logic...</span>
-                        </div>
-                        <Button
-                          onClick={() => cancelCellExecution(cell.id)}
-                          size="sm"
-                          variant="outline"
-                          className="bg-rose-500/10 border-rose-500/30 text-rose-300 hover:bg-rose-500/20 text-xs h-6 px-2.5 rounded-lg flex items-center gap-1 font-sans transition-all"
-                        >
-                          <Ban className="h-3 w-3" /> Cancel Execution
-                        </Button>
-                      </div>
-                    ) : cell.output && cell.type !== 'markdown' ? (
-                      <div className="bg-slate-950/90 rounded-xl border border-slate-800/90 overflow-hidden text-xs font-mono shadow-inner">
-                        <div className="bg-slate-900/60 px-3 py-1.5 border-b border-slate-800/80 flex items-center justify-between">
-                          <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Output
-                          </span>
-                          <Button onClick={() => clearOutput(cell.id)} variant="ghost" size="sm" className="h-5 text-[10px] text-slate-400 hover:text-slate-200 px-1.5 py-0.5 rounded">Clear Output</Button>
-                        </div>
-
-                        <div className="p-3.5 overflow-x-auto">
-                          {/* Text / stdout Output */}
-                          {cell.output.type === "text" && (
-                            <div className="space-y-2">
-                              <pre className="whitespace-pre-wrap leading-relaxed text-slate-300 text-xs font-mono select-text">{cell.output.text}</pre>
-                              <div className="flex justify-end pt-1">
-                                <Button
-                                  onClick={() => copyToClipboard(cell.output?.text || '', "Copied text output to clipboard!")}
-                                  variant="ghost" size="sm" className="h-6 text-[10px] text-slate-400 hover:text-white p-1 flex items-center gap-1"
-                                >
-                                  <Copy className="h-3 w-3" /> Copy Output
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Error Diagnostic Output Panel */}
-                          {cell.output.type === "error" && (
-                            <div className="bg-red-500/5 border border-red-500/20 rounded-lg p-4 space-y-3 font-sans text-slate-300">
-                              <div className="flex items-start gap-2.5">
-                                <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
-                                <div className="space-y-1 flex-1">
-                                  <h4 className="text-sm font-bold text-red-400">
-                                    {cell.output.error?.error_class || "ExecutionException"}: {cell.output.error?.message}
-                                  </h4>
-                                  {cell.output.error?.line_number && (
-                                    <div className="text-xs text-red-500 font-mono">Line: {cell.output.error.line_number}</div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {cell.output.error?.suggested_fix && (
-                                <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800 text-xs space-y-1">
-                                  <div className="font-semibold text-slate-400 flex items-center gap-1">
-                                    <Info className="h-3 w-3 text-emerald-400" /> Expected Fix
-                                  </div>
-                                  <div className="text-slate-300 leading-relaxed">{cell.output.error.suggested_fix}</div>
-                                </div>
-                              )}
-
-                              {cell.output.error?.traceback && (
-                                <details className="mt-2">
-                                  <summary className="text-[10px] text-slate-500 hover:text-slate-400 cursor-pointer select-none font-mono">View Stacktrace Trace</summary>
-                                  <pre className="mt-2 bg-slate-950 p-2.5 rounded border border-slate-850 text-[10px] font-mono text-red-400 overflow-x-auto max-h-48 whitespace-pre-wrap">
-                                    {cell.output.error.traceback}
-                                  </pre>
-                                </details>
-                              )}
-
-                              <div className="flex gap-2 justify-end pt-1 flex-wrap">
-                                <Button
-                                  onClick={() => copyToClipboard(cell.output?.error?.traceback || cell.output?.error?.message || "", "Copied error stacktrace to clipboard!")}
-                                  size="sm"
-                                  variant="outline"
-                                  className="border-slate-800 text-slate-300 hover:bg-slate-800 text-xs rounded-xl"
-                                >
-                                  <Copy className="h-3.5 w-3.5 mr-1" /> Copy Error
-                                </Button>
-                                <Button
-                                  onClick={() => {
-                                    setCodeDoctorTargetCell({
-                                      id: cell.id,
-                                      code: cell.code,
-                                      error: cell.output?.error?.traceback || cell.output?.error?.message || "ExecutionException"
-                                    });
-                                    setShowCodeDoctorDrawer(true);
-                                  }}
-                                  size="sm"
-                                  className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow-md"
-                                >
-                                  <Sparkles className="h-3.5 w-3.5 mr-1.5 text-rose-200" /> Self-Healing Doctor
-                                </Button>
-                                <Button
-                                  onClick={() => { setTargetCellId(cell.id); setCopilotOpen(true); }}
-                                  size="sm"
-                                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-md"
-                                >
-                                  <Bot className="h-3.5 w-3.5 mr-1.5 text-indigo-200" /> Copilot Prompt
-                                </Button>
-                                <Button
-                                  onClick={() => handleAiAutoFix(cell.id, cell.output?.error?.message || "unknown")}
-                                  size="sm"
-                                  className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl"
-                                >
-                                  <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Instant Auto-Fix
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Interactive Table Grid Output */}
-                          {cell.output.type === "table" && cell.output.data && cell.output.data.length > 0 && (
-                            <InteractiveTableOutput data={cell.output.data} />
-                          )}
-
-                          {/* Dynamic Plotting Matplotlib / Seaborn Charts Output */}
-                          {cell.output.type === "chart" && cell.output.images && cell.output.images.length > 0 && (
-                            <div className="space-y-4 pt-1">
-                              {cell.output.images.map((imgB64, i) => (
-                                <div key={i} className="rounded-xl border border-slate-800 overflow-hidden bg-white p-3 max-w-xl mx-auto flex flex-col items-center shadow-lg relative group">
-                                  <img loading="lazy"
-                                    src={`data:image/png;base64,${imgB64}`}
-                                    referrerPolicy="no-referrer"
-                                    alt={`Captured Notebook Plot ${i + 1}`}
-                                    className="w-full h-auto object-contain"
-                                  />
-                                  <a
-                                    href={`data:image/png;base64,${imgB64}`}
-                                    download={`plot_${i + 1}.png`}
-                                    className="absolute bottom-2 right-2 bg-slate-900/80 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-xs flex items-center gap-1"
-                                  >
-                                    <Download className="h-3 w-3" /> Save Image
-                                  </a>
-                                </div>
-                              ))}
-                              {cell.output.text && (
-                                <pre className="whitespace-pre-wrap leading-relaxed text-slate-400 text-xs font-mono border-t border-slate-850 pt-3 mt-2">{cell.output.text}</pre>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
-                  </NotebookCellEditor>
-                </React.Fragment>
-              );
-            })
-          )}
-        </div>
-
-        {/* Dynamic Insert cell buttons block */}
-        <div className="flex items-center justify-center gap-3 pt-6 border-t border-slate-800">
-          <Button onClick={() => addCell("python")} variant="outline" className="bg-blue-500/10 border-blue-500/30 text-blue-300 hover:bg-blue-500/20 text-xs rounded-xl h-10">
-            <Plus className="h-4 w-4 mr-2" /> + Python Cell
-          </Button>
-          <Button onClick={() => addCell("sql")} variant="outline" className="bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 text-xs rounded-xl h-10">
-            <Plus className="h-4 w-4 mr-2" /> + SQL Cell
-          </Button>
-          <Button onClick={() => addCell("markdown")} variant="outline" className="bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 text-xs rounded-xl h-10">
-            <Plus className="h-4 w-4 mr-2" /> + Markdown Cell
-          </Button>
-        </div>
+        {/* Modular Notebook Cells Flow */}
+        <NotebookCellList
+          filteredCells={filteredCells}
+          notebookMode={notebookMode}
+          activeFocusedCellId={activeFocusedCellId}
+          cellExecutionMeta={cellExecutionMeta}
+          activeLocks={activeLocks}
+          collaborators={collaborators}
+          currentUserId={currentUserId}
+          cellRuntimes={cellRuntimes}
+          setCellRuntimes={setCellRuntimes}
+          insertCellAt={insertCellAt}
+          executeCell={executeCell}
+          runAndAdvanceCell={runAndAdvanceCell}
+          runInPlaceCell={runInPlaceCell}
+          runAndInsertBelow={runAndInsertBelow}
+          setNotebookMode={setNotebookMode}
+          setActiveFocusedCellId={setActiveFocusedCellId}
+          cancelCellExecution={cancelCellExecution}
+          runCellsAbove={runCellsAbove}
+          runCellsBelow={runCellsBelow}
+          updateCellCode={updateCellCode}
+          updateCellType={updateCellType}
+          duplicateCell={duplicateCell}
+          deleteCell={deleteCell}
+          moveCell={moveCell}
+          setTargetCellId={setTargetCellId}
+          setCopilotOpen={setCopilotOpen}
+          handleQuickAiAction={handleQuickAiAction}
+          focusCell={focusCell}
+          setTyping={setTyping}
+          clearOutput={clearOutput}
+          codeSnippets={CODE_SNIPPETS}
+          injectSnippet={injectSnippet}
+          addCell={addCell}
+          onFixWithCopilot={(cellId, errorText) => {
+            setCodeDoctorTargetCell({
+              id: cellId,
+              code: activeNb.cells.find((c) => c.id === cellId)?.code || "",
+              error: errorText || "ExecutionException",
+            });
+            setShowCodeDoctorDrawer(true);
+          }}
+        />
       </>
     )}
   </div>

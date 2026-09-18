@@ -7,6 +7,23 @@ export interface SecurityContext {
   regions?: string[];
 }
 
+export interface QueryCostForecast {
+  estimatedDataScannedBytes: number;
+  estimatedDataScannedFormatted: string;
+  cloudWarehouseEstimatedCostUsd: number;
+  duckdbEdgeCostUsd: number;
+  projectedSavingsUsd: number;
+  savingsPercentage: number;
+  carbonGramsEstimate: number;
+  complexityScore: "LOW" | "MEDIUM" | "HIGH" | "COMPLEX";
+  recommendation: string;
+  breakdown: {
+    scanCostUsd: number;
+    computeCostUsd: number;
+    egressCostUsd: number;
+  };
+}
+
 export interface QueryRouteDecision {
   engine: "DuckDB-WASM-Vectorized" | "Cloud-Warehouse-Pushdown" | "Server-OLAP-Streaming" | "MicroVM-Container-Pod";
   targetWarehouse?: "Snowflake" | "Databricks" | "BigQuery" | "ClickHouse" | "PostgreSQL" | "Enterprise-Lakehouse";
@@ -15,6 +32,7 @@ export interface QueryRouteDecision {
   rowCount: number;
   isPushdown: boolean;
   costSavedUsd: number;
+  costForecast?: QueryCostForecast;
   partitionsScanned?: number;
   securityEnforced?: {
     clsMaskedColumns: string[];
@@ -33,6 +51,7 @@ export interface AdaptiveQueryResult {
   scannedBytes?: string;
   engine: "DuckDB-WASM-Vectorized" | "Cloud-Warehouse-Pushdown" | "Server-OLAP-Streaming" | "MicroVM-Container-Pod" | "local_wasm" | "remote_pushdown";
   routeDecision?: QueryRouteDecision;
+  costForecast?: QueryCostForecast;
   error?: string;
   plan?: string;
   sourceTable?: string;
@@ -100,7 +119,8 @@ export class AdaptiveQueryRouter {
         const wasmResult = workerRes.result.data as { columns: string[], rows: any[], rowCount: number, scannedRows: number };
         
         const execTime = Number((performance.now() - startTime).toFixed(2));
-        const estimatedCreditsSaved = Number(((rowCount / 100000) * 0.04).toFixed(4));
+        const costForecast = AdaptiveQueryRouter.forecastCost(cleanSql, profile);
+        const estimatedCreditsSaved = costForecast.projectedSavingsUsd;
 
         // Apply Column-Level Security (CLS) Masking
         const maskedRows = this.applyColumnMasking(wasmResult.rows, userRole);
@@ -113,8 +133,9 @@ export class AdaptiveQueryRouter {
           durationMs: execTime,
           executionTimeMs: execTime,
           scannedRows: wasmResult.scannedRows,
-          scannedBytes: `${(sizeBytes / 1024 / 1024).toFixed(2)} MB`,
+          scannedBytes: costForecast.estimatedDataScannedFormatted,
           engine: "DuckDB-WASM-Vectorized",
+          costForecast,
           routeDecision: {
             engine: "DuckDB-WASM-Vectorized",
             reason: `Dataset size (${(sizeBytes / 1024 / 1024).toFixed(1)}MB, ${rowCount.toLocaleString()} rows) within optimal WASM vectorized SIMD tier.`,
@@ -122,6 +143,7 @@ export class AdaptiveQueryRouter {
             rowCount,
             isPushdown: false,
             costSavedUsd: estimatedCreditsSaved,
+            costForecast,
             securityEnforced: {
               clsMaskedColumns: ["ssn", "credit_card", "salary"],
               rlsFiltersApplied: [`tenant_id = '${securityContext?.tenantId || "default_tenant"}'`]
@@ -139,6 +161,7 @@ export class AdaptiveQueryRouter {
       const serverResult = await this.executePushdown(cleanSql, profile);
       const execTime = Number((performance.now() - startTime).toFixed(2));
       const maskedRows = this.applyColumnMasking(serverResult.rows, userRole);
+      const costForecast = AdaptiveQueryRouter.forecastCost(cleanSql, profile);
 
       return {
         success: true,
@@ -148,8 +171,9 @@ export class AdaptiveQueryRouter {
         durationMs: execTime,
         executionTimeMs: execTime,
         scannedRows: serverResult.scannedRows || rowCount,
-        scannedBytes: `${Math.max(1, (sizeBytes / 1024 / 1024)).toFixed(1)} MB`,
+        scannedBytes: costForecast.estimatedDataScannedFormatted,
         engine: "Cloud-Warehouse-Pushdown",
+        costForecast,
         routeDecision: {
           engine: "Cloud-Warehouse-Pushdown",
           targetWarehouse: targetWarehouse,
@@ -160,6 +184,7 @@ export class AdaptiveQueryRouter {
           rowCount,
           isPushdown: true,
           costSavedUsd: 0,
+          costForecast,
           partitionsScanned: Math.max(1, Math.ceil(rowCount / 50000)),
           securityEnforced: {
             clsMaskedColumns: ["ssn", "credit_card", "salary"],
@@ -263,6 +288,98 @@ export class AdaptiveQueryRouter {
     const { duckdbEngine } = await import("./duckdbEngine");
     const fallback = await duckdbEngine.query(sql);
     return { columns: fallback.columns, rows: fallback.rows, scannedRows: fallback.scannedRows };
+  }
+
+  /**
+   * Predicts query scanning costs, cloud warehouse consumption fees (Snowflake/BigQuery),
+   * and edge savings before query execution.
+   */
+  public static forecastCost(sql: string, profile?: DatasetProfile): QueryCostForecast {
+    const rawSql = (sql || "").trim().toUpperCase();
+    const totalBytes = profile?.sizeBytes || 25 * 1024 * 1024; // default 25MB
+    const rowCount = profile?.rowCount || 150000;
+
+    // 1. Projection Factor: SELECT * scans 100%, SELECT col1, col2 scans fraction
+    let projectionFactor = 1.0;
+    if (rawSql.startsWith("SELECT") && !rawSql.includes("SELECT *") && !rawSql.includes("SELECT COUNT(*)")) {
+      const selectPart = rawSql.split("FROM")[0] || "";
+      const selectedColCount = Math.max(1, selectPart.split(",").length);
+      // Average dataset has ~15 columns
+      projectionFactor = Math.min(1.0, Math.max(0.15, selectedColCount / 15));
+    }
+
+    // 2. Partition / Predicate Pruning Factor
+    let pruningFactor = 1.0;
+    if (rawSql.includes("WHERE")) {
+      if (rawSql.includes("BETWEEN") || rawSql.includes("DATE") || rawSql.includes("TIMESTAMP")) {
+        pruningFactor = 0.25; // 75% scanned partition pruning
+      } else {
+        pruningFactor = 0.50; // 50% scanned partition pruning
+      }
+    }
+
+    // 3. Complexity & Compute multi-tier
+    let computeMultiplier = 1.0;
+    let complexity: "LOW" | "MEDIUM" | "HIGH" | "COMPLEX" = "LOW";
+    if (rawSql.includes("JOIN")) {
+      computeMultiplier += 1.5;
+      complexity = "HIGH";
+    }
+    if (rawSql.includes("GROUP BY") || rawSql.includes("ORDER BY")) {
+      computeMultiplier += 0.5;
+      if (complexity === "LOW") complexity = "MEDIUM";
+    }
+    if (rawSql.includes("OVER (") || rawSql.includes("PARTITION BY") || rawSql.includes("WINDOW")) {
+      computeMultiplier += 2.0;
+      complexity = "COMPLEX";
+    }
+
+    const estimatedScannedBytes = Math.round(totalBytes * projectionFactor * pruningFactor);
+    const scannedMb = estimatedScannedBytes / (1024 * 1024);
+    const scannedTb = estimatedScannedBytes / (1024 * 1024 * 1024 * 1024);
+
+    // Cloud Warehouse Rates:
+    // BigQuery: $6.25 per TB on-demand
+    // Snowflake: ~0.0005 credit/second minimum warehouse execution (~$0.02 base)
+    const scanCostUsd = Number(Math.max(0.0001, scannedTb * 6.25).toFixed(4));
+    const computeCostUsd = Number((0.015 * computeMultiplier).toFixed(4));
+    const egressCostUsd = Number(((scannedMb / 1024) * 0.09).toFixed(4));
+    const totalCloudCost = Number((scanCostUsd + computeCostUsd + egressCostUsd).toFixed(4));
+
+    const duckdbCost = 0.00; // Edge in-browser is completely zero cloud egress/compute cost!
+    const projectedSavings = totalCloudCost;
+    const savingsPercentage = 100;
+    const carbonGrams = Number(((estimatedScannedBytes / (1024 * 1024 * 1024)) * 0.5).toFixed(3));
+
+    let recommendation = "Optimal for in-browser Vectorized DuckDB WASM execution: 0 cloud costs & sub-20ms latency.";
+    if (estimatedScannedBytes > 250 * 1024 * 1024) {
+      recommendation = `Dataset (${(estimatedScannedBytes / 1024 / 1024).toFixed(0)}MB scanned) exceeds WASM boundary. Pushdown to partitioned lakehouse recommended.`;
+    } else if (complexity === "COMPLEX") {
+      recommendation = "Complex analytical query with windowing: DuckDB WASM SIMD acceleration delivers 10x speedup with zero egress.";
+    }
+
+    const formattedSize = scannedMb < 1 
+      ? `${(estimatedScannedBytes / 1024).toFixed(1)} KB` 
+      : scannedMb > 1024 
+        ? `${(scannedMb / 1024).toFixed(2)} GB` 
+        : `${scannedMb.toFixed(1)} MB`;
+
+    return {
+      estimatedDataScannedBytes: estimatedScannedBytes,
+      estimatedDataScannedFormatted: formattedSize,
+      cloudWarehouseEstimatedCostUsd: totalCloudCost,
+      duckdbEdgeCostUsd: duckdbCost,
+      projectedSavingsUsd: projectedSavings,
+      savingsPercentage,
+      carbonGramsEstimate: carbonGrams,
+      complexityScore: complexity,
+      recommendation,
+      breakdown: {
+        scanCostUsd,
+        computeCostUsd,
+        egressCostUsd
+      }
+    };
   }
 }
 

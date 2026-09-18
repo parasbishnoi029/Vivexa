@@ -24,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import DataCleaningStudio from "@/components/workspace/DataCleaningStudio";
 import { VisualDimensionRelationshipBuilder } from "@/components/workspace/VisualDimensionRelationshipBuilder";
 import { EmbeddedDuckDBWorkbench } from "@/components/workspace/EmbeddedDuckDBWorkbench";
+import { WedgeOnboardingModal } from "@/components/workspace/WedgeOnboardingModal";
 import { Boxes, Zap } from "lucide-react";
 
 // Dynamic metadata extractor to safely compute or default all 31 enterprise-grade fields
@@ -115,6 +116,7 @@ const itemVariants = {
 export default function Datasets() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isWedgeOpen, setIsWedgeOpen] = useState(false);
   const [uploadState, setUploadState] = useState<'idle' | 'uploading' | 'validating' | 'cleaning' | 'profiling' | 'complete'>('idle');
   const [progress, setProgress] = useState(0);
   const [activeSpecsDataset, setActiveSpecsDataset] = useState<any | null>(null);
@@ -601,6 +603,13 @@ export default function Datasets() {
           >
             <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
             Sync Warehouse
+          </Button>
+          <Button 
+            onClick={() => setIsWedgeOpen(true)}
+            className="group relative overflow-hidden bg-emerald-600 hover:bg-emerald-500 text-white border-0 shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] h-9 text-xs font-semibold gap-1.5"
+          >
+            <Zap className="h-3.5 w-3.5" />
+            Instant Wedge (CSV/Parquet)
           </Button>
           <Button 
             onClick={() => setIsUploadOpen(true)}
@@ -1411,6 +1420,10 @@ export default function Datasets() {
         onClose={() => setIsShareDialogOpen(false)}
         title={shareTitle}
         shareUrl={shareUrl}
+      />
+      <WedgeOnboardingModal
+        isOpen={isWedgeOpen}
+        onClose={() => setIsWedgeOpen(false)}
       />
     </motion.div>
   );

@@ -34,30 +34,11 @@ import {
   globalApiRateLimiter 
 } from "./server/middleware/rateLimiter";
 
-// --- ENTERPRISE IN-MEMORY DATABASE ---
-// In a true deployed cluster, this would be a real distributed Lakehouse (e.g. DuckDB/Databricks).
-// Here we use SQLite to prove Server-Side execution and AST validation.
-
-// --- ENTERPRISE IN-MEMORY DATABASE (MOCK) ---
-// In-memory lightweight SQL engine for sandbox execution
-const enterpriseDB = {
-  tables: {},
-  run: function(query: string, params?: any, cb?: any) {
-    if (typeof params === 'function') cb = params;
-    if (cb) cb(null);
-  },
-  all: function(query: string, params?: any, cb?: any) {
-    if (typeof params === 'function') cb = params;
-    // Synthesized telemetry rows
-    const mockRows = Array.from({ length: 5 }).map((_, i) => ({
-      id: i + 1,
-      tenant_id: 'demo_tenant',
-      name: 'Simulated Record ' + (i+1),
-      value: Math.floor(Math.random() * 1000)
-    }));
-    if (cb) cb(null, mockRows);
-  }
-};
+// --- APACHE ARROW FLIGHT SQL & VECTORIZED LAKEHOUSE ENGINE ---
+// Replaces simulated database mocks with real Apache Arrow in-memory columnar processing,
+// zero-copy IPC streams, and AST-validated SQL sandbox execution.
+import { arrowFlightEngine } from "./server/services/arrowFlightEngine";
+const enterpriseDB = arrowFlightEngine;
 
 const sqlParser = new SqlParser();
 

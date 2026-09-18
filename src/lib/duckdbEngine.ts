@@ -6,8 +6,9 @@ export interface DuckDBQueryResult {
   rowCount: number;
   executionTimeMs: number;
   scannedRows: number;
-  engine: "DuckDB-WASM-Vectorized" | "Embedded-SQL-WASM";
+  engine: "DuckDB-WASM-Vectorized" | "Embedded-SQL-WASM" | "Server-Sandboxed-Container-Worker" | "Apache-Arrow-Flight-SQL";
   plan?: string;
+  cspFallbackActive?: boolean;
 }
 
 export interface DuckDBTableInfo {
@@ -306,7 +307,34 @@ class DuckDBEngineService {
         };
       }
     } catch (duckdbErr: any) {
-      console.warn("DuckDB WASM execution exception, trying fallback parser:", duckdbErr);
+      console.warn("DuckDB WASM execution exception, trying server container failover:", duckdbErr);
+    }
+
+    // 2. Automated Server-Side Container Worker Fallback (for locked enterprise environments)
+    try {
+      const response = await fetch("/api/v1/enterprise-compute/sql/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sql: cleanSql })
+      });
+
+      if (response.ok) {
+        const serverData = await response.json();
+        if (serverData.success && Array.isArray(serverData.data)) {
+          const executionTimeMs = Number((performance.now() - startTime).toFixed(2));
+          return {
+            columns: serverData.columns || Object.keys(serverData.data[0] || { result: "" }),
+            rows: serverData.data,
+            rowCount: serverData.data.length,
+            executionTimeMs,
+            scannedRows: serverData.data.length,
+            engine: (serverData.engine as any) || "Server-Sandboxed-Container-Worker",
+            cspFallbackActive: true
+          };
+        }
+      }
+    } catch (serverErr) {
+      console.warn("Server container fallback also unavailable, using local embedded query engine:", serverErr);
     }
 
     // High-performance client-side fallback query engine
